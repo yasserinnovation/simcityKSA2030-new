@@ -27,6 +27,17 @@
   G.nextMission = () => VM.MISSIONS.find(m => G.unlocked(m.id) && !(G.profile.missions[m.id] || {}).medal) || VM.MISSIONS.filter(m => G.unlocked(m.id)).pop();
   const MEDAL_VAL = {bronze:1, silver:2, gold:3};
   G.MEDAL_VAL = MEDAL_VAL;
+  // One-line summary of a saved mission record (best score, last attempt, stars banked vs only met) for mission selection.
+  G.recordLine = pr => {
+    if (!pr || !pr.attempts) return '';
+    const parts = [];
+    if (pr.bestScore != null) parts.push(G.t('bestScoreLbl', {b:pr.bestScore}));
+    if (pr.last) { const k = (pr.last.stars || []).filter(Boolean).length;
+      parts.push(G.t('lastAttemptLbl', {r:pr.last.medal ? G.t(pr.last.medal) : '✗', g:pr.last.goal != null ? `${pr.last.goal}/${pr.last.target}` : '—'}));
+      if (k && !pr.last.medal) parts.push(G.t('metNotBanked', {k})); }
+    else parts.push(G.t('attemptsLbl', {a:pr.attempts}));
+    return parts.join(' · ');
+  };
 
   /* ============================ LANGUAGE ============================= */
   G.lang = () => G.profile.lang || 'en';
@@ -193,7 +204,7 @@
     return {daily:mk(key, 1), weekly:mk(wk, 2)};
   };
   G.showMenu = () => {
-    VM.setBoard('riyadh'); G.hideAll(); $('#menu').classList.remove('hidden'); W.setBeacons(false); W.setProjectLabels(false); W.setHazard(null); W.setEntities([]); W.setDynamicLabels([]); W.onGroundClick(null);
+    VM.setBoard('riyadh'); G.hideAll(); $('#play').classList.remove('hidden'); $('#menu').classList.remove('hidden'); G.renderNav('home'); W.setBeacons(false); W.setProjectLabels(false); W.setHazard(null); W.setEntities([]); W.setDynamicLabels([]); W.onGroundClick(null);
     G.showScene(null); W.setOverlay(G.flows(null));
     const nm = G.nextMission(), run = G.loadRun(), di = G.dailyInfo(), best = G.profile.missions[nm.id] || {};
     $('#profileChip').innerHTML = G.profileChip();
@@ -205,7 +216,7 @@
       <p class="menu-tag">${esc(G.t('tagline'))}</p>
       <div class="next-card">
         <div class="nc-num">${nm.n}</div>
-        <div class="nc-body"><small>${esc(G.t('mission'))} ${nm.n} · ${esc(G.t(nm.date))}</small><b>${esc(G.t(nm.title))}</b><p>${esc(G.t(nm.objective))}</p></div>
+        <div class="nc-body"><small>${esc(G.t('mission'))} ${nm.n} · ${esc(G.t(nm.date))}</small><b>${esc(G.t(nm.title))}</b><p>${esc(G.t(nm.objective))}</p>${G.recordLine(best) ? `<small class="mc-rec">${esc(G.recordLine(best))}</small>` : ''}</div>
         ${best.medal ? `<span class="medal-dot ${best.medal}" title="${esc(G.t(best.medal))}"></span>` : ''}
       </div>
       <button class="primary big" id="playBtn">${esc(G.t('play'))} ${G.lang() === 'ar' ? '◂' : '▸'}</button>
@@ -231,16 +242,74 @@
     clearInterval(G.menuCycle); if (!G.profile.reduced) { let ph = 0; G.menuCycle = setInterval(() => { if ($('#menu').classList.contains('hidden')) { clearInterval(G.menuCycle); W.setNight(0); return; } ph += .05; W.setNight(Math.max(0, Math.sin(ph) * .62)); }, 1000); }
     setTimeout(() => $('#playBtn') && $('#playBtn').focus(), 50);
   };
+  // National Simulation: return to the session in memory, else restore the autosaved mandate, else show the setup screen.
   G.openNational = () => {
     G.hideAll(); $('#play').classList.add('hidden'); W.setMissionScene({links:[], sites:[]}); W.setMissionLights([]); W.setOverlay([]); W.setNight(0); W.setBeacons(true); W.setProjectLabels(true);
-    $('#intro').classList.remove('hidden', 'exit');
+    const N = window.VisionNational;
+    if (N && N.hasSession && N.resume()) return;
+    G.openNationalSetup();
+  };
+  G.openNationalSetup = () => {
+    G.hideAll(); $('#play').classList.add('hidden'); W.setBeacons(true); W.setProjectLabels(true);
+    $('#intro').classList.remove('hidden', 'exit'); G.renderNav('national');
+    const sv = window.VisionNational && VisionNational.savedInfo(), lb = $('#loadBtn');   // a saved mandate is the default way in
+    if (sv) { lb.classList.remove('hidden', 'secondary'); lb.classList.add('primary'); lb.textContent = `Continue saved mandate · ${sv.label}`; $('#beginBtn').classList.replace('primary', 'secondary'); $('#beginBtn').textContent = 'Start a new mandate'; }
+    else { $('#beginBtn').classList.replace('secondary', 'primary'); $('#beginBtn').textContent = 'Enter the Kingdom'; }
+  };
+
+  /* ============================ MODE SWITCHER ========================= */
+  // One bar, visible in every mode, to move between the Kingdom (home), Campaign Missions, City Builder and the National
+  // Simulation without reloading. Every mode saves automatically before you leave it, so switching never discards progress.
+  G.mode = 'home';
+  const MODES = [['home','🗺','navKingdom'], ['missions','🎯','navMissions'], ['city','🏗','navCity'], ['national','🧭','navNational']];
+  function saveStatus(mode){
+    if (mode === 'missions') { const S = VM.state; if (S && !S.done && !$('#mhud').classList.contains('hidden')) return G.t('savedMission', {m:G.t(VM.mission(S.mission).title), n:Math.min(S.turn, S.maxTurns)});
+      if (S && S.done && !$('#mhud').classList.contains('hidden')) return G.t('savedResults'); }
+    if (mode === 'city') { const c = G.cityStatus && G.cityStatus(); return c ? G.t('savedCity', {d:c.date}) : G.t('savedAuto'); }
+    if (mode === 'national') { const N = window.VisionNational, st = N && N.active ? N.status() : null; return st ? G.t('savedNational', {d:st.date}) : N && N.savedInfo() ? G.t('savedNationalSlot', {d:N.savedInfo().label}) : G.t('nationalNone'); }
+    const r = G.loadRun(); let run = null; try { run = r && r.s ? JSON.parse(r.s) : null; } catch(e) {}
+    return run && !run.done ? G.t('savedHomeRun', {m:G.t(VM.mission(run.mission).title), n:run.turn}) : G.t('savedAuto');
+  }
+  G.renderNav = mode => {
+    if (mode) G.mode = mode;
+    const nav = $('#modeNav'); if (!nav) return;
+    nav.className = 'mode-nav glass mode-' + G.mode + (G.mode === 'national' && !$('#hud').classList.contains('hidden') ? ' in-hud' : '') + (G.mode === 'city' ? ' in-city' : '');
+    nav.innerHTML = `<div class="mn-row" role="tablist">${MODES.map(([id, ic, k]) => `<button role="tab" data-go="${id}" class="${G.mode === id ? 'on' : ''}" aria-selected="${G.mode === id}">${ic} ${esc(G.t(k))}</button>`).join('')}</div>
+      <small class="mn-save" title="${esc(G.t('savePolicy'))}">💾 ${esc(saveStatus(G.mode))}</small>`;
+    $$('#modeNav [data-go]').forEach(b => b.onclick = () => G.go(b.dataset.go));
+  };
+  // Leave whatever is on screen, saving it first. `next` runs once the current mode has been put away.
+  G.leaveMode = next => {
+    $$('.sheet:not(.hidden), #pauseMenu, #report, #decision, #causePop').forEach(e => e.classList.add('hidden'));
+    if ($('#confirmBox')) $('#confirmBox').remove();
+    if (!$('#mhud').classList.contains('hidden')) { G.saveRun(); W.onGroundClick(null); W.setHazard(null); }
+    const N = window.VisionNational; if (N) N.leave();
+    $('#play').classList.remove('hidden');
+    if (G.cityActive && G.cityActive()) { G.closeCity(next); return; }
+    next();
+  };
+  G.go = mode => {
+    if (G.mode === mode && mode !== 'home' && mode !== 'missions') return;
+    G.sfx && G.sfx('click');
+    const open = {home:() => G.showMenu(), missions:() => G.openMissions(), city:() => G.openCity(false), national:() => G.openNational()}[mode];
+    G.leaveMode(open);
+  };
+  G.openMissions = () => { const r = G.loadRun(); let s = null; try { s = r && r.s ? JSON.parse(r.s) : null; } catch(e) {} if (s && !s.done) G.resumeRun(); else G.showChapter(); };
+  // In-page confirmation (no browser dialog): used before anything that would replace unfinished progress.
+  G.confirmBox = (msg, yes, no, onYes, onNo) => {
+    if ($('#confirmBox')) $('#confirmBox').remove();
+    const d = document.createElement('div'); d.id = 'confirmBox'; d.className = 'confirm-box glass'; d.setAttribute('role', 'alertdialog');
+    d.innerHTML = `<p>${esc(msg)}</p><div class="row-btns"><button class="secondary" id="cbNo">${esc(no)}</button><button class="primary" id="cbYes">${esc(yes)}</button></div>`;
+    document.body.appendChild(d);
+    $('#cbYes').onclick = () => { d.remove(); onYes(); }; $('#cbNo').onclick = () => { d.remove(); onNo && onNo(); };
+    setTimeout(() => $('#cbNo') && $('#cbNo').focus(), 30);
   };
 
   /* ============================= CHAPTER ============================= */
   G.chapterSel = 'riyadh';
   G.showChapter = (chId) => {
     if (typeof chId === 'string') G.chapterSel = chId;
-    G.hideAll(); $('#chapter').classList.remove('hidden');
+    G.hideAll(); $('#play').classList.remove('hidden'); $('#chapter').classList.remove('hidden'); G.renderNav('missions');
     const di = G.dailyInfo(), chap = VM.CHAPTERS.find(c => c.id === G.chapterSel) || VM.CHAPTERS[0];
     $('#chapter').innerHTML = `<div class="sheet-head"><b>${esc(G.t('chapterMap'))}</b><button class="icon-btn" id="chClose" aria-label="${esc(G.t('close'))}">✕</button></div>
       <div class="ch-tabs">${VM.CHAPTERS.map(c => { const open = c.status === 'play' && G.chapterUnlocked(c);
@@ -248,8 +317,8 @@
       <p class="hint">${esc(G.t('legacyNote'))}</p>
       <div class="mission-cards">${VM.MISSIONS.filter(m => chap.missions.includes(m.id)).map(m => { const pr = G.profile.missions[m.id] || {}, un = G.unlocked(m.id);
         return `<button class="mission-card ${un ? '' : 'locked'}" data-mid="${m.id}" ${un ? '' : 'disabled'}>
-          <span class="mc-num">${m.n}</span><span class="mc-body"><small>${m.arc ? `<span class="arc-tag sm">${m.arc}</span> ` : ''}${esc(G.t(m.date))}${m.storm ? ' · ⚠' : ''}</small><b>${esc(G.t(m.title))}</b><em>${un ? esc(G.t(m.objective)) : '🔒 ' + esc(G.t('unlockedBy'))}</em></span>
-          <span class="mc-medal">${pr.medal ? `<span class="medal-dot ${pr.medal}"></span>` : ''}<span class="stars">${[0,1,2].map(i => `<i class="${pr.stars && pr.stars[i] ? 'on' : ''}">★</i>`).join('')}</span></span></button>`; }).join('')}</div>
+          <span class="mc-num">${m.n}</span><span class="mc-body"><small>${m.arc ? `<span class="arc-tag sm">${m.arc}</span> ` : ''}${esc(G.t(m.date))}${m.storm ? ' · ⚠' : ''}</small><b>${esc(G.t(m.title))}</b><em>${un ? esc(G.t(m.objective)) : '🔒 ' + esc(G.t('unlockedBy'))}</em>${G.recordLine(pr) ? `<small class="mc-rec">${esc(G.recordLine(pr))}</small>` : ''}</span>
+          <span class="mc-medal">${pr.medal ? `<span class="medal-dot ${pr.medal}"></span>` : ''}<span class="stars" title="${esc(G.t('bankedStarsTip'))}">${[0,1,2].map(i => `<i class="${pr.stars && pr.stars[i] ? 'on' : ''}">★</i>`).join('')}</span></span></button>`; }).join('')}</div>
       <div class="challenge-row">
         ${['daily','weekly'].map(k => { const d = di[k], m = VM.mission(d.mission), done = (k === 'daily' ? G.profile.daily : G.profile.weekly)[d.key];
           return `<button class="challenge-card" data-ch="${k}"><small>${esc(G.t(k))} · ${esc(d.key)}</small><b>${esc(G.t(m.title))}</b><em>${d.mods.map(id => esc(G.t(VM.DAILY_MODS.find(x => x.id === id).name))).join(' · ')}</em><span>${done ? esc(G.t('dailyDone', {medal:G.t(done)})) : esc(G.t(k === 'daily' ? 'dailyReward' : 'weeklyReward'))}</span></button>`; }).join('')}

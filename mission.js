@@ -940,26 +940,29 @@
     if (S.done) return null;
     snapshot();
     const m = M(S.mission), before = clone(S.m), events = [];
+    const budget0 = S.budget, ledger = {income:[], spend:[], upkeep:[]};   // every credit change this turn, in credits per turn
     S.decisions.push({turn:S.turn, actions:S.plan.map(p => ({id:p.id, target:p.target}))});
     // 1) commit plan
     for (const p of S.plan) {
-      S.budget -= p.cost;
+      S.budget -= p.cost; if (p.cost) ledger.spend.push({id:p.id, target:p.target, v:-p.cost, toggle:!!ACTIONS[p.id].toggle});
       const a = ACTIONS[p.id];
       if (p.pressure) S.pricePressure++;
       if (a.toggle) { S.ops[p.id] = true; events.push({type:'op', id:p.id}); continue; }
       if (['permits','framework','incentive','offerA','offerB'].includes(p.id)) S.invest['did_' + p.id] = true;
       if (p.id === 'incentive') { S.invest.incentive = 1; events.push({type:'event', text:L('Investor incentive announced: readiness +8.','إعلان حافز للمستثمرين: الجاهزية +8.')}); continue; }
-      if (p.id === 'offerA' || p.id === 'offerB') { const A = p.id === 'offerA'; S.invest.offer = A ? 'A' : 'B'; S.budget += (A ? 10 : 5) - S.invest.incentive * 2; if (!A) S.invest.talent += 20; S.invest.openAt = S.turn + (A ? 1 : 2); S.nodes[M(S.mission).invest.node].jobs += A ? 8 : 20; events.push({type:'event', text:A ? L('Offer A accepted: fast capital arrives; the project opens next turn.','قُبل العرض أ: وصل رأس مال سريع؛ يُفتتح المشروع في الجولة التالية.') : L('Offer B accepted: a local partnership forms; the project opens in 2 turns.','قُبل العرض ب: تشكّلت شراكة محلية؛ يُفتتح المشروع بعد جولتين.')}); continue; }
+      if (p.id === 'offerA' || p.id === 'offerB') { const A = p.id === 'offerA'; S.invest.offer = A ? 'A' : 'B'; S.budget += (A ? 10 : 5) - S.invest.incentive * 2; ledger.income.push({k:'offer', v:(A ? 10 : 5) - S.invest.incentive * 2}); if (!A) S.invest.talent += 20; S.invest.openAt = S.turn + (A ? 1 : 2); S.nodes[M(S.mission).invest.node].jobs += A ? 8 : 20; events.push({type:'event', text:A ? L('Offer A accepted: fast capital arrives; the project opens next turn.','قُبل العرض أ: وصل رأس مال سريع؛ يُفتتح المشروع في الجولة التالية.') : L('Offer B accepted: a local partnership forms; the project opens in 2 turns.','قُبل العرض ب: تشكّلت شراكة محلية؛ يُفتتح المشروع بعد جولتين.')}); continue; }
       if (p.id === 'contract') { S.contracts.push({until:S.turn + 2}); continue; }
       if (p.id === 'fasttrack') { const b = S.builds.find(x => x.bid === p.target); if (b) { b.turnsLeft -= 1; b.fast = true; } continue; }
-      if (p.id === 'advance') { const pr = S.projects[p.target]; const pk = PKG[pr.stage]; pr.active = pk.k; pr.left = p.dur; pr.dur = p.dur; S.builds.push({bid:'b' + S.turn + '-' + p.target, action:'advance', target:p.target, node:pr.node, turnsLeft:p.dur, dur:p.dur, crews:p.crews, skilled:p.skilled, cost:p.cost, project:true}); S.started++; continue; }
+      if (p.id === 'advance') { const pr = S.projects[p.target]; const pk = PKG[pr.stage]; pr.active = pk.k; pr.left = p.dur; pr.dur = p.dur; S.builds.push({bid:'b' + S.turn + '-' + p.target, action:'advance', target:p.target, node:pr.node, turnsLeft:p.dur, dur:p.dur, crews:p.crews, skilled:p.skilled, cost:p.cost, project:true}); S.started++;
+        events.push({type:'started', action:'advance', target:p.target, node:pr.node, stage:pr.stage, dur:p.dur, crews:p.crews, cost:p.cost, opensTurn:S.turn + p.dur}); continue; }
       if (a.cat === 'response') { stormAction(p.id, p.target); continue; }
-      if (p.dur > 0) { const node = a.target === 'route' ? String(p.target).split('>').pop() : a.target === 'node' ? p.target : a.target === 'corridor' || a.target === 'road' ? (p.target.split(':')[1] || '').split('-')[1] : a.cat === 'energy' ? (BOARDS[BOARD].energy || {}).site : null; S.builds.push({bid:'b' + S.turn + '-' + p.id + '-' + (p.target || ''), action:p.id, target:p.target, node, turnsLeft:p.dur, dur:p.dur, crews:p.crews, cost:p.cost}); S.started++; }
-      else applyNow(p.id, p.target);
+      if (p.dur > 0) { const node = a.target === 'route' ? String(p.target).split('>').pop() : a.target === 'node' ? p.target : a.target === 'corridor' || a.target === 'road' ? (p.target.split(':')[1] || '').split('-')[1] : a.cat === 'energy' ? (BOARDS[BOARD].energy || {}).site : null; S.builds.push({bid:'b' + S.turn + '-' + p.id + '-' + (p.target || ''), action:p.id, target:p.target, node, turnsLeft:p.dur, dur:p.dur, crews:p.crews, cost:p.cost}); S.started++;
+        events.push({type:'started', action:p.id, target:p.target, dur:p.dur, crews:p.crews, cost:p.cost, opensTurn:S.turn + p.dur}); }
+      else { applyNow(p.id, p.target); events.push({type:'applied', action:p.id, target:p.target, cost:p.cost}); }
     }
     S.plan = [];
     // 2) operations running cost
-    for (const [id, on] of Object.entries(S.ops)) if (on) S.budget -= costOf(S, id);
+    for (const [id, on] of Object.entries(S.ops)) if (on) { const c = costOf(S, id); S.budget -= c; ledger.upkeep.push({id, v:-c}); }
     // 3) storm advances (mission 5)
     if (S.storm) stormPhase(events);
     // 4) builds progress; materials for project structures
@@ -996,7 +999,8 @@
       if (ev.industry) { S.industry += ev.industry; events.push({type:'event', text:ev.text}); }
       if (ev.retire) { S.fossil -= ev.retire; events.push({type:'event', text:ev.text}); } }
     // 6) revenue
-    S.budget += .35 + (S.m.visitorsServed || 0) * .012;
+    const baseInc = .35, visInc = (S.m.visitorsServed || 0) * .012;
+    S.budget += baseInc + visInc; ledger.income.push({k:'base', v:baseInc}); if (visInc) ledger.income.push({k:'visitors', v:visInc});
     // 7) indicators with causes
     compute();
     S.outageHistory.push(S.m.energy.outage > 0);
@@ -1004,7 +1008,10 @@
     const deltas = explain(before, S.m);
     S.history.push({turn:S.turn, m:pick(S.m), budget:S.budget, events, deltas});
     S.turn++;
-    let report = {events, deltas, turn:S.turn - 1};
+    // Measured effect of each asset that opened this turn: access of its endpoints at the start vs the end of the turn
+    for (const e of events) if (e.type === 'complete' && e.target && String(e.target).includes(':')) { const [a, b] = linkEnds(e.target);
+      e.effect = [a, b].filter(x => NODE_DEF[x] && !NODE_DEF[x].core && before.nodeMob && before.nodeMob[x] != null && S.m.nodeMob[x] != null).map(x => ({id:x, from:before.nodeMob[x], to:S.m.nodeMob[x]})); }
+    let report = {events, deltas, turn:S.turn - 1, credits:{before:budget0, after:S.budget, ...ledger}};
     if (S.turn > S.maxTurns) { S.done = true; S.result = evaluate(); report.result = S.result; }
     return report;
   }
@@ -1245,6 +1252,26 @@
     while (!S.done) { endTurn(); S.plan = []; }
     const r = S.result; S = saved; return r;
   }
+  /* ========================= PROFILE RECORDS ========================= */
+  // How one finished attempt updates the saved record for a mission. Rules:
+  //  • a medal needs the main goal; the saved medal is the best ever earned;
+  //  • optional-objective stars and insight points are BANKED only on an attempt that earns a medal;
+  //  • every attempt (won or not) keeps its score, objectives met and goal value as `last`, and raises `bestScore`.
+  const MEDAL_VAL = {bronze:1, silver:2, gold:3};
+  function mergeRecord(rec, res, at){
+    const r = Object.assign({attempts:0, stars:[], bestTotal:0}, rec ? clone(rec) : {});
+    const n = Math.max(3, res.stars.length, (r.stars || []).length), met = res.stars.map(Boolean);
+    r.attempts = (r.attempts || 0) + 1;
+    const val = (MEDAL_VAL[res.medal] || 0) + (res.medal ? met.filter(Boolean).length : 0);
+    const gained = res.medal ? Math.max(0, val - (r.bestTotal || 0)) : 0;
+    r.medal = [r.medal, res.medal].filter(Boolean).sort((a, b) => MEDAL_VAL[b] - MEDAL_VAL[a])[0] || null;
+    r.stars = Array.from({length:n}, (_, i) => !!((r.stars || [])[i] || (res.medal && met[i])));
+    r.bestTotal = Math.max(r.bestTotal || 0, val);
+    r.bestScore = Math.max(r.bestScore || 0, res.composite || 0);
+    r.last = {score:res.composite, medal:res.medal || null, stars:met, goal:res.primary ? res.primary.fmt : null, target:res.primary ? res.primary.target : null, met:!!(res.primary && res.primary.met), at:at || null};
+    return {rec:r, gained, banked:!!res.medal};
+  }
+
   /* ============================ SAVE / REWIND ======================== */
   function snapshot(){ const c = clone(S); delete c.snapshots; S.snapshots[S.turn] = JSON.stringify(c); }
   function rewind(turn){ useBoard(S.board); const snaps = S.snapshots; const txt = snaps[turn]; if (!txt) return false; const keep = {}; for (const t in snaps) if (+t <= turn) keep[t] = snaps[t]; S = JSON.parse(txt); S.snapshots = keep; S.plan = []; S.done = false; S.result = null; S.decisions = S.decisions.filter(d => d.turn < turn); compute(); return true; }
@@ -1257,7 +1284,7 @@
     boardOf:mid => { const m = M(mid); return m ? (m.board || m.chapter || 'riyadh') : 'riyadh'; }, get NODE_DEF(){ return NODE_DEF; }, get ROADS(){ return ROADS; }, get CORRIDORS(){ return CORRIDORS; }, get board(){ return BOARD; }, BOARDS, setBoard:useBoard, ACTIONS, UPGRADES, MISSIONS, CHAPTERS, DAILY_MODS, PKG,
     setWorld:w => { W = w; }, init, get state(){ return S; }, set state(v){ S = v; },
     check, addPlan, removePlan, validTargets, routeValid:t => routeValid(t), roadNeighbours:n => roadNeighbours(n), endTurn, forecast, projectEnd, evaluate, rewind, serialize, load, compute,
-    goalBreakdown, routeImpact, linkLabel,
+    goalBreakdown, routeImpact, linkLabel, mergeRecord, MEDAL_VAL,
     costOf:(id, t) => costOf(S, id, t), durOf:(id, t) => durOf(S, id, t), crewsTotal, crewsBusy, respPoints, transitBetween:(a, b) => transitBetween(S, a, b), transitPath:id => transitPath(S, id), canAdvance, nextPackage:pid => nextPackage(S, pid),
     upgradeAvailable, stormCenter, mission:M, linkCap:l => linkCap(S, l), km
   };

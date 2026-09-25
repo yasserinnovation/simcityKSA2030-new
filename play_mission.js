@@ -15,6 +15,12 @@
   /* ============================== START ============================== */
   G.startMission = (mid, opts={}) => {
     if (!G.unlocked(mid)) return;
+    const r = G.loadRun(); let cur = null; try { cur = r && r.s ? JSON.parse(r.s) : null; } catch(e) {}
+    if (cur && !cur.done && !opts.confirmed) {   // starting a mission would replace an unfinished, autosaved run: ask first
+      G.confirmBox(t('replaceRun', {m:t(VM.mission(cur.mission).title), n:cur.turn}), t('startNewAnyway'), t('resumeInstead'),
+        () => G.startMission(mid, {...opts, confirmed:true}), () => G.leaveMode(() => G.resumeRun()));
+      return;
+    }
     VM.init(mid, {upgrades:G.profile.upgrades, daily:opts.daily || null, couplings:window.VisionCompetitiveness ? window.VisionCompetitiveness.couplings(G.profile) : null});
     ui.runMeta = G.runMeta = {daily:opts.daily || null}; ui.whatIf = null; ui.coach = (mid === 'm1' && !(G.profile.missions.m1 || {}).attempts) ? 1 : 0;
     enterHud(); G.saveRun();
@@ -39,6 +45,7 @@
   /* ============================== RENDER ============================= */
   function refresh(){
     const s = S(); if (!s) return;
+    G.renderNav('missions');
     G.showScene(s); W.setOverlay(G.flows(s, {lens:ui.lens}).concat(previewOverlay()));
     renderCard(); renderMeasures(); renderActions(); renderPlan(); renderMarkers(); renderStorm(); renderCoach();
     if (ui.whatIf) { $('#banner').classList.remove('hidden'); $('#banner').textContent = t('whatIfBanner', {n:ui.whatIf.turn}); } else $('#banner').classList.add('hidden');
@@ -318,6 +325,18 @@
       setTimeout(() => { mo.classList.add('hidden'); mo.classList.remove('reveal'); $('#mhud').classList.remove('cine'); W.setNight(0); res(); }, reduced ? 1400 : 3300);
     });
   }
+  // Credits this turn, split into income, construction spending and upkeep — all in credits for this one turn.
+  function creditLedger(c){
+    if (!c) return '';
+    const sum = xs => xs.reduce((a, x) => a + x.v, 0), f1 = v => (v >= 0 ? '+' : '−') + fmt(Math.abs(v), 1);
+    const inc = sum(c.income), sp = sum(c.spend), up = sum(c.upkeep), per = M().turnStep ? t('perTurnMonths', {n:M().turnStep}) : t('perTurnLbl');
+    const incLbl = {base:'incBase', visitors:'incVisitors', offer:'incOffer'};
+    const row = (lbl, v, detail) => `<li><span>${esc(lbl)}</span><b>${f1(v)}</b>${detail ? `<small>${esc(detail)}</small>` : ''}</li>`;
+    return `<div class="rp-credits"><b>◆ ${esc(t('creditsTurn'))}: ${fmt(c.before, 1)} ${arw()} ${fmt(c.after, 1)}</b> <small>(${esc(per)})</small><ul>
+      ${row(t('incomeLbl'), inc, c.income.map(x => `${t(incLbl[x.k] || x.k)} ${f1(x.v)}`).join(' · '))}
+      ${c.spend.length ? row(t('constructionLbl'), sp, c.spend.map(x => `${t(G.aname(x.id))}${x.target ? ' · ' + targetNameSafe(x.id, x.target) : ''}${x.toggle ? ' (' + t('firstTurnFee') + ')' : ''} ${f1(x.v)}`).join(' · ')) : ''}
+      ${c.upkeep.length ? row(t('upkeepLbl'), up, c.upkeep.map(x => `${t(G.aname(x.id))} ${f1(x.v)}`).join(' · ')) : ''}</ul></div>`;
+  }
   function showReport(report){
     const s = S(), m = M(), el = $('#report');
     const ev = [];
@@ -326,14 +345,19 @@
       if (e.type === 'materials') ev.push(`<li class="neg">📦 ${esc(t('materialsWait', {p:nodeName(s.projects[e.project].node)}))} (${Math.round(e.f * 100)}%)</li>`);
       if (e.type === 'package') ev.push(`<li class="pos">🏗 ${esc(t('packageDone', {p:nodeName(s.projects[e.project].node), k:t(VM.PKG[e.stage - 1].name)}))}</li>`);
       if (e.type === 'open') ev.push(`<li class="pos">✦ ${esc(t('projectOpen', {p:nodeName(e.node)}))}</li>`);
-      if (e.type === 'complete') ev.push(`<li class="pos">✓ ${esc(t(G.aname(e.action)))}${e.target ? ' · ' + esc(targetNameSafe(e.action, e.target)) : ''}</li>`);
+      if (e.type === 'complete') { const eff = (e.effect || []).map(x => `${nodeName(x.id)} ${t('accessToCore')} ${Math.round(x.from)} ${arw()} ${Math.round(x.to)}`).join(' · ');
+        ev.push(`<li class="pos">✓ <b>${esc(t('openedNow'))}:</b> ${esc(t(G.aname(e.action)))}${e.target ? ' · ' + esc(targetNameSafe(e.action, e.target)) : ''}${eff ? `<small class="rp-eff">${esc(t('measuredEffect'))}: ${esc(eff)}</small>` : ''}</li>`); }
+      if (e.type === 'started') { const opensSame = report.events.some(x => x.type === 'complete' && x.action === e.action && String(x.target) === String(e.target));
+        if (!opensSame) ev.push(`<li class="build">🏗 <b>${esc(t('startedNow'))}:</b> ${esc(e.action === 'advance' ? `${nodeName(e.node)} · ${t(VM.PKG[e.stage].name)}` : t(G.aname(e.action)) + (e.target ? ' · ' + targetNameSafe(e.action, e.target) : ''))}<small class="rp-eff">${esc(t(e.opensTurn > s.maxTurns ? 'opensAfterEnd' : e.action === 'advance' ? 'dueTurn' : 'opensTurnCap', {n:e.opensTurn}))} · ${e.dur} ${esc(t(e.dur === 1 ? 'turn1' : 'turns'))} · ${e.crews} ${esc(t(e.crews === 1 ? 'crew1' : 'crews').toLowerCase())} · ${fmt(e.cost, 1)} ◆</small></li>`); }
+      if (e.type === 'op') ev.push(`<li class="build">${VM.ACTIONS[e.id].icon} <b>${esc(t('switchedOn'))}:</b> ${esc(t(G.aname(e.id)))}<small class="rp-eff">${esc(t('upkeepPerTurn', {c:fmt(VM.costOf(e.id), 1)}))}</small></li>`);
+      if (e.type === 'applied' && !VM.ACTIONS[e.action].toggle) ev.push(`<li class="pos">✓ <b>${esc(t('doneNow'))}:</b> ${esc(t(G.aname(e.action)))}${e.target ? ' · ' + esc(targetNameSafe(e.action, e.target)) : ''}</li>`);
       if (e.type === 'event') ev.push(`<li>📣 ${esc(t(e.text))}</li>`);
       if (e.type === 'hit') ev.push(`<li class="${e.protected >= .99 ? 'pos' : 'neg'}">🌪 ${esc(nodeName(e.node))}: ${e.protected >= .99 ? esc(t('protectedLbl')) + ' ✓' : `${Math.round(e.risk * (1 - e.protected) * 1000).toLocaleString()} ${esc(t('exposedLbl'))}`}</li>`);
       if (e.type === 'roadClosed') ev.push(`<li class="${e.rerouted ? 'pos' : 'neg'}">🛣 ${esc(linkName(e.link))} — ${esc(t(e.rerouted ? 'rerouted' : 'roadClosed'))}</li>`);
     }
     const deltas = report.deltas.map(d => `<li class="${d.d > 0 ? 'pos' : 'neg'}"><b>${esc(t(d.k))} ${sgn(d.d)}</b>${d.causes.length ? ` — ${d.causes.map(c => `${esc(t(c.label))} (${sgn(c.d)})`).join(', ')}` : ''}</li>`).join('');
     el.innerHTML = `<div class="rp-head"><b>${esc(t(m.storm ? 'phaseReport' : 'turnReport', {n:report.turn}))}</b><button class="icon-btn" id="rpClose">✕</button></div>
-      <ul class="rp-list">${ev.join('')}${deltas || (ev.length ? '' : `<li>${esc(t('noActions'))}</li>`)}</ul>
+      <ul class="rp-list">${ev.join('')}${deltas || (ev.length ? '' : `<li>${esc(t('noActions'))}</li>`)}</ul>${creditLedger(report.credits)}
       <button class="primary sm" id="rpOk">${esc(t(report.result ? 'viewResult' : 'continue'))}</button>`;
     el.classList.remove('hidden');
     const close = () => { el.classList.add('hidden'); if (report.result) finishMission(report.result); };
@@ -344,12 +368,9 @@
 
   /* =========================== RESULTS =============================== */
   function recordResult(res){
-    const p = G.profile, rec = p.missions[res.mission] || {attempts:0, stars:[false,false,false], bestTotal:0};
-    rec.attempts = (rec.attempts || 0) + 1;
-    const val = (G.MEDAL_VAL[res.medal] || 0) + res.stars.filter(Boolean).length * (res.medal ? 1 : 0);
-    const bestMedal = [rec.medal, res.medal].filter(Boolean).sort((a, b) => G.MEDAL_VAL[b] - G.MEDAL_VAL[a])[0] || null;
-    const gained = res.medal ? Math.max(0, val - (rec.bestTotal || 0)) : 0;
-    rec.medal = bestMedal; rec.stars = rec.stars.map((s, i) => s || (res.medal && res.stars[i])); rec.bestTotal = Math.max(rec.bestTotal || 0, val);
+    const p = G.profile, prev = p.missions[res.mission] || null;
+    const mr = VM.mergeRecord(prev, res, new Date().toISOString()), rec = mr.rec, gained = mr.gained;   // rules: mission.js mergeRecord
+    ui.lastRecord = {prev:prev ? JSON.parse(JSON.stringify(prev)) : null, rec};
     if (res.medal && (!rec.bestComposite || res.composite >= rec.bestComposite)) { rec.compDeltas = window.VisionCompetitiveness ? window.VisionCompetitiveness.deltasFor(res) : []; rec.bestComposite = res.composite; p.legacy[res.mission] = res.built; }
     p.missions[res.mission] = rec; p.points += gained;
     let bonus = 0; const d = S().daily;
@@ -373,6 +394,13 @@
     setTimeout(() => { W.setNight(0); done(); }, 3200);
   }
   function measureRows(ms){ return Object.entries(ms).map(([k, v]) => `<div class="rs-row ${v < 50 ? 'low' : ''}"><span>${esc(t(k === 'objective' ? 'objectiveM' : k === 'budget' ? 'budgetM' : k))}</span><i style="--v:${Math.max(2, v)}%"></i><b>${Math.round(v)}</b></div>`).join(''); }
+  // What this attempt changed in the save, next to what it achieved: stars bank only with a medal (mission.js mergeRecord).
+  function savedBox(res){
+    const lr = ui.lastRecord; if (!lr || !lr.rec) return '';
+    const r = lr.rec, n = r.stars.length, banked = r.stars.filter(Boolean).length, metNow = res.stars.filter(Boolean).length;
+    const note = res.medal ? t('bankedNote', {k:metNow}) : metNow ? t('notBankedNote', {k:metNow}) : t('noMedalNote');
+    return `<div class="rs-saved"><h4>💾 ${esc(t('savedRecord'))}</h4><p>${esc(t('savedLine', {medal:r.medal ? t(r.medal) : t('noMedalYet'), s:banked, n, b:r.bestScore, a:r.attempts}))}</p><p class="hint">${esc(note)}</p></div>`;
+  }
   function showResults(res, rw, last){
     const m = M(), el = $('#results'), s = S(), nextIdx = VM.MISSIONS.findIndex(x => x.id === m.id) + 1, next = VM.MISSIONS[nextIdx] && G.unlocked(VM.MISSIONS[nextIdx].id) ? VM.MISSIONS[nextIdx] : null;
     W.setOverlay(G.flows(s));
@@ -380,7 +408,7 @@
         <div><small>${esc(t('mission'))} ${m.n} · ${esc(t(m.title))}</small><h2>${esc(t(res.medal ? (last ? (m.chapter === 'riyadh' ? 'chapterComplete' : 'chapterCompleteX') : 'missionComplete') : 'notYet'))}</h2><p>${esc(t('objective'))}: <b>${esc(String(res.primary.fmt))}</b> / ${res.primary.target} · ${esc(t('score'))} ${res.composite}</p></div></div>
       <div class="rs-body"><div class="rs-col">${measureRows(res.measures)}${res.capped ? `<p class="hint">${esc(t('cappedNote'))}</p>` : ''}</div>
         <div class="rs-col">${res.goal ? `<h4>${esc(t('goalMainTitle'))}</h4><ul class="rs-goal">${res.goal.sites.map(x => `<li class="${x.met ? 'met' : 'miss'} ${x.id === res.goal.weakest ? 'weak' : ''}"><span>${x.met ? '✓' : '✗'} ${esc(nodeName(x.id))} ${esc(t('accessToCore'))}</span><b>${Math.round(x.value)} / ${res.goal.target}</b><small>${esc(x.transitMin != null ? t('transitMinLbl', {m:x.transitMin}) : t('noTransitLbl'))}</small></li>`).join('')}</ul><p class="hint">${esc(t('goalLower'))} ${arw()} <b>${esc(String(res.primary.fmt))}</b> / ${res.primary.target}</p>` : ''}
-          <h4>${esc(t('optional'))}</h4><ul class="rs-stars">${m.optional.map((o, i) => { const mv = (res.optMeasures || [])[i]; return `<li class="${res.stars[i] ? 'on' : ''}">${res.stars[i] ? '★' : '☆'} ${esc(t(o.label))}${mv != null && o.unit ? ` — <b>${mv} ${esc(t(o.unit))}</b>` : ''}${o.note && res.goal ? `<small class="rs-note">${esc(t(o.note))}</small>` : ''}</li>`; }).join('')}</ul>${res.goal ? `<p class="hint">${esc(t('optionalSepNote'))}</p>` : ''}
+          <h4>${esc(t('optThisAttempt'))}</h4><ul class="rs-stars">${m.optional.map((o, i) => { const mv = (res.optMeasures || [])[i]; return `<li class="${res.stars[i] ? 'on' : ''}">${res.stars[i] ? '★' : '☆'} ${esc(t(o.label))}${mv != null && o.unit ? ` — <b>${mv} ${esc(t(o.unit))}</b>` : ''}${o.note && res.goal ? `<small class="rs-note">${esc(t(o.note))}</small>` : ''}</li>`; }).join('')}</ul>${res.goal ? `<p class="hint">${esc(t('optionalSepNote'))}</p>` : ''}${savedBox(res)}
           ${res.hints.length ? `<h4>${esc(t('whyFail'))}</h4><ul class="rs-hints">${res.hints.map(h => `<li>${esc(t(h))}</li>`).join('')}</ul>` : ''}
           ${res.medal && window.VisionCompetitiveness ? (() => { const ds = window.VisionCompetitiveness.deltasFor(res).slice(0, 5); return ds.length ? `<h4>${esc(t('compEffect'))} <span class="badge sim">${esc(t('simulated'))}</span></h4><ul class="rs-comp">${ds.map(d => `<li><b>${esc(t(window.VisionCompetitiveness.OBSERVED.FACTORS.find(f => f.id === d.factor).name))} ${d.delta > 0 ? '+' : ''}${d.delta}</b> — ${esc(t(d.why))}</li>`).join('')}</ul><button class="link" id="rsLens">📊 ${esc(t('openLens'))}</button>` : ''; })() : ''}
           ${(() => { const s0 = S(), snap = s0.snapshots && s0.snapshots[1] ? JSON.parse(s0.snapshots[1]) : null; if (!snap) return '';
@@ -433,7 +461,7 @@
     pm.innerHTML = `<div class="sheet-card glass"><div class="sheet-head"><b>${esc(t('menu'))}</b><button class="icon-btn" id="pmClose">✕</button></div>
       <button class="secondary" id="pmRestart">${esc(t('restart'))}</button><button class="secondary" id="pmUp">✦ ${esc(t('upgrades'))}</button><button class="secondary" id="pmSet">⚙ ${esc(t('settings'))}</button><button class="secondary" id="pmQuit">${esc(t('quit'))}</button><button class="link" id="pmMain">${esc(t('backMenu'))}</button></div>`;
     $('#pmClose').onclick = () => pm.classList.add('hidden');
-    $('#pmRestart').onclick = () => { pm.classList.add('hidden'); G.startMission(S().mission, S().daily ? {daily:S().daily} : {}); };
+    $('#pmRestart').onclick = () => { pm.classList.add('hidden'); G.startMission(S().mission, S().daily ? {daily:S().daily, confirmed:true} : {confirmed:true}); };
     $('#pmUp').onclick = () => { pm.classList.add('hidden'); G.showUpgrades(() => {}); };
     $('#pmSet').onclick = () => { pm.classList.add('hidden'); G.showSettings(); };
     $('#pmQuit').onclick = () => { pm.classList.add('hidden'); W.onGroundClick(null); W.setHazard(null); G.showChapter(M().chapter); };
@@ -452,7 +480,8 @@
   $('#langBtn').onclick = () => { G.profile.lang = G.lang() === 'ar' ? 'en' : 'ar'; G.saveProfile(); G.applyLang(); G.showMenu(); };
   $('#soundBtn').onclick = () => { G.profile.sound = !G.profile.sound; G.saveProfile(); $('#soundBtn').textContent = G.profile.sound ? '🔊' : '🔈'; };
   $('#soundBtn').textContent = G.profile.sound ? '🔊' : '🔈';
-  $('#natBack').onclick = () => location.reload();
+  $('#natBack').onclick = () => G.go('home');
+  addEventListener('pagehide', () => { if (!$('#mhud').classList.contains('hidden')) G.saveRun(); });
   const params = new URLSearchParams(location.search);
   setTimeout(() => {
     if (params.has('national')) { G.openNational(); return; }

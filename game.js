@@ -32,16 +32,31 @@
   /* ============================== START ============================== */
   try { if (localStorage.getItem(SAVE_KEY)) $('#loadBtn').classList.remove('hidden'); } catch(e) {}
   $('#beginBtn').onclick = () => {
+    const saved = savedInfo();
+    if (saved && !$('#natConfirm')) {   // never replace a saved mandate silently
+      const box = document.createElement('div'); box.id = 'natConfirm'; box.className = 'nat-confirm';
+      box.innerHTML = `<p>This starts a new mandate and replaces your saved one (${esc(saved.label)}).</p><div><button class="primary sm" id="natYes">Start new mandate</button><button class="secondary sm" id="natKeep">Keep saved — continue it</button></div>`;
+      $('.intro-actions').after(box);
+      $('#natYes').onclick = () => { box.remove(); startNew(); };
+      $('#natKeep').onclick = () => { box.remove(); $('#loadBtn').click(); };
+      return;
+    }
+    startNew();
+  };
+  function startNew(){
+    if ($('#natConfirm')) $('#natConfirm').remove();
     const mode = $('input[name=mode]:checked').value, difficulty = $('input[name=difficulty]:checked').value;
     SIM.init({mode, difficulty, challenge: $('#challengePick').value});
-    enterGame();
-  };
+    enterGame(); autosave();
+  }
   $('#challengePick').onchange = () => { $('input[name=mode][value=challenge]').checked = true; };
-  $('#loadBtn').onclick = () => { try { SIM.load(localStorage.getItem(SAVE_KEY)); enterGame(); setMessage('Saved mandate restored.', 'SAVE'); } catch(e) { setMessage('That save could not be loaded: ' + e.message, 'SAVE'); } };
+  $('#loadBtn').onclick = () => { if ($('#natConfirm')) $('#natConfirm').remove(); if (!VisionNational.loadSaved()) setMessage('That save could not be loaded.', 'SAVE'); };
   function enterGame(){
-    ui.started = true; ui.selected = null; ui.speed = 0; ui.acc = 0;   // planning pause: time never runs until the player chooses ui.tool = null; ui.readiness = false; syncSpeed();
+    ui.started = true; ui.selected = null; ui.speed = 0; ui.acc = 0;   // planning pause: time never runs until the player chooses
+    ui.tool = null; ui.readiness = false; syncSpeed();
     $('#intro').classList.add('exit'); setTimeout(() => $('#intro').classList.add('hidden'), 900);
-    $('#hud').classList.remove('hidden'); $('#mandateOverlay').classList.add('hidden'); $('#reviewCard').classList.add('hidden');
+    $('#hud').classList.remove('hidden'); $('#mandateOverlay').classList.add('hidden'); $('#reviewCard').classList.add('hidden'); if ($('#natConfirm')) $('#natConfirm').remove();
+    if (window.VNP && VNP.renderNav) VNP.renderNav('national');
     ['#challengePanel','#challengeTop','#unitBar'].forEach(s => $(s).classList.add('hidden')); ['#navigator','#bottombar'].forEach(s => $(s).classList.remove('hidden'));
     W.onGroundClick(null); W.setHazard(null); W.setEntities([]); W.setDynamicLabels([]);
     const st = S(); $('#modeTag').textContent = `${SIM.DIFFICULTY[st.difficulty].label.toUpperCase()} · ${st.mode==='challenge'?'TIMED CHALLENGE':st.mode.toUpperCase()}`;
@@ -56,7 +71,8 @@
     if (!ui.started) return;
     if (type === 'log') { if (data.kind !== 'action' || performance.now() > ui.msgHold) setMessage(data.text, LABELS[data.kind] || 'KINGDOM MOTION', data.kind !== 'action'); }
     if (type === 'change') { renderDock(); renderNavigator(); renderTimeline(); renderSignal(); pushWorld(); if (ui.readiness || S().challenge) { renderUnitBar(); renderChallengePanel(); } }
-    if (type === 'month') { refreshAll(); opportunities(); }
+    if (type === 'month') { refreshAll(); opportunities(); autosave(); }
+    if (type === 'change') autosaveSoon();
     if (type === 'advisory' || type === 'recovery') { renderSignal(); renderTimeline(); }
     if (type === 'challengeStart') startLiveUI();
     if (type === 'challengeEnd') endLiveUI(data);
@@ -324,7 +340,7 @@
     rc.classList.remove('hidden');
     const c = $('#rvClose'); if (c) c.onclick = () => { rc.classList.add('hidden'); W.overview(); };
     const r = $('#rvRetry'); if (r) r.onclick = () => { const st = S(); SIM.init({mode:'challenge', difficulty:st.difficulty, challenge:review.id}); enterGame(); };
-    const m = $('#rvMenu'); if (m) m.onclick = () => location.reload();
+    const m = $('#rvMenu'); if (m) m.onclick = () => { rc.classList.add('hidden'); window.VNP ? VNP.go('home') : location.reload(); };
     refreshAll();
   }
   function renderUnitBar(){
@@ -412,7 +428,7 @@
     $('#mandateOverlay').classList.remove('hidden'); $('#continueBtn').focus();
   }
   $('#continueBtn').onclick = () => { SIM.continueSandbox(); $('#mandateOverlay').classList.add('hidden'); buildTimeline(); ui.speed = 1; syncSpeed(); refreshAll(); };
-  $('#restartBtn').onclick = () => location.reload();
+  $('#restartBtn').onclick = () => { $('#mandateOverlay').classList.add('hidden'); VisionNational.leave(); if (window.VNP) VNP.openNational(); };
 
   /* ============================ CONTROLS ============================== */
   $$('[data-region]').forEach(b => b.onclick = () => { ui.selected = null; W.focusRegion(b.dataset.region); $$('[data-region]').forEach(x => x.classList.toggle('active', x === b)); renderDock(); renderNavigator(); });
@@ -421,7 +437,37 @@
   const syncQuality = () => { const hi = W.getQuality() === 'high'; $('#qualityBtn').textContent = hi ? 'HD' : 'LITE'; $('#qualityBtn').setAttribute('aria-pressed', String(hi)); };
   $('#qualityBtn').onclick = () => { W.setQuality(W.getQuality() === 'high' ? 'low' : 'high'); syncQuality(); };
   addEventListener('vision-quality', e => { syncQuality(); if (e.detail.auto) setMessage('Graphics switched to LITE for smoother play on this device. Press HD to restore shadows.', 'PERFORMANCE'); });
-  $('#saveBtn').onclick = () => { try { localStorage.setItem(SAVE_KEY, SIM.serialize()); setMessage(`Mandate saved at ${SIM.dateOf(S().month)}.`, 'SAVE'); } catch(e) { setMessage('Saving is not available in this browser mode.', 'SAVE'); } };
+  $('#saveBtn').onclick = () => { if (autosave()) setMessage(`Mandate saved at ${SIM.dateOf(S().month)}. It also saves automatically every month and when you switch mode.`, 'SAVE'); else setMessage('Saving is not available in this browser mode.', 'SAVE'); };
+
+  /* ============================ MODE SWITCH ============================ */
+  // The national mandate saves automatically: every in-game month, shortly after each command, when you switch mode
+  // and when the page closes. Leaving pauses time and restores the shared 3D world for the other modes.
+  const INITIAL_PS = Object.fromEntries(D.projects.map(p => [p.id, {done:p.stage === 2 ? 3 : 1, doneKeys:p.stage === 2 ? ['design','site','materials'] : ['design'], progress:0, active:undefined, health:undefined}]));
+  let saveSoon = 0;
+  function savedInfo(){ try { const raw = localStorage.getItem(SAVE_KEY); if (!raw) return null; const d = JSON.parse(raw); return {month:d.month, label:`${SIM.dateOf(d.month)} · ${d.mode}`}; } catch(e) { return null; } }
+  function autosave(){
+    if (!S()) return false;
+    try { localStorage.setItem(SAVE_KEY, SIM.serialize()); ui.savedMonth = S().month; $('#loadBtn').classList.remove('hidden'); $('#saveBtn').textContent = 'Saved ✓'; if (window.VNP && VNP.renderNav && ui.started) VNP.renderNav('national'); return true; } catch(e) { return false; }
+  }
+  function autosaveSoon(){ clearTimeout(saveSoon); saveSoon = setTimeout(() => { if (ui.started) autosave(); }, 1200); }
+  window.VisionNational = {
+    get active(){ return ui.started; },
+    get hasSession(){ return !!S(); },
+    savedInfo,
+    status(){ const st = S(); return st ? {date:SIM.dateOf(st.month), saved:ui.savedMonth === st.month, mode:st.mode} : null; },
+    save:autosave,
+    leave(){
+      if (!ui.started) { $('#intro').classList.add('hidden'); return; }
+      autosave(); clearTimeout(saveSoon);
+      ui.started = false; ui.speed = 0; ui.selected = null; ui.tool = null; ui.readiness = false; ui.drillFor = null; syncSpeed();
+      ['#hud','#intro','#mandateOverlay','#kpiDrill','#reviewCard'].forEach(sel => $(sel) && $(sel).classList.add('hidden'));
+      W.clearSelection(); for (const p of D.projects) W.setProjectState(p.id, INITIAL_PS[p.id]);
+      W.setOverlay([]); W.setEntities([]); W.setDynamicLabels([]); W.setHazard(null); W.onGroundClick(null);
+    },
+    resume(){ if (!S()) return false; enterGame(); setMessage(`Mandate resumed at ${SIM.dateOf(S().month)} — time is paused. Press 1× to continue.`, 'SAVE'); return true; },
+    loadSaved(){ try { SIM.load(localStorage.getItem(SAVE_KEY)); enterGame(); ui.savedMonth = S().month; setMessage(`Saved mandate restored at ${SIM.dateOf(S().month)}.`, 'SAVE'); return true; } catch(e) { return false; } }
+  };
+  addEventListener('pagehide', () => { if (ui.started) autosave(); });
   let speedBefore = 1;
   addEventListener('keydown', e => {
     if (!ui.started || e.repeat || (e.target.closest && e.target.closest('input,select,textarea'))) return;

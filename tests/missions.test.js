@@ -107,6 +107,44 @@ expect('M1 Bus City Centre↔Expo wins', rBus, win);
 ok('Winning bus result reports both sites ≥ 72', rBus.goal.sites.every(x => x.met) && rBus.hints.length === 0);
 const rLate = play('m1', {4:[['metro','metro:core-expo']]});
 ok('Late metro result says it was still under construction', /still under construction at the event/.test(en(rLate.hints)));
+// ---- Turn feedback: builds started, assets opened with measured effect, and a credit ledger that adds up
+V.init('m1'); V.addPlan('metro', 'metro:core-expo'); let rep = V.endTurn();
+const st = rep.events.find(e => e.type === 'started');
+ok('A build started this turn is reported (not "No new actions")', st && st.action === 'metro' && st.target === 'metro:core-expo' && st.opensTurn === 5 && st.crews === 2 && st.dur === 4);
+const sumL = c => [...c.income, ...c.spend, ...c.upkeep].reduce((a, x) => a + x.v, 0);
+ok('Credit ledger: construction −9.4, income +0.35, adds up to the change', Math.abs(sumL(rep.credits) - (rep.credits.after - rep.credits.before)) < 1e-9 && rep.credits.spend[0].v === -9.4 && rep.credits.income[0].v === .35);
+let opened = null; while (!V.state.done && !opened) { rep = V.endTurn(); opened = rep.events.find(e => e.type === 'complete' && e.target === 'metro:core-expo') ? rep : null; }
+ok('The metro opening is announced on turn 4 (usable from turn 5, as promised)', opened && opened.turn === 4 && V.state.turn === 5);
+const eff = opened && opened.events.find(e => e.type === 'complete').effect;
+ok('The opening shows its measured effect on Expo access', eff && eff.length === 1 && eff[0].id === 'expo' && eff[0].to > eff[0].from, eff ? `→ ${eff[0].from.toFixed(1)}→${eff[0].to.toFixed(1)}` : '');
+V.init('m1'); V.addPlan('brt', 'brt:core-expo'); V.addPlan('freq'); rep = V.endTurn();
+ok('A 1-turn bus opens in the same turn with its effect', rep.events.some(e => e.type === 'started') && rep.events.some(e => e.type === 'complete' && e.effect && e.effect[0].to > e.effect[0].from));
+ok('Frequency: switch-on fee and first-turn upkeep are both itemised', rep.events.some(e => e.type === 'op') && rep.credits.spend.some(x => x.id === 'freq' && x.toggle) && rep.credits.upkeep.some(x => x.id === 'freq' && x.v === -.6));
+{ V.init('m2'); let okAll = true; const plan = {1:[['hotel','diriyah'],['brt','brt:core-diriyah'],['hotel','expo']],3:[['hotel','qiddiya'],['brt','brt:diriyah-qiddiya']],4:[['park','diriyah']]};
+  while (!V.state.done) { for (const [id, t] of (plan[V.state.turn] || [])) V.addPlan(id, t); const r = V.endTurn(); okAll = okAll && Math.abs(sumL(r.credits) - (r.credits.after - r.credits.before)) < 1e-9; }
+  ok('Credit ledger adds up every turn of a full M2 run (visitor income)', okAll); }
+// ---- Results vs saved record (mergeRecord): the V5 case was a failure with 2 optional objectives and score 59
+const rFail = play('m1', {1:[['metro','metro:ksip-expo']]}), rSilver = play('m1', {1:[['brt','brt:core-expo']]}), rGold = play('m1', {1:[['brt','brt:core-expo'],['brt','brt:core-ksip']],3:[['freq']]});
+ok('Fixture: failure with 2 objectives met and score 59', !rFail.medal && rFail.stars.filter(Boolean).length === 2 && rFail.composite === 59);
+let m1 = V.mergeRecord(null, rFail, 't1');
+ok('Failure: attempt, best score 59 and objectives met are saved', m1.rec.attempts === 1 && m1.rec.bestScore === 59 && m1.rec.last.score === 59 && m1.rec.last.stars.filter(Boolean).length === 2 && m1.rec.last.goal === 41 && !m1.rec.last.met);
+ok('Failure: stars are not banked and no points (needs a medal)', m1.rec.stars.every(x => !x) && m1.gained === 0 && !m1.rec.medal && !m1.banked);
+const refreshed = JSON.parse(JSON.stringify(m1.rec));   // what a refresh reads back from localStorage
+ok('Refresh: the saved record survives a JSON round trip unchanged', JSON.stringify(refreshed) === JSON.stringify(m1.rec));
+let m2 = V.mergeRecord(refreshed, rSilver, 't2');
+ok('Silver: medal and its stars banked, points = medal + stars', m2.rec.medal === 'silver' && m2.rec.stars.filter(Boolean).length === rSilver.stars.filter(Boolean).length && m2.gained === 2 + rSilver.stars.filter(Boolean).length && m2.rec.bestScore === rSilver.composite);
+let m3 = V.mergeRecord(m2.rec, rGold, 't3');
+ok('Gold: upgrades the medal, stars only add, points only for the improvement', m3.rec.medal === 'gold' && m3.rec.stars.every((x, i) => x || !m2.rec.stars[i]) && m3.gained === m3.rec.bestTotal - m2.rec.bestTotal && m3.rec.attempts === 3);
+let m4 = V.mergeRecord(m3.rec, rFail, 't4');
+ok('Replay that fails keeps gold, stars and best score; last attempt updates', m4.rec.medal === 'gold' && JSON.stringify(m4.rec.stars) === JSON.stringify(m3.rec.stars) && m4.rec.bestScore === m3.rec.bestScore && m4.rec.last.score === 59 && m4.gained === 0);
+ok('Legacy V5 record (stars [null,null,null]) merges cleanly', (() => { const r = V.mergeRecord({attempts:1, stars:[null,null,null], bestTotal:0, medal:null}, rSilver).rec; return r.attempts === 2 && r.medal === 'silver' && r.stars.length === 3; })());
+// ---- Resume: a mid-mission save continued in a fresh session gives the same result as playing straight through
+{ const plan = {1:[['brt','brt:core-expo']],2:[['metro','metro:ksip-expo']],3:[['freq']]};
+  V.init('m1'); while (V.state.turn < 3) { for (const [id, t] of (plan[V.state.turn] || [])) V.addPlan(id, t); V.endTurn(); }
+  for (const [id, t] of plan[3]) V.addPlan(id, t); const saved = V.serialize();
+  V.init('m2'); V.load(saved); while (!V.state.done) V.endTurn(); const resumed = V.state.result;
+  const straight = play('m1', plan);
+  ok('Resume from a mid-turn save (plan included) matches an uninterrupted run', resumed.composite === straight.composite && resumed.medal === straight.medal && JSON.stringify(resumed.stars) === JSON.stringify(straight.stars), `→ ${resumed.medal} ${resumed.composite}`); }
 ok('All 18 missions preserved', V.MISSIONS.length === 18 && ['m1','m2','m3','m4','m5','w1','w2','c1','t1','d1','a1','n1','n2','e1','e2','s1','s2','k1'].every(id => V.mission(id)));
 console.log(fails ? `\n${fails} FAILED` : '\nAll mission tests passed');
 process.exit(fails ? 1 : 0);

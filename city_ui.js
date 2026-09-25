@@ -28,7 +28,7 @@
     if (!fresh) for (const key of [VC.KEY, VC.KEY + '.backup']) { if (loaded) break; let s = null; try { s = localStorage.getItem(key); if (s) { VC.load(s); loaded = true; } } catch(e) { try { if (s) localStorage.setItem(VC.KEY + '.unreadable', s); } catch(e2) {} G.toast(t('cityLoadFail')); } }
     if (!loaded) VC.newCity({seed:(Date.now() % 100000) || 7, anchors:anchorsInGrid()});
     ui.active = true; ui.speed = 0; ui.tool = 'select'; ui.overlay = null; ui.sel = null; ui.panel = null;
-    G.hideAll(); $('#chud').classList.remove('hidden'); $('#play').classList.remove('hidden');
+    G.hideAll(); $('#chud').classList.remove('hidden'); $('#play').classList.remove('hidden'); G.renderNav && G.renderNav('city');
     W.setBeacons(false); W.setProjectLabels(false); W.setHazard(null); W.setEntities([]); W.setDynamicLabels([]); W.setMissionScene({links:[], sites:[]}); W.setOverlay([]);
     W.onGroundClick(null); W.onGroundDrag(onDrag); W.onGroundHover(onHover);
     const c = [grid.x0 + N * grid.ts / 2, grid.z0 + N * grid.ts / 2], K = W.place(45.3, 23.7), core = W.place(46.68, 24.71, 'Riyadh');
@@ -39,7 +39,12 @@
     } else W.cam(.35, .82, 1.9, c[0], c[1], 2);
     render(); renderHUD(); if (G.profile.reduced) say(loaded ? t('cityResumed') : t('cityWelcome'), 'info');
   };
-  function leaveCity(){ save(); ui.active = false; W.setDynamicLabels([]); W.setHazard(null); W.setProjectLabels(true); W.onGroundDrag(null); W.onGroundHover(null); W.setCity(null); W.setOverlay([]); W.setEntities([]); W.setMissionLights([]); $('#chud').classList.add('hidden'); G.showMenu(); }
+  // The city saves automatically: every in-game month, when you leave or switch mode, and when the page closes.
+  G.cityActive = () => ui.active;
+  G.closeCity = next => { if (ui.active) leaveCity(next); };
+  G.cityStatus = () => { try { const d = VC.dateOf(); return {date:`${G.month(d.month, d.year)}`}; } catch(e) { return null; } };
+  addEventListener('pagehide', () => { if (ui.active) save(); });
+  function leaveCity(next){ save(); ui.active = false; W.setDynamicLabels([]); W.setHazard(null); W.setProjectLabels(true); W.onGroundDrag(null); W.onGroundHover(null); W.setCity(null); W.setOverlay([]); W.setEntities([]); W.setMissionLights([]); $('#chud').classList.add('hidden'); if (typeof next === 'function') next(); else G.showMenu(); }
   function save(){ try { const prev = localStorage.getItem(VC.KEY); if (prev) localStorage.setItem(VC.KEY + '.backup', prev); localStorage.setItem(VC.KEY, VC.serialize());
       const S = VC.state, deltas = VC.factorDeltas(), old = (G.profile.city && G.profile.city.deltas) || [], d = VC.dateOf();
       G.profile.compEvents = G.profile.compEvents || [];
@@ -119,7 +124,7 @@
     $$('#cTop [data-panel]').forEach(b => b.onclick = () => openPanel(ui.panel === b.dataset.panel ? null : b.dataset.panel));
     $$('#cTop [data-dem]').forEach(b => b.onclick = () => openPanel('demand:' + b.dataset.dem));
     $('#cLens').onclick = () => G.showLens('overview');
-    $('#cExit').onclick = leaveCity;
+    $('#cExit').onclick = () => leaveCity();
     $('#cKingdom').onclick = () => { if (ui.kingdom) { ui.kingdom = false; const c = [grid.x0 + N * grid.ts / 2, grid.z0 + N * grid.ts / 2]; W.cam(.35, .82, 1.7, c[0], c[1], .5); } else { ui.kingdom = true; const K = W.place(45.3, 23.7); W.cam(.1, 1.05, 14, K[0], K[1], .45); } };
     renderTools(); renderMissionCard();
   }
