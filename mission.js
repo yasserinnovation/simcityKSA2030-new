@@ -254,21 +254,21 @@
   const MISSIONS = [
     { id:'m1', chapter:'riyadh', arc:'A', hud:['mobility'], n:1, date:L('2026','2026'), turns:6, turnLabel:L('Month','شهر'), turnStep:2, startMonth:0, year:2026, budget:14, crews:2,
       title:L('Connect for the Opening','اربط المدينة للافتتاح'),
-      brief:L('A preview event for Expo 2030 is coming. Visitors will arrive at King Salman Airport and head to the Expo site. Make both easy to reach before the event, without choking the rest of the city.','فعالية تمهيدية لإكسبو 2030 قادمة. سيصل الزوار إلى مطار الملك سلمان ويتجهون إلى موقع إكسبو. اجعل الوصول إليهما سهلًا قبل الفعالية دون خنق بقية المدينة.'),
-      objective:L('Expo and Airport mobility ≥ 72 during the event (final turn)','تنقل إكسبو والمطار ≥ 72 خلال الفعالية (الجولة الأخيرة)'),
+      brief:L('A preview event for Expo 2030 is coming. Visitors stay in City Centre hotels and travel between the City Centre and two sites: the Expo site and King Salman Airport. On the final turn (the event), each site needs an access score of 72 or more. The access score (0–100) rates how quickly trips from that site reach the City Centre by road and transit, including event crowds. A transit line only carries these trips if it connects to the City Centre, directly or through another line.','فعالية تمهيدية لإكسبو 2030 قادمة. يقيم الزوار في فنادق وسط المدينة ويتنقلون بينه وبين موقعين: موقع إكسبو ومطار الملك سلمان. في الجولة الأخيرة (يوم الفعالية) يحتاج كل موقع إلى درجة وصول 72 أو أكثر. درجة الوصول (0–100) تقيس سرعة وصول الرحلات من الموقع إلى وسط المدينة بالطرق والنقل العام، مع زحام الفعالية. لا يحمل خط النقل العام هذه الرحلات إلا إذا اتصل بوسط المدينة، مباشرة أو عبر خط آخر.'),
+      objective:L('Event day: Expo and Airport access to the City Centre ≥ 72 each (final turn)','يوم الفعالية: وصول إكسبو والمطار إلى وسط المدينة ≥ 72 لكل منهما (الجولة الأخيرة)'),
+      // The goal is the LOWER of the two sites' access scores (nodeMob: trips from the site to the City Centre, 0–100) after the final turn.
+      goal:{sites:['expo','ksip'], to:'core', target:72},
       actions:['metro','brt','route','road','freq','priority','park'],
       visitors:{event:{expo:[0,0,10,25,45,65], ksip:[0,0,6,15,25,35]}},
       primary:S => { const v = Math.min(S.m.nodeMob.expo, S.m.nodeMob.ksip); return {value:v, target:72, met:v >= 72, fmt:Math.round(v)}; },
       optional:[
         {id:'budget', label:L('Finish with 3 credits or more unspent','أنهِ بـ 3 أرصدة أو أكثر غير مصروفة'), test:S => S.budget >= 3},
         {id:'trust', label:L('Public trust ≥ 60','الثقة العامة ≥ 60'), test:S => S.m.trust >= 60},
-        {id:'link', label:L('Airport to Expo within 40 minutes by transit','من المطار إلى إكسبو خلال 40 دقيقة بالنقل العام'), test:S => { const tm = transitBetween(S, 'ksip', 'expo'); return tm != null && tm <= 40; }}
+        {id:'link', label:L('Airport to Expo within 40 minutes by transit','من المطار إلى إكسبو خلال 40 دقيقة بالنقل العام'), test:S => { const tm = transitBetween(S, 'ksip', 'expo'); return tm != null && tm <= 40; },
+         measure:S => { const tm = transitBetween(S, 'ksip', 'expo'); return tm == null ? null : Math.round(tm); }, unit:L('min','دقيقة'),
+         note:L('Optional and separate from the main goal: it times a direct transit trip between the Airport and Expo. The main goal times trips from each site to the City Centre.','هدف اختياري منفصل عن الهدف الرئيسي: يقيس رحلة مباشرة بالنقل العام بين المطار وإكسبو، بينما يقيس الهدف الرئيسي الرحلات من كل موقع إلى وسط المدينة.')}
       ],
-      hints:[
-        {when:S => !S.links.some(l => l.kind === 'metro' && l.built) && S.m.nodeMob.expo < 72, text:L('A metro to Expo takes 4 turns. Start it by turn 2, or pair a cheaper BRT line with higher frequency.','يستغرق المترو إلى إكسبو 4 جولات. ابدأه قبل الجولة 2، أو ادمج خط حافلات سريعة أرخص مع زيادة التردد.')},
-        {when:S => S.m.ringVC > 1.05, text:L('The central ring is jammed. Road widening pushed more cars into it, so try transit that bypasses the ring.','الحلقة المركزية مزدحمة؛ التوسعة دفعت مزيدًا من السيارات إليها. جرّب نقلًا عامًا يتجاوز الحلقة.')},
-        {when:S => S.m.nodeMob.ksip < 72, text:L('The airport was the weak link. Visitors also need a fast route from King Salman Airport.','كان المطار الحلقة الأضعف. يحتاج الزوار أيضًا طريقًا سريعًا من مطار الملك سلمان.')}
-      ],
+      hints:[],   // result advice is generated from the playthrough by accessAdvice()
       tease:L('Next: tens of thousands of visitors want to stay — can Riyadh host them and stay liveable?','التالي: عشرات الآلاف من الزوار يريدون الإقامة — هل تستطيع الرياض استضافتهم مع بقائها مريحة للعيش؟')
     },
     { id:'m2', chapter:'riyadh', arc:'D', hud:['visitors'], n:2, date:L('2027','2027'), turns:6, turnLabel:L('Month','شهر'), turnStep:2, year:2027, budget:18, crews:3,
@@ -749,6 +749,7 @@
       const Tref = rp ? rp.free + RING.base : 60;
       const mob = rp || tp ? 100 * Math.min(1, 1.35 * Tref / (Tact + .35 * Tref)) : 0;
       out.nodeMob[id] = NODE_DEF[id].energySite ? 100 : mob;
+      (out.nodeTime = out.nodeTime || {})[id] = {transit:tp ? tp.time : null, road:rp ? roadT : null, free:Tref, transitShare:d > 0 ? tt / d : 0};   // minutes to the City Centre (explanations only)
       if (!NODE_DEF[id].energySite) { wsum += d; msum += d * mob; }
       vkt += rt * (rp ? rp.free : 30) / 10 * (BOARDS[BOARD].vkt || 1);
     }
@@ -1077,16 +1078,148 @@
     if (pr.met) { medal = 'bronze'; if (composite >= 64 && lowest >= 40) medal = 'silver'; if (composite >= 78 && lowest >= 50) medal = 'gold'; }
     const capped = pr.met && lowest < 50 && composite >= 78;
     const stars = m.optional.map(o => o.test(S));
-    const hints = pr.met ? [] : m.hints.filter(h => h.when(S)).slice(0, 2).map(h => h.text);
+    const gb = m.goal ? goalBreakdown() : null, adv = gb && !pr.met ? accessAdvice(m, gb) : null;
+    const hints = pr.met ? [] : adv ? adv.hints : m.hints.filter(h => h.when(S)).slice(0, 2).map(h => h.text);
     const weak = Object.entries(measures).filter(([k, v]) => v < 50).map(([k]) => k);
     const extra = {mobility:S.m.mobility, visitors:S.m.visitorsServed || 0, renewShare:(S.gridlink && (S.solar || S.wind)) ? S.m.renewShare : 0, freightShare:m.freight ? S.m.freightShare : undefined, reliability:S.m.reliability,
       digital:!!S.ops.digital, twin:has('twin'), offer:S.invest.offer, permits:!!S.invest.did_permits, framework:!!S.invest.did_framework, incentive:!!S.invest.did_incentive, academies:S.academies.length, skilled:skilledTotal(),
       apprentice:!!S.ops.apprentice || !!S.decisions.some(d => d.actions.some(a => a.id === 'apprentice')), research:!!S.research, pricePressure:S.pricePressure, builds:S.completed, projectsOpened:Object.values(S.projects).filter(p => p.done).length + (S.invest.opened ? 1 : 0)};
-    return {mission:m.id, extra, primary:pr, measures, composite:Math.round(composite), medal, stars, hints, weak, capped, budgetLeft:+S.budget.toFixed(1), decisions:clone(S.decisions), built:legacy()};
+    return {mission:m.id, extra, primary:pr, measures, composite:Math.round(composite), medal, stars, hints, weak, capped, budgetLeft:+S.budget.toFixed(1), decisions:clone(S.decisions), built:legacy(),
+      ...(gb ? {goal:gb, next:adv ? adv.next : null} : {}), optMeasures:m.optional.map(o => o.measure ? o.measure(S) : null)};
   }
   function legacy(){ return {links:S.links.filter(l => l.kind !== 'road' && l.built).map(l => [l.kind, l.a, l.b]).concat(S.links.filter(l => l.kind === 'road' && l.widen).map(l => ['wide', l.a, l.b])),
     sites:[...Object.entries(S.nodes).filter(([id, n]) => n.hotelLv).map(([id, n]) => ['hotel', id, n.hotelLv]), ...Object.keys(S.parks).map(id => ['park', id]), ...Object.keys(S.housing).map(id => ['housing', id]),
       ...(S.solar && S.gridlink ? [['solar', (BOARDS[BOARD].energy || {}).site, S.solar]] : []), ...(S.wind && S.gridlink ? [['wind', (BOARDS[BOARD].energy || {}).site, S.wind]] : []), ...(S.storage ? [['storage', (BOARDS[BOARD].energy || {}).site, S.storage]] : []), ...S.hubs.map(id => ['hub', id]), ...Object.entries(S.projects).filter(([k, p]) => p.done).map(([k, p]) => ['opened', p.node]), ...(S.invest && S.invest.opened ? [['opened', M(S.mission).invest.node]] : []), ...S.academies.map(id => ['academy', id]), ...(S.research ? [['research', S.researchAt]] : []), ...S.warehouses.map(id => ['warehouse', id])].concat([])}; }
+
+  /* ======================== GOAL EXPLANATIONS ======================== */
+  // Missions with goal:{sites, to, target} score the LOWEST access score among `sites`. A site's access score
+  // (S.m.nodeMob, 0–100) rates trips from that site to `to` (the City Centre) by road and transit; transitPath only
+  // follows built lines that connect to the City Centre, so a line between two goal sites carries goal trips only
+  // once one of them has its own line to the City Centre.
+  const linkEnds = id => (String(id).split(':')[1] || '').split('-');
+  const samePair = (id, p) => { const [a, b] = linkEnds(id); return (a === p[0] && b === p[1]) || (a === p[1] && b === p[0]); };
+  const transitKinds = {metro:'metro', brt:'brt', route:'brt'};
+  function transitPairs(id, target){
+    if (id === 'route') { const ns = String(target).split('>'); return ns.slice(1).map((n, k) => [ns[k], n]); }
+    return id === 'metro' || id === 'brt' ? [linkEnds(target)] : [];
+  }
+  function linkLabel(id){
+    const kind = String(id).split(':')[0], [a, b] = linkEnds(id), k = (ACTIONS[kind] || {}).name || L(kind, kind);
+    return L(`${k.en} ${NODE_DEF[a].name.en} ↔ ${NODE_DEF[b].name.en}`, `${k.ar} ${NODE_DEF[a].name.ar} ↔ ${NODE_DEF[b].name.ar}`);
+  }
+  const orList = (ids, lang) => ids.map(x => NODE_DEF[x].name[lang]).join(lang === 'en' ? ' or ' : ' أو ');
+  function goalBreakdown(){
+    const m = M(S.mission); if (!m.goal || !S.m.nodeMob) return null;
+    const g = m.goal, nt = S.m.nodeTime || {};
+    const sites = g.sites.map(id => { const tm = nt[id] || {}; return {id, value:S.m.nodeMob[id], met:S.m.nodeMob[id] >= g.target,
+      transitMin:tm.transit != null ? Math.round(tm.transit) : null, roadMin:tm.road != null ? Math.round(tm.road) : null, freeMin:Math.round(tm.free || 0),
+      transitShare:tm.transitShare || 0, path:(S.m.tPaths || {})[id] || null, visitors:+(S.nodes[id].visitors || 0).toFixed(1)}; });
+    const weakest = sites.reduce((a, b) => b.value < a.value ? b : a);
+    return {target:g.target, to:g.to, value:weakest.value, weakest:weakest.id, sites, ringPct:Math.round((S.m.ringVC || 0) * 100)};
+  }
+
+  // What one candidate action does to the goal by the event, and why — shown BEFORE the player spends credits and crews.
+  let impactBase = null;
+  function routeImpact(id, target){
+    const m = M(S.mission); if (!m.goal || !ACTIONS[id]) return null;
+    const c = check(id, target); if (!c.ok) return {ok:false, why:c.why};
+    const g = m.goal, saved = S, base = clone(S), pairs = transitPairs(id, target);
+    const run = withAction => {
+      S = clone(base); S.snapshots = {};
+      if (withAction) addPlan(id, target);
+      let opens = null;
+      const pending = () => S.builds.some(b => b.action === id && String(b.target) === String(target));
+      while (!S.done) { endTurn(); S.plan = []; if (withAction && opens == null && !pending()) opens = S.turn; }
+      return {goal:goalBreakdown(), stars:m.optional.map(o => !!o.test(S)), opens, unfinished:withAction && pending(), ringPct:Math.round(S.m.ringVC * 100)};
+    };
+    const key = JSON.stringify([S.mission, S.turn, S.plan, S.builds, S.ops, S.budget, S.links.map(l => [l.built, l.widen])]);
+    let w, wo;
+    try { w = run(true); wo = impactBase && impactBase.key === key ? impactBase.wo : run(false); impactBase = {key, wo}; } finally { S = saved; }
+    const site = (r, sid) => r.goal.sites.find(x => x.id === sid);
+    const d = w.goal.value - wo.goal.value;
+    const sd = Object.fromEntries(g.sites.map(sid => [sid, site(w, sid).value - site(wo, sid).value]));
+    const isTransit = !!transitKinds[id], isOps = id === 'freq' || id === 'priority';
+    const usedBy = isTransit ? g.sites.filter(sid => (site(w, sid).path || []).some(lid => pairs.some(p => samePair(lid, p)))) : [];
+    const touches = isTransit ? g.sites.filter(sid => pairs.some(p => p.includes(sid))) : [];
+    const reachesCore = pairs.some(p => p.includes(g.to));
+    const r0 = v => Math.round(v), sg = v => (v >= 0 ? '+' : '−') + Math.abs(Math.round(v));
+    const nmE = sid => NODE_DEF[sid].name.en, nmA = sid => NODE_DEF[sid].name.ar;
+    let code;
+    if (w.unfinished) code = 'late';
+    else if (isTransit && !usedBy.length && d < .5) code = touches.length && !reachesCore ? 'noCore' : 'offGoal';
+    else if (isOps && !g.sites.some(sid => site(w, sid).path)) code = 'noTransit';
+    else if (d < 1 && sd[w.goal.weakest] < 1 && Math.max(...Object.values(sd)) >= 1) code = 'capped';   // another site improved, but the binding site did not
+    else if (d >= .5) code = 'helps';
+    else if (d <= -.5) code = 'hurts';
+    else code = 'none';
+    const reasons = [], wk = w.goal.weakest, wkv = r0(w.goal.value);
+    if (code === 'late') reasons.push(L(`Opens too late: it needs ${c.dur} turns and would still be under construction at the event (turn ${S.maxTurns}).`, `يُفتتح متأخرًا: يحتاج ${c.dur} جولات وسيبقى قيد البناء عند الفعالية (الجولة ${S.maxTurns}).`));
+    if (code === 'noCore') {
+      const need = touches.filter(sid => !site(w, sid).path);
+      reasons.push(L(`Does not reach the City Centre. The goal times trips from each site to the City Centre, so this line carries none of them until ${orList(need.length ? need : touches, 'en')} has its own line to the City Centre (built or in your plan). Add that first, or together.`,
+        `لا يصل إلى وسط المدينة. يقيس الهدف الرحلات من كل موقع إلى وسط المدينة، لذلك لن يحمل هذا الخط أيًا منها حتى يحصل ${orList(need.length ? need : touches, 'ar')} على خط خاص به إلى وسط المدينة (منفّذ أو في خطتك). أضف ذلك أولًا أو معه.`));
+    }
+    if (code === 'offGoal') reasons.push(L(`Serves neither ${g.sites.map(nmE).join(' nor ')}, so it cannot change the goal: only trips from those sites to the City Centre count.`, `لا يخدم ${g.sites.map(nmA).join(' ولا ')}، لذلك لا يغيّر الهدف: تُحتسب فقط الرحلات من هذين الموقعين إلى وسط المدينة.`));
+    if (code === 'noTransit') reasons.push(L(`No goal site has a transit line to the City Centre yet, so there is nothing for this to speed up.`, `لا يوجد لأي موقع من مواقع الهدف خط نقل عام إلى وسط المدينة بعد، فلا شيء لتسريعه.`));
+    if (code === 'helps') {
+      for (const sid of g.sites) { const a = site(w, sid), b = site(wo, sid);
+        if (a.path && !b.path && a.transitMin != null) reasons.push(L(`Gives ${nmE(sid)} a ${a.transitMin}-minute transit trip to the City Centre, so event visitors avoid the jammed ring (${nmE(sid)} ${r0(b.value)} → ${r0(a.value)}).`, `يمنح ${nmA(sid)} رحلة نقل عام إلى وسط المدينة مدتها ${a.transitMin} دقيقة، فيتجنب زوار الفعالية الحلقة المزدحمة (${nmA(sid)} ${r0(b.value)} ← ${r0(a.value)}).`));
+        else if (Math.abs(sd[sid]) >= 1) reasons.push(L(`${nmE(sid)} access at the event ${r0(b.value)} → ${r0(a.value)}.`, `وصول ${nmA(sid)} يوم الفعالية ${r0(b.value)} ← ${r0(a.value)}.`)); }
+      if (id === 'road') reasons.push(L(`More car capacity on this road, but new lanes also attract extra car trips (central ring at ${w.ringPct}% of capacity at the event).`, `سعة أكبر للسيارات على هذا الطريق، لكن المسارات الجديدة تجذب رحلات سيارات إضافية (الحلقة المركزية عند ${w.ringPct}٪ من سعتها يوم الفعالية).`));
+      else if (isTransit && !usedBy.length) reasons.push(L(`It carries no Expo or Airport trips itself, but it takes other cars off the central ring.`, `لا يحمل رحلات إكسبو أو المطار بنفسه، لكنه يخفف السيارات الأخرى عن الحلقة المركزية.`));
+    }
+    if (code === 'hurts') reasons.push(id === 'road'
+      ? L(`New lanes attract extra car trips: the central ring reaches ${w.ringPct}% of capacity at the event, so ${nmE(wk)} ends at ${wkv} instead of ${r0(site(wo, wk).value)}.`, `المسارات الجديدة تجذب رحلات سيارات إضافية: تصل الحلقة المركزية إلى ${w.ringPct}٪ من سعتها يوم الفعالية، فينتهي ${nmA(wk)} عند ${wkv} بدلًا من ${r0(site(wo, wk).value)}.`)
+      : L(`Lowers the goal: ${nmE(wk)} ends at ${wkv} instead of ${r0(site(wo, wk).value)}.`, `يخفض الهدف: ينتهي ${nmA(wk)} عند ${wkv} بدلًا من ${r0(site(wo, wk).value)}.`));
+    if (code === 'capped') { const up = g.sites.filter(sid => sd[sid] >= 1);
+      reasons.push(L(`${up.map(sid => `${nmE(sid)} ${sg(sd[sid])}`).join(', ')}, but the goal is the lower of the two sites and ${nmE(wk)} stays at ${wkv}.`, `${up.map(sid => `${nmA(sid)} ${sg(sd[sid])}`).join('، ')}، لكن الهدف هو الموقع الأدنى، ويبقى ${nmA(wk)} عند ${wkv}.`)); }
+    if (code === 'none') reasons.push(L(`No measurable change to either site's access at the event.`, `لا تغيير ملموس في وصول أي من الموقعين يوم الفعالية.`));
+    if (code !== 'late' && w.goal.value < g.target && code !== 'capped' && code !== 'hurts') reasons.push(L(`Still short: the goal is the lower site, and ${nmE(wk)} would end at ${wkv} of ${g.target}.`, `ما زال غير كافٍ: الهدف هو الموقع الأدنى، وسينتهي ${nmA(wk)} عند ${wkv} من ${g.target}.`));
+    const gained = m.optional.filter((o, i) => w.stars[i] && !wo.stars[i]).map(o => o.label), lost = m.optional.filter((o, i) => !w.stars[i] && wo.stars[i]).map(o => o.label);
+    for (const o of gained) reasons.push(L(`Also meets the optional ★ “${o.en}” — separate from the main goal.`, `ويحقق أيضًا الهدف الاختياري ★ «${o.ar}» — وهو منفصل عن الهدف الرئيسي.`));
+    for (const o of lost) reasons.push(L(`Loses the optional ★ “${o.en}”.`, `يُفقد الهدف الاختياري ★ «${o.ar}».`));
+    return {ok:true, code, before:wo.goal.value, after:w.goal.value, delta:d, target:g.target, met:w.goal.value >= g.target, weakest:wk,
+      sites:g.sites.map(sid => ({id:sid, before:site(wo, sid).value, after:site(w, sid).value})), cost:c.cost, crews:c.crews || 0, dur:c.dur || 0,
+      opens:w.opens, eventTurn:S.maxTurns, reasons, starsGained:gained, starsLost:lost};
+  }
+
+  // Result advice built from what actually happened in this playthrough (never blames an action the player did not take).
+  function accessAdvice(m, gb){
+    const g = m.goal, hints = [], short = gb.sites.filter(x => !x.met).sort((a, b) => a.value - b.value);
+    const nmE = sid => NODE_DEF[sid].name.en, nmA = sid => NODE_DEF[sid].name.ar, r0 = Math.round;
+    const builtT = S.links.filter(l => (l.kind === 'metro' || l.kind === 'brt') && l.built);
+    const usedIds = new Set(Object.values(S.m.tPaths || {}).flat().filter(Boolean));
+    let next = null; const told = new Set();
+    short.forEach((x, i) => {
+      const o = gb.sites.find(y => y.id !== x.id), v = r0(x.value);
+      const lead = i === 0 && o ? (o.value > x.value
+        ? L(`${nmE(x.id)} was the weak link: its access to the City Centre finished at ${v}/${g.target}, and the goal takes the lower site (${nmE(o.id)} finished at ${r0(o.value)}).`, `كان ${nmA(x.id)} الحلقة الأضعف: انتهى وصوله إلى وسط المدينة عند ${v}/${g.target}، والهدف يأخذ الموقع الأدنى (انتهى ${nmA(o.id)} عند ${r0(o.value)}).`)
+        : L(`${nmE(x.id)} finished at ${v}/${g.target}.`, `انتهى ${nmA(x.id)} عند ${v}/${g.target}.`))
+        : L(`${nmE(x.id)} also missed: ${v}/${g.target}.`, `لم يبلغ ${nmA(x.id)} الهدف أيضًا: ${v}/${g.target}.`);
+      let why;
+      if (!x.path) {
+        const dangling = builtT.filter(l => (l.a === x.id || l.b === x.id) && !usedIds.has(l.id));
+        const dl = dangling.filter(l => !told.has(l.id)).map(l => (told.add(l.id), linkLabel(l.id)));
+        why = L(`${dl.length ? `Your ${dl.map(q => q.en).join(', ')} opened, but it does not reach the City Centre, so it carried none of these trips. ` : ''}With no transit line to the City Centre, event visitors went by road through the central ring (${gb.ringPct}% of capacity): about ${x.roadMin} min instead of ${x.freeMin} min uncongested.`,
+          `${dl.length ? `افتُتح ${dl.map(q => q.ar).join('، ')}، لكنه لا يصل إلى وسط المدينة فلم يحمل أيًا من هذه الرحلات. ` : ''}بلا خط نقل عام إلى وسط المدينة، سلك زوار الفعالية الطرق عبر الحلقة المركزية (${gb.ringPct}٪ من سعتها): نحو ${x.roadMin} دقيقة بدلًا من ${x.freeMin} دقيقة دون زحام.`);
+        const brt = `brt:${g.to}-${x.id}`, metro = `metro:${g.to}-${x.id}`, hasB = S.links.some(l => l.id === brt), hasM = S.links.some(l => l.id === metro);
+        if (!next && (hasB || hasM)) { const db = hasB ? durOf(S, 'brt', brt) : null, dm = hasM ? durOf(S, 'metro', metro) : null;
+          next = L(`Connect ${nmE(x.id)} to the City Centre: ${[db != null ? `Bus rapid transit opens after ${db} turn${db > 1 ? 's' : ''}` : '', dm != null ? `a metro after ${dm} turns (start it early)` : ''].filter(Boolean).join(', or ')}.${dangling.length ? ' Your existing line then starts to count too.' : ''}`,
+            `اربط ${nmA(x.id)} بوسط المدينة: ${[db != null ? `تُفتتح حافلات التردد السريع بعد ${db} جولة` : '', dm != null ? `والمترو بعد ${dm} جولات (ابدأه مبكرًا)` : ''].filter(Boolean).join(' ')}.${dangling.length ? ' عندها يبدأ خطك الحالي في الاحتساب أيضًا.' : ''}`); }
+      } else {
+        why = L(`It had transit to the City Centre (${x.transitMin} min), but at the event peak only ${r0(x.transitShare * 100)}% of its trips used it; the rest drove through the central ring (${gb.ringPct}% of capacity).`,
+          `كان لديه نقل عام إلى وسط المدينة (${x.transitMin} دقيقة)، لكن ${r0(x.transitShare * 100)}٪ فقط من رحلاته استخدمته في ذروة الفعالية؛ والباقي عبر الحلقة المركزية (${gb.ringPct}٪ من سعتها).`);
+        if (!next) next = L(`Give ${nmE(x.id)}'s line more capacity: boost transit frequency, or add a faster second line to the City Centre.`, `زد سعة خط ${nmA(x.id)}: عزّز تردد النقل العام، أو أضف خطًا ثانيًا أسرع إلى وسط المدينة.`);
+      }
+      hints.push(L(`${lead.en} ${why.en}`, `${lead.ar} ${why.ar}`));
+    });
+    for (const b of S.builds.filter(b => transitKinds[b.action] || b.action === 'road'))
+      hints.push(L(`${linkLabel(b.target).en} was still under construction at the event (${b.turnsLeft} turn${b.turnsLeft > 1 ? 's' : ''} left).`, `كان ${linkLabel(b.target).ar} لا يزال قيد البناء يوم الفعالية (بقي ${b.turnsLeft} جولة).`));
+    const widened = S.links.filter(l => l.kind === 'road' && l.widen > 0);
+    if (widened.length && (S.m.ringVC || 0) > 1.05) hints.push(L(`Your road widening (${widened.map(l => `${nmE(l.a)} ↔ ${nmE(l.b)}`).join(', ')}) attracted extra car trips into the central ring, which reached ${gb.ringPct}% of capacity. Transit to the City Centre takes cars off it instead.`,
+      `توسعة الطرق التي نفذتها (${widened.map(l => `${nmA(l.a)} ↔ ${nmA(l.b)}`).join('، ')}) جذبت رحلات سيارات إضافية إلى الحلقة المركزية التي بلغت ${gb.ringPct}٪ من سعتها. النقل العام إلى وسط المدينة يخفف عنها بدلًا من ذلك.`));
+    return {hints, next};
+  }
 
   /* ============================== FORECAST =========================== */
   // Runs the deterministic model forward on a copy: with vs without the candidate action.
@@ -1124,6 +1257,7 @@
     boardOf:mid => { const m = M(mid); return m ? (m.board || m.chapter || 'riyadh') : 'riyadh'; }, get NODE_DEF(){ return NODE_DEF; }, get ROADS(){ return ROADS; }, get CORRIDORS(){ return CORRIDORS; }, get board(){ return BOARD; }, BOARDS, setBoard:useBoard, ACTIONS, UPGRADES, MISSIONS, CHAPTERS, DAILY_MODS, PKG,
     setWorld:w => { W = w; }, init, get state(){ return S; }, set state(v){ S = v; },
     check, addPlan, removePlan, validTargets, routeValid:t => routeValid(t), roadNeighbours:n => roadNeighbours(n), endTurn, forecast, projectEnd, evaluate, rewind, serialize, load, compute,
+    goalBreakdown, routeImpact, linkLabel,
     costOf:(id, t) => costOf(S, id, t), durOf:(id, t) => durOf(S, id, t), crewsTotal, crewsBusy, respPoints, transitBetween:(a, b) => transitBetween(S, a, b), transitPath:id => transitPath(S, id), canAdvance, nextPackage:pid => nextPackage(S, pid),
     upgradeAvailable, stormCenter, mission:M, linkCap:l => linkCap(S, l), km
   };

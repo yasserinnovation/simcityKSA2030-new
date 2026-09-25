@@ -51,16 +51,20 @@
   }
   function renderCard(){
     const m = M(), s = S(); let pr = m.primary(s), proj = false;
-    if (!s.done) { const r = VM.projectEnd(); if (r) { pr = r.primary; proj = true; } }   // forecast at the mission end with the current plan
+    ui.goalEnd = s.done && s.result ? s.result.goal || null : null;
+    if (!s.done) { const r = VM.projectEnd(); if (r) { pr = r.primary; proj = true; ui.goalEnd = r.goal || null; } }   // forecast at the mission end with the current plan
+    const ge = ui.goalEnd;
+    const goalLine = ge ? `<p class="mc-goal" title="${esc(t('mapNumbers'))}">${ge.sites.map(x => `<span class="${x.met ? 'met' : x.id === ge.weakest ? 'weak' : ''}">${esc(nodeName(x.id))} ${esc(t('accessToCore'))} <b>${Math.round(x.value)}</b></span>`).join('')}<small>${esc(t('goalEvent'))} · ${esc(t('goalLower'))} · ${esc(t('goalNeed', {n:ge.target}))}</small></p>` : '';
     const pct = Math.max(0, Math.min(100, pr.value / pr.target * 100));
     const crewFree = VM.crewsTotal() - VM.crewsBusy() - s.plan.reduce((a, p) => a + p.crews, 0);
     const mods = s.daily ? s.daily.mods.map(id => t(VM.DAILY_MODS.find(x => x.id === id).name)).join(' · ') : '';
     $('#mcard').innerHTML = `<div class="mc-top"><span class="mc-n">${m.n}</span><div><small>${esc(t('mission'))} ${m.n}${s.daily ? ' · ' + esc(t(s.daily.kind)) : ''}</small><b>${esc(t(m.title))}</b></div></div>
       <p class="mc-obj">🎯 ${esc(t(m.objective))}</p>
       <div class="mc-meter ${pr.met ? 'met' : ''}" title="${esc(t('forecastEnd'))}"><i style="width:${pct}%"></i><span>${proj ? esc(t('forecastEnd')) + ': ' : ''}${esc(String(pr.fmt))} / ${pr.target}${m.storm ? '%' : ''} ${pr.met ? '✓' : ''}</span></div>
+      ${goalLine}
       ${mods ? `<p class="mc-mods">⚑ ${esc(mods)}</p>` : ''}
       <div class="mc-stats"><span>🗓 ${esc(dateLabel())}</span><span title="${esc(t('creditsNote'))}">◆ ${fmt(s.budget - s.plan.reduce((a, p) => a + p.cost, 0), 1)} ${esc(t('credits'))}</span>${m.storm ? `<span>⚡ ${VM.respPoints() - s.plan.length}/${VM.respPoints()}</span>` : `<span>👷 ${crewFree}/${VM.crewsTotal()} ${esc(t('free'))}</span>`}</div>
-      <details class="mc-brief"><summary>ⓘ</summary><p>${esc(t(m.brief))}</p></details>`;
+      <details class="mc-brief"><summary>ⓘ</summary><p>${esc(t(m.brief))}</p>${m.goal ? `<p>${esc(t('mapNumbers'))}</p><p>${esc(t('mobilityNote'))}</p>` : ''}</details>`;
   }
   function measureKeys(){ const m = M(); if (m.hud) return ['trust', ...m.hud]; if (m.storm) return ['people','services','mobility','trust']; const k = ['mobility','trust','sustainability','resilience']; if (m.projects) k.splice(1, 0, 'delivery'); if (m.visitors && m.visitors.season) k.unshift('visitors'); return k; }
   function measureVal(k){ const x = S().m; return {people:x.protected, services:x.services, visitors:x.visitorsServed, freight:(x.freightShare || 0) * 100, skilled:x.skilled || 0}[k] ?? x[k]; }
@@ -68,7 +72,7 @@
     const h = S().history, prev = h.length ? h[h.length - 1] : null, prev2 = h.length > 1 ? h[h.length - 2].m : null;
     $('#mmeasures').innerHTML = measureKeys().map(k => { const v = measureVal(k) ?? 0, pv = prev2 ? ({people:prev2.protected, services:prev2.services, visitors:prev2.visitorsServed}[k] ?? prev2[k]) : null, d = pv != null ? v - pv : 0;
       const bad = k !== 'visitors' && v < 45;
-      return `<button class="mchip ${bad ? 'warn' : ''}" data-m="${k}"><small>${esc(t(k))}</small><b>${fmt(v)}${k === 'visitors' ? 'k' : ''}</b>${Math.abs(d) >= .8 ? `<i class="${d > 0 ? 'up' : 'down'}">${d > 0 ? '▲' : '▼'}${fmt(Math.abs(d))}</i>` : ''}</button>`; }).join('');
+      return `<button class="mchip ${bad ? 'warn' : ''}" data-m="${k}"${k === 'mobility' && M().goal ? ` title="${esc(t('mobilityNote'))}"` : ''}><small>${esc(t(k))}</small><b>${fmt(v)}${k === 'visitors' ? 'k' : ''}</b>${Math.abs(d) >= .8 ? `<i class="${d > 0 ? 'up' : 'down'}">${d > 0 ? '▲' : '▼'}${fmt(Math.abs(d))}</i>` : ''}</button>`; }).join('');
     $$('#mmeasures [data-m]').forEach(b => b.onclick = e => { e.stopPropagation(); showCauses(b.dataset.m, b); });
   }
   function showCauses(k, anchor){
@@ -80,7 +84,7 @@
     if (!pop.classList.contains('hidden') && pop.dataset.k === k) { pop.classList.add('hidden'); return; }
     pop.dataset.k = k; const r = anchor.getBoundingClientRect();
     pop.style.top = (r.bottom + 6) + 'px'; pop.style.left = Math.max(8, Math.min(innerWidth - 330, r.left - 120)) + 'px';
-    pop.innerHTML = `<b>${esc(t(k))}: ${fmt(measureVal(k) || 0)}</b><ul>${list.map(c => `<li class="${c.v >= 0 ? 'pos' : 'neg'}"><span>${esc(t(c.label))}</span><em>${c.v >= 0 ? '+' : ''}${fmt(c.v, 1)}</em></li>`).join('')}</ul>`;
+    pop.innerHTML = `<b>${esc(t(k))}: ${fmt(measureVal(k) || 0)}</b>${k === 'mobility' && M().goal ? `<p class="hint">${esc(t('mobilityNote'))}</p>` : ''}<ul>${list.map(c => `<li class="${c.v >= 0 ? 'pos' : 'neg'}"><span>${esc(t(c.label))}</span><em>${c.v >= 0 ? '+' : ''}${fmt(c.v, 1)}</em></li>`).join('')}</ul>`;
     pop.classList.remove('hidden');
   }
   document.addEventListener('click', e => { if (!e.target.closest('#causePop') && !e.target.closest('[data-m]')) $('#causePop').classList.add('hidden'); });
@@ -120,11 +124,13 @@
       const d = ui.fc && ui.fc.nodeDelta ? ui.fc.nodeDelta[id] || 0 : 0;
       ents.push({x:p[0], z:p[1], y:W.ground + .02, color:isT ? [1,.85,.3] : [.95,.95,.9], size:isT ? 14 : 8, ring:isT ? .085 : Math.abs(d) > 1 ? .07 : .045, ringColor:isT ? [1,.8,.25] : d > 1 ? [.35,.9,.5] : d < -1 ? [.95,.4,.3] : [.9,.9,.85], pulse:isT});
       let txt = nodeName(id);
-      if (!VM.NODE_DEF[id].core && !VM.NODE_DEF[id].energySite && mob != null && !M().storm) txt += ` · ${Math.round(mob)}`;
+      const gs = ui.goalEnd && ui.goalEnd.sites.find(x => x.id === id);
+      if (gs) txt += ` · ${Math.round(mob)} ${t('nowLbl')} · 🎯${Math.round(gs.value)} ${t('eventLbl')}`;
+      else if (!VM.NODE_DEF[id].core && !VM.NODE_DEF[id].energySite && mob != null && !M().storm) txt += ` · ${Math.round(mob)}`;
       if (Math.abs(d) > 1) txt += `  ${d > 0 ? '▲' : '▼'}${Math.round(Math.abs(d))}`;
       if (M().storm) { const n = s.nodes[id]; txt += (n.shelter ? ' 🏠' : '') + (n.medic ? '⛑' : '') + (n.power ? (n.power > 1 ? '🔋' : '🔌') : ''); }
       if (M().projects) { const pr = Object.entries(s.projects).find(([k, p]) => p.node === id); if (pr) txt += ` · ${pr[1].done ? '✦' : pr[1].stage + '/3'}`; }
-      labs.push({id:'n-' + id, text:txt, x:p[0], z:p[1], cls:'node ' + (isT ? 'target' : Math.abs(d) > 1 ? (d > 0 ? 'good' : 'bad') : mob != null && mob < 50 && !M().storm ? 'low' : '')});
+      labs.push({id:'n-' + id, text:txt, x:p[0], z:p[1], cls:'node ' + (isT ? 'target' : Math.abs(d) > 1 ? (d > 0 ? 'good' : 'bad') : (gs ? !gs.met : mob != null && mob < 50) && !M().storm ? 'low' : '')});
     }
     W.setEntities(ents); W.setDynamicLabels(labs);
   }
@@ -133,9 +139,20 @@
     const a = VM.ACTIONS[ui.sel];
     if (a.target === 'route') { const ch = ui.routeChain && ui.routeChain.length ? ui.routeChain : String(ui.target || '').split('>').filter(Boolean); for (let k = 1; k < ch.length; k++) ov.push({a:G.nodePos(ch[k - 1]), b:G.nodePos(ch[k]), color:[.4,1,.55], thick:true, flow:true, n:6, speed:1.5, size:5}); return ov; }
     if (a.target === 'corridor' || a.target === 'road') {
-      for (const id of validTargetsFor(ui.sel)) { const l = s.links.find(x => x.id === id); const sel = ui.target === id;
-        ov.push({a:G.nodePos(l.a), b:G.nodePos(l.b), color:sel ? [1,.9,.35] : a.cat === 'response' ? [1,.55,.35] : [1,.78,.3], thick:true, dash:!sel, flow:sel, n:8, speed:2, size:5}); }
+      const goal = M().goal && ['metro','brt','road'].includes(ui.sel);
+      const impColor = code => code === 'helps' ? [.3,.85,.45] : code === 'hurts' ? [.92,.35,.28] : code === 'noCore' || code === 'late' ? [1,.7,.22] : [.5,.52,.5];
+      for (const id of validTargetsFor(ui.sel)) { const l = s.links.find(x => x.id === id); const sel = ui.target === id, imp = goal && ui.impacts ? ui.impacts[`${ui.sel}|${id}`] : null;
+        if (imp && imp.ok) {   // 1-px dashed lines sink under roads and buildings, so goal previews float marker dots just above rooftops: moving = raises the goal, static = does not
+          const helps = imp.code === 'helps';
+          ov.push({a:G.nodePos(l.a), b:G.nodePos(l.b), color:sel ? [1,.9,.35] : impColor(imp.code), noLine:true, flow:true, y:W.ground + .07, n:sel ? 16 : 12, speed:sel || helps ? 1.2 : .002, size:sel ? 7 : helps ? 6 : 4.5});
+          continue; }
+        const base = a.cat === 'response' ? [1,.55,.35] : [1,.78,.3];
+        ov.push({a:G.nodePos(l.a), b:G.nodePos(l.b), color:sel ? [1,.9,.35] : base, thick:true, dash:!sel, flow:sel, n:8, speed:2, size:sel ? 6 : 5}); }
     }
+    // A selected line that cannot carry goal trips: mark the missing link to the City Centre it depends on (static amber dots).
+    const imp = ui.target != null && ui.impacts ? ui.impacts[`${ui.sel}|${ui.target}`] : null, g = M().goal;
+    if (imp && imp.ok && imp.code === 'noCore' && g) for (const sid of g.sites) if (String(ui.target).split(/[:>-]/).includes(sid) && !(s.m.tPaths || {})[sid])
+      ov.push({a:G.nodePos(sid), b:G.nodePos(g.to), color:[1,.62,.2], noLine:true, flow:true, y:W.ground + .07, n:12, speed:.002, size:6});
     return ov;
   }
   function renderStorm(){
@@ -167,7 +184,7 @@
     if (c.locked) { G.sfx('warn'); G.toast(t(c.why)); return; }
     if (a.toggle && s.ops[id]) { VM.addPlan(id); G.sfx('click'); G.toast(`${t(a.name)} — ${t('offOp')}`); refresh(); return; }
     if (!c.ok) { G.sfx('warn'); G.toast(t(c.why || 'noTargets')); return; }
-    G.sfx('select'); ui.sel = id; ui.target = null; ui.fc = null;
+    G.sfx('select'); ui.sel = id; ui.target = null; ui.fc = null; ui.impacts = {};
     if (ui.coach === 1) ui.coach = 2;
     if (a.target === 'none') { openDecision(id, null); return; }
     const tg = validTargetsFor(id);
@@ -175,11 +192,26 @@
     if (tg.length === 1 && a.target === 'build') { openDecision(id, tg[0]); return; }
     showTargetList(id, tg); refresh();
   }
+  // Goal effect of one candidate (missions with a goal descriptor): computed before the player spends anything.
+  function impactFor(id, tg){
+    if (!M().goal) return null;
+    const k = `${id}|${tg}`; ui.impacts = ui.impacts || {};
+    if (!(k in ui.impacts)) ui.impacts[k] = VM.routeImpact(id, tg);
+    return ui.impacts[k];
+  }
+  const arw = () => G.lang() === 'ar' ? '←' : '→';   // before→after reads right-to-left in Arabic
+  const goalShift = imp => `🎯 ${Math.round(imp.before)} ${arw()} ${Math.round(imp.after)}${imp.met ? ' ✓' : ''} (${sgn(imp.after - imp.before)})`;
+  const opensTxt = imp => imp.code === 'late' ? t('notReady') : imp.opens == null ? '' : imp.opens > imp.eventTurn ? t('opensEvent') : t('opensTurn', {n:imp.opens});
   function showTargetList(id, tg){
-    const a = VM.ACTIONS[id], d = $('#decision');
+    const a = VM.ACTIONS[id], d = $('#decision'), goal = !!M().goal && ['metro','brt','road'].includes(id);
+    const row = x => { const c = VM.check(id, x), imp = goal ? impactFor(id, x) : null;
+      const facts = `${c.cost ?? VM.costOf(id, x)} ◆ · ${c.crews || VM.ACTIONS[id].crews} ${esc(t(((c.crews || VM.ACTIONS[id].crews) === 1) ? 'crew1' : 'crews').toLowerCase())} · ${VM.durOf(id, x)} ${esc(t(VM.durOf(id, x) === 1 ? 'turn1' : 'turns'))}`;
+      if (!imp || !imp.ok) return `<button class="tg" data-tg="${esc(x)}">${esc(targetName(id, x))}${['metro','brt','road'].includes(id) ? ` <small>${facts}</small>` : ''}</button>`;
+      return `<button class="tg imp imp-${imp.code}" data-tg="${esc(x)}"><span class="tg-top"><b>${esc(targetName(id, x))}</b><em class="imp-tag">${esc(t('imp_' + imp.code))}</em></span>
+        <small class="tg-facts"><b>${esc(goalShift(imp))}</b> · ${facts}${opensTxt(imp) ? ' · ' + esc(opensTxt(imp)) : ''}</small><small class="tg-why">${esc(t(imp.reasons[0]))}</small></button>`; };
     d.innerHTML = `<div class="dc-head"><span class="dc-icon">${a.icon}</span><div><b>${esc(t(G.aname(id)))}</b><small>${esc(t('tapHint'))}</small></div><button class="icon-btn" id="dcClose">✕</button></div>
-      <p class="dc-why">${esc(t(a.why))}</p><p class="hint">${esc(t('chooseTarget'))}</p>
-      <div class="tg-list">${tg.map(x => `<button class="tg" data-tg="${esc(x)}">${esc(targetName(id, x))}${['metro','brt','road'].includes(id) ? ` <small>${VM.costOf(id, x)} ◆ · ${VM.durOf(id, x)} ${esc(t(VM.durOf(id, x) === 1 ? 'turn1' : 'turns'))}</small>` : ''}</button>`).join('')}</div>`;
+      <p class="dc-why">${esc(t(a.why))}</p><p class="hint">${esc(t('chooseTarget'))}</p>${goal ? `<p class="hint legend">${esc(t('previewLegend'))}</p>` : ''}
+      <div class="tg-list">${tg.map(row).join('')}</div>`;
     d.classList.remove('hidden');
     $('#dcClose').onclick = clearSel;
     $$('#decision [data-tg]').forEach(b => b.onclick = () => openDecision(id, b.dataset.tg));
@@ -196,7 +228,7 @@
     $('#dcClose').onclick = clearSel; $$('#decision [data-rn]').forEach(b => b.onclick = () => { ui.routeChain.push(b.dataset.rn); G.sfx('click'); routePanel(); refresh(); });
     $('#rtBack').onclick = () => { ui.routeChain.pop(); routePanel(); refresh(); }; $('#rtDone').onclick = () => openDecision('route', ui.routeChain.join('>'));
   }
-  function clearSel(){ ui.routeChain = null; ui.sel = ui.target = ui.fc = null; $('#decision').classList.add('hidden'); refresh(); }
+  function clearSel(){ ui.routeChain = null; ui.sel = ui.target = ui.fc = null; ui.impacts = {}; $('#decision').classList.add('hidden'); refresh(); }
   function groundClick({x, z}){
     if (ui.busy || !ui.sel) return false;
     const a = VM.ACTIONS[ui.sel], s = S(), tg = validTargetsFor(ui.sel);
@@ -222,13 +254,20 @@
       return `<li class="${v > 0 ? 'pos' : 'neg'}"><span>${esc(t(lbl[k] || k))}</span><i style="--w:${w}%"></i><em>${txt}</em></li>`; }).join('') : '';
     // Mission-specific objective effect
     let objLine = '';
-    if (fc && m.id === 'm1') { const e = fc.nodeDelta.expo || 0, k = fc.nodeDelta.ksip || 0; objLine = `${nodeName('expo')} ${sgn(e)} · ${nodeName('ksip')} ${sgn(k)}`; }
+    const imp = m.goal ? impactFor(id, tg) : null;
+    if (imp && imp.ok) objLine = `<div class="dc-goal imp-${imp.code} ${imp.met ? 'met' : ''}">
+        <div class="dg-head"><small>🎯 ${esc(t('goalEvent'))} · ${esc(t('goalLower'))}</small><b>${Math.round(imp.before)} ${arw()} ${Math.round(imp.after)} ${imp.met ? '✓' : ''}</b><em>${esc(t('goalNeed', {n:imp.target}))}</em></div>
+        <ul class="dg-sites">${imp.sites.map(x => `<li class="${x.id === imp.weakest ? 'weak' : ''}"><span>${esc(nodeName(x.id))} ${esc(t('accessToCore'))}</span><b>${Math.round(x.before)} ${arw()} ${Math.round(x.after)}</b></li>`).join('')}</ul>
+        <p class="dg-tag"><b>${esc(t('imp_' + imp.code))}</b>${opensTxt(imp) ? ' · ' + esc(opensTxt(imp)) : ''}</p>
+        <ul class="dg-why">${imp.reasons.map(r => `<li>${esc(t(r))}</li>`).join('')}</ul>
+        ${imp.code !== 'helps' ? `<p class="warnTxt">⚠ ${esc(t('wontHelpWarn'))}</p>` : ''}</div>`;
+    else if (fc && m.id === 'm1') { const e = fc.nodeDelta.expo || 0, k = fc.nodeDelta.ksip || 0; objLine = esc(`${nodeName('expo')} ${sgn(e)} · ${nodeName('ksip')} ${sgn(k)}`); }
     const needs = [a.req ? t(VM.UPGRADES[a.req].name) : null, a.needs ? t(VM.ACTIONS[a.needs].name) : null].filter(Boolean);
     const dur = c.dur || 0;
     $('#decision').innerHTML = `<div class="dc-head"><span class="dc-icon">${a.icon}</span><div><b>${esc(t(G.aname(id)))}</b><small>${tg != null ? esc(targetName(id, tg)) : ''}</small></div><button class="icon-btn" id="dcClose">✕</button></div>
       <div class="dc-facts"><div><small>${esc(t('cost'))}</small><b>${c.cost} ◆${a.toggle ? ' / ' + esc(t('turn')) : ''}</b></div><div><small>${esc(t('time'))}</small><b>${dur ? dur + ' ' + esc(t(dur === 1 ? 'turn1' : 'turns')) : esc(t('instant'))}</b></div>${c.crews ? `<div><small>${esc(t('crews'))}</small><b>${c.crews}</b></div>` : ''}${needs.length ? `<div><small>${esc(t('needs'))}</small><b>${needs.map(esc).join(', ')}</b></div>` : ''}</div>
       <p class="dc-sub">${esc(t(exact ? 'exactTwin' : 'approx'))}</p>
-      ${objLine ? `<p class="dc-obj">🎯 ${esc(objLine)}</p>` : ''}
+      ${objLine ? (imp && imp.ok ? objLine : `<p class="dc-obj">🎯 ${objLine}</p>`) : ''}
       <ul class="dc-effects">${effects || `<li class="neu"><span>—</span></li>`}</ul>
       ${exact && fc.result ? `<p class="dc-medal">${esc(t('medalForecast', {medal:t(fc.result.medal || 'none')}))}</p>` : ''}
       <p class="dc-why"><b>${esc(t('tradeoff'))}:</b> ${esc(t(a.why))}</p>
@@ -340,7 +379,8 @@
     el.innerHTML = `<div class="rs-head">${res.medal ? `<div class="medal big ${res.medal}"><span>${esc(t(res.medal))}</span></div>` : '<div class="medal big none"><span>↻</span></div>'}
         <div><small>${esc(t('mission'))} ${m.n} · ${esc(t(m.title))}</small><h2>${esc(t(res.medal ? (last ? (m.chapter === 'riyadh' ? 'chapterComplete' : 'chapterCompleteX') : 'missionComplete') : 'notYet'))}</h2><p>${esc(t('objective'))}: <b>${esc(String(res.primary.fmt))}</b> / ${res.primary.target} · ${esc(t('score'))} ${res.composite}</p></div></div>
       <div class="rs-body"><div class="rs-col">${measureRows(res.measures)}${res.capped ? `<p class="hint">${esc(t('cappedNote'))}</p>` : ''}</div>
-        <div class="rs-col"><h4>${esc(t('optional'))}</h4><ul class="rs-stars">${m.optional.map((o, i) => `<li class="${res.stars[i] ? 'on' : ''}">${res.stars[i] ? '★' : '☆'} ${esc(t(o.label))}</li>`).join('')}</ul>
+        <div class="rs-col">${res.goal ? `<h4>${esc(t('goalMainTitle'))}</h4><ul class="rs-goal">${res.goal.sites.map(x => `<li class="${x.met ? 'met' : 'miss'} ${x.id === res.goal.weakest ? 'weak' : ''}"><span>${x.met ? '✓' : '✗'} ${esc(nodeName(x.id))} ${esc(t('accessToCore'))}</span><b>${Math.round(x.value)} / ${res.goal.target}</b><small>${esc(x.transitMin != null ? t('transitMinLbl', {m:x.transitMin}) : t('noTransitLbl'))}</small></li>`).join('')}</ul><p class="hint">${esc(t('goalLower'))} ${arw()} <b>${esc(String(res.primary.fmt))}</b> / ${res.primary.target}</p>` : ''}
+          <h4>${esc(t('optional'))}</h4><ul class="rs-stars">${m.optional.map((o, i) => { const mv = (res.optMeasures || [])[i]; return `<li class="${res.stars[i] ? 'on' : ''}">${res.stars[i] ? '★' : '☆'} ${esc(t(o.label))}${mv != null && o.unit ? ` — <b>${mv} ${esc(t(o.unit))}</b>` : ''}${o.note && res.goal ? `<small class="rs-note">${esc(t(o.note))}</small>` : ''}</li>`; }).join('')}</ul>${res.goal ? `<p class="hint">${esc(t('optionalSepNote'))}</p>` : ''}
           ${res.hints.length ? `<h4>${esc(t('whyFail'))}</h4><ul class="rs-hints">${res.hints.map(h => `<li>${esc(t(h))}</li>`).join('')}</ul>` : ''}
           ${res.medal && window.VisionCompetitiveness ? (() => { const ds = window.VisionCompetitiveness.deltasFor(res).slice(0, 5); return ds.length ? `<h4>${esc(t('compEffect'))} <span class="badge sim">${esc(t('simulated'))}</span></h4><ul class="rs-comp">${ds.map(d => `<li><b>${esc(t(window.VisionCompetitiveness.OBSERVED.FACTORS.find(f => f.id === d.factor).name))} ${d.delta > 0 ? '+' : ''}${d.delta}</b> — ${esc(t(d.why))}</li>`).join('')}</ul><button class="link" id="rsLens">📊 ${esc(t('openLens'))}</button>` : ''; })() : ''}
           ${(() => { const s0 = S(), snap = s0.snapshots && s0.snapshots[1] ? JSON.parse(s0.snapshots[1]) : null; if (!snap) return '';
@@ -351,7 +391,7 @@
               <section><h4>2 · ${esc(t('cmpChanged'))}</h4><ul class="causes">${keys.map(k => `<li><span>${esc(t(k))}</span><b>${Math.round(snap.m[k])} → ${Math.round(s0.m[k])}</b></li>`).join('')}<li><span>${esc(t('budget'))}</span><b>◆${snap.budget.toFixed(1)} → ◆${s0.budget.toFixed(1)}</b></li></ul></section>
               <section><h4>3 · ${esc(t('cmpFactors'))}</h4><p class="hint">${res.medal ? esc(t('seeCompEffect')) : esc(t('noFactorChange'))}</p></section>
               <section><h4>4 · ${esc(t('cmpEarned'))}</h4><p>${res.medal ? esc(t(res.medal)) + (rw.gained ? ' · ✦ +' + rw.gained : '') : esc(t('noReward'))}</p></section>
-              <section><h4>5 · ${esc(t('cmpNext'))}</h4><p>${esc(res.hints && res.hints[0] ? t(res.hints[0]) : next ? t(next.title) : t('allCityMissions'))}</p></section></div>`; })()}
+              <section><h4>5 · ${esc(t('cmpNext'))}</h4><p>${esc(res.next ? t(res.next) : res.hints && res.hints[0] ? t(res.hints[0]) : next ? t(next.title) : t('allCityMissions'))}</p></section></div>`; })()}
           <h4>${esc(t('rewards'))}</h4><p class="rs-reward">${rw.gained ? '✦ ' + esc(t('newPoints', {n:rw.gained})) : esc(t('noNewPoints'))}${rw.bonus ? ' · ✦ +' + rw.bonus : ''}</p>
           ${res.medal ? `<p class="rs-tease">➜ ${esc(t(m.tease))}</p>` : ''}</div></div>
       <div class="row-btns">${res.medal && next ? `<button class="primary" id="rsNext">${esc(t('nextMission'))} ${G.lang() === 'ar' ? '◂' : '▸'}</button>` : ''}
