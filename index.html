@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#7acfd6" />
+  <meta name="description" content="An unofficial Saudi Vision 2030 strategy and resilience-simulation prototype." />
+  <title>Vision Nexus 2030 — The Kingdom in Motion</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <canvas id="world" aria-label="Interactive 3D map of Saudi Arabia"></canvas>
+  <div class="tiltshift" aria-hidden="true"></div>
+  <div class="sun-glow"></div>
+  <div class="build-badge">Vision Nexus 2030 · build V7 (city missions)</div>
+
+  <!-- ====================== MISSION MODE (V4) ====================== -->
+  <div id="play" class="play">
+    <div id="cine" class="cine hidden"><div class="cine-bar top"></div><div class="cine-bar bottom"></div><p id="cineCaption" class="cine-caption"></p><button id="skipBtn" class="skip" data-i18n="skip">Skip ›</button></div>
+    <section id="menu" class="menu hidden">
+      <header class="menu-top"><div class="profile-chip" id="profileChip"></div><div class="menu-icons"><button id="langBtn" class="icon-btn lang-btn" title="English / العربية">ع / EN</button><button id="soundBtn" class="icon-btn" title="Sound">🔊</button></div></header>
+      <div id="menuCard" class="menu-card glass"></div>
+    </section>
+    <section id="chapter" class="chapter glass hidden"></section>
+    <section id="upgradesPanel" class="sheet hidden"></section>
+    <section id="settingsPanel" class="sheet hidden"></section>
+    <section id="mhud" class="mhud hidden">
+      <div id="mcard" class="mcard glass"></div>
+      <div class="mtop-right"><div id="mmeasures" class="mmeasures"></div><button id="mCompBtn" class="icon-btn" title="Competitiveness" aria-label="Competitiveness">📊</button><button id="mMenuBtn" class="icon-btn" aria-label="Menu">☰</button></div>
+      <div id="causePop" class="cause-pop glass hidden"></div>
+      <div id="banner" class="banner hidden"></div>
+      <div id="coach" class="coach hidden"></div>
+      <aside id="decision" class="decision glass hidden"></aside>
+      <div id="actionBar" class="action-bar glass"></div>
+      <div id="planTray" class="plan-tray glass"></div>
+      <div id="report" class="report glass hidden"></div>
+      <div id="moment" class="moment hidden"></div>
+      <section id="results" class="results glass hidden"></section>
+      <div id="pauseMenu" class="sheet hidden"></div>
+    </section>
+    <section id="chud" class="chud hidden">
+      <div id="cTop" class="ctop glass"></div>
+      <div id="cTools" class="ctools glass"></div>
+      <aside id="cPanel" class="cpanel glass hidden"></aside>
+      <div id="cConfirm" class="cconfirm glass hidden"></div>
+      <div id="cTicker" class="cticker"></div>
+      <div id="cMission" class="cmission glass hidden"></div>
+      <section id="cResult" class="sheet hidden"></section>
+    </section>
+    <section id="shareModal" class="sheet hidden"></section>
+    <section id="lensPanel" class="sheet hidden"></section>
+    <div id="toast" class="toast hidden" role="status"></div>
+  </div>
+
+  <!-- ============================ START ============================ -->
+  <section id="intro" class="intro hidden">
+    <div class="intro-copy">
+      <p class="eyebrow">A LIVING SAUDI WORLDBUILDER</p>
+      <h1>VISION <span>NEXUS</span> 2030</h1>
+      <p class="tagline">Build the Kingdom · Day by Day</p>
+      <div class="setup">
+        <fieldset class="setup-group">
+          <legend>Mode</legend>
+          <label><input type="radio" name="mode" value="campaign" checked /> <b>Campaign</b><small>Jan 2024 → Dec 2030 mandate with Expo 2030 and three national challenges.</small></label>
+          <label><input type="radio" name="mode" value="sandbox" /> <b>Sandbox</b><small>No end date, larger budget. Test bold futures.</small></label>
+          <label><input type="radio" name="mode" value="challenge" /> <b>Timed challenge</b>
+            <select id="challengePick" aria-label="Challenge scenario">
+              <option value="sandstorm">Riyadh Sandstorm Continuity</option>
+              <option value="rainfall">Jeddah Rainfall &amp; Mobility</option>
+              <option value="hajj">Hajj Heat &amp; Flow Readiness</option>
+            </select><small>Short scenario, scored on what you achieve in the world.</small></label>
+        </fieldset>
+        <fieldset class="setup-group">
+          <legend>Difficulty</legend>
+          <label><input type="radio" name="difficulty" value="strategic" /> <b>Strategic</b><small>More crews, wider warnings, suggested next steps.</small></label>
+          <label><input type="radio" name="difficulty" value="executive" checked /> <b>Executive</b><small>Default. Tighter capacity, explained systems, no prescribed answer.</small></label>
+          <label><input type="radio" name="difficulty" value="simulation" /> <b>Simulation</b><small>Fewer resources, wider uncertainty, short warnings.</small></label>
+        </fieldset>
+      </div>
+      <div class="intro-actions">
+        <button id="beginBtn" class="primary">Enter the Kingdom</button>
+        <button id="loadBtn" class="secondary hidden">Continue saved mandate</button>
+        <button id="natBack" class="secondary">← Missions</button>
+      </div>
+      <p class="micro">Progress comes from work in the world: schedule packages, assign shared crews, move materials through ports, and keep services running through national challenges.<br />An unofficial creative simulation, not affiliated with any government body.</p>
+    </div>
+  </section>
+
+  <!-- ============================= HUD ============================= -->
+  <main id="hud" class="hud hidden">
+    <header class="topbar glass">
+      <div class="brand"><span class="brand-mark">✦</span><div><b>VISION NEXUS 2030</b><small id="modeTag">EXECUTIVE · CAMPAIGN</small></div></div>
+      <div id="kpis" class="kpis" role="list"></div>
+      <div class="clock">
+        <div class="clock-date"><small>STRATEGIC CALENDAR</small><strong id="dateValue">JAN 2024</strong></div>
+        <div class="speed-controls">
+          <button data-speed="0" title="Pause (Space)">Ⅱ</button><button class="active" data-speed="1">1×</button><button data-speed="5">5×</button><button data-speed="20">20×</button>
+          <button id="qualityBtn" class="quality-btn" title="Graphics quality (G)" aria-pressed="true">HD</button>
+          <button id="saveBtn" class="save-btn" title="Save this mandate in the browser">Save</button>
+        </div>
+      </div>
+    </header>
+    <div id="kpiDrill" class="drill glass hidden" role="dialog" aria-label="KPI causes"></div>
+
+    <div id="messageRibbon" class="message-ribbon"><span class="pulse-dot"></span><b id="ribbonLabel">KINGDOM MOTION</b><p id="positiveMessage">Schedule work, assign crews and keep materials moving.</p></div>
+
+    <!-- Left: Portfolio Navigator -->
+    <aside id="navigator" class="left-panel glass">
+      <div class="panel-head">
+        <div><small>PORTFOLIO NAVIGATOR</small><b><span id="navCount">30</span> national projects</b></div>
+        <button class="collapse-btn" data-collapse="navigator" title="Collapse panel" aria-expanded="true">‹</button>
+      </div>
+      <div class="panel-body">
+        <input id="navSearch" class="search" type="search" placeholder="Search projects or regions" aria-label="Search projects" />
+        <div class="chips" id="navFilters">
+          <button data-filter="all" class="active">All</button><button data-filter="attention">Needs attention</button><button data-filter="ready">Ready</button><button data-filter="active">Active</button><button data-filter="operating">Operating</button><button data-filter="expo">Expo-critical</button>
+        </div>
+        <div id="projectList" class="project-list"></div>
+      </div>
+    </aside>
+
+    <!-- Left (live challenge): objectives -->
+    <aside id="challengePanel" class="left-panel glass challenge-panel hidden"></aside>
+
+    <!-- Right: Operations Dock -->
+    <aside id="dock" class="right-panel glass">
+      <div class="panel-head">
+        <div><small id="dockKicker">OPERATIONS DOCK</small><b id="dockTitle">National capacity</b></div>
+        <button class="collapse-btn" data-collapse="dock" title="Collapse panel" aria-expanded="true">›</button>
+      </div>
+      <div id="dockBody" class="panel-body"></div>
+    </aside>
+
+    <!-- Live challenge indicators -->
+    <div id="challengeTop" class="challenge-top glass hidden"></div>
+
+    <!-- Bottom bar: regions · timeline · layers · signals -->
+    <section id="bottombar" class="bottombar glass">
+      <nav class="region-nav" aria-label="Regional camera views">
+        <button class="active" data-region="kingdom" title="All Saudi Arabia"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 30V14" stroke="#9a6a2f" stroke-width="2.4" fill="none" stroke-linecap="round"/><path d="M16 14c-3-5-9-5-12-2 4-1 7 0 12 2zm0 0c3-5 9-5 12-2-4-1-7 0-12 2zm0 0c-1-5-5-9-10-9 4 2 7 5 10 9zm0 0c1-5 5-9 10-9-4 2-7 5-10 9z" fill="#ffd257"/></svg><span>Kingdom</span></button>
+        <button data-region="riyadh" title="Riyadh Region"><svg viewBox="0 0 32 32" aria-hidden="true"><rect x="4" y="16" width="5" height="13" rx="1" fill="#f6b73c"/><path d="M12 29V6c2 3 4 3 6 0v23h-2v-9h-2v9z" fill="#ffd257"/><rect x="21" y="12" width="6" height="17" rx="1" fill="#f39a2f"/></svg><span>Riyadh</span></button>
+        <button data-region="west" title="Makkah & Western Corridor"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M6 27v-9a10 10 0 0 1 20 0v9z" fill="#f4e7c8"/><path d="M8 18a8 8 0 0 1 16 0" fill="#3fb86a"/><rect x="3" y="11" width="2.6" height="16" fill="#f4e7c8"/><rect x="26.4" y="11" width="2.6" height="16" fill="#f4e7c8"/></svg><span>West</span></button>
+        <button data-region="northwest" title="NEOM, AlUla & Red Sea"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M2 27 12 11l6 9 4-5 8 12z" fill="#a78bfa"/><rect x="2" y="24" width="28" height="2.5" rx="1" fill="#5ee0e8"/></svg><span>NEOM</span></button>
+        <button data-region="east" title="Eastern Province"><svg viewBox="0 0 32 32" aria-hidden="true"><rect x="4" y="13" width="5" height="16" fill="#62c7f2"/><rect x="11" y="6" width="6" height="23" fill="#8fdcff"/><rect x="19" y="16" width="5" height="13" fill="#62c7f2"/></svg><span>East</span></button>
+        <button data-region="south" title="Aseer & Jazan"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M1 27 11 10l7 10 4-6 9 13z" fill="#3fb86a"/><circle cx="24" cy="8" r="3" fill="#fff" opacity=".85"/></svg><span>South</span></button>
+      </nav>
+      <div class="timeline-wrap">
+        <div class="timeline-head"><small>STRATEGIC TIMELINE</small><small id="queueInfo">Drag a work package here to schedule it</small></div>
+        <div id="timeline" class="timeline" aria-label="Strategic timeline, 2024 to 2030"></div>
+      </div>
+      <div class="layers" role="group" aria-label="Map layers">
+        <small>LAYERS</small>
+        <button data-layer="logistics" class="active" title="Ports, convoys and material flows">Logistics</button>
+        <button data-layer="grid" title="Grid headroom and energy supply">Grid</button>
+        <button data-layer="deps" title="Project dependencies">Dependencies</button>
+      </div>
+      <button id="signalChip" class="signal-chip hidden"></button>
+    </section>
+
+    <!-- Live challenge: unit dispatch bar (replaces the bottom bar) -->
+    <section id="unitBar" class="unitbar glass hidden" aria-label="Support units"></section>
+
+    <div id="reviewCard" class="review glass hidden" role="region" aria-label="Outcome and learning review"></div>
+    <div class="map-controls glass"><span>DRAG</span> orbit <span>RIGHT-DRAG / WASD</span> pan <span>SCROLL</span> zoom <span>CLICK</span> inspect <span>SPACE</span> pause</div>
+  </main>
+
+  <!-- Mandate conclusion -->
+  <section id="mandateOverlay" class="modal hidden">
+    <div class="mandate-card glass">
+      <div class="mandate-symbol">✦</div>
+      <p class="eyebrow" id="mandateEyebrow">MANDATE TRANSITION</p>
+      <h2 id="mandateTitle">Your leadership mandate has concluded.<br /><span>Saudi Arabia’s transformation continues.</span></h2>
+      <p class="mandate-text" id="mandateText"></p>
+      <div id="outcomeBreakdown" class="outcome"></div>
+      <div class="mandate-actions">
+        <button id="continueBtn" class="primary">Continue into Beyond 2030</button>
+        <button id="restartBtn" class="secondary">Begin a New Mandate</button>
+      </div>
+    </div>
+  </section>
+
+  <script src="data.js"></script>
+  <script src="engine.js"></script>
+  <script src="sim.js"></script>
+  <script src="game.js"></script>
+  <script src="competitiveness.js"></script>
+  <script src="mission.js"></script>
+  <script src="i18n.js"></script>
+  <script src="play_core.js"></script>
+  <script src="play_mission.js"></script>
+  <script src="city.js"></script>
+  <script src="lens.js"></script>
+  <script src="city_ui.js"></script>
+  <script src="national_ar.js"></script>
+</body>
+</html>
