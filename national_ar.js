@@ -6,7 +6,7 @@
   const P = {  // exact phrases (matched case-insensitively)
     'a living saudi worldbuilder':'بناء عالم سعودي نابض', 'build the kingdom · day by day':'ابنِ المملكة · يومًا بيوم', 'mode':'النمط', 'difficulty':'الصعوبة',
     'campaign':'الحملة', 'sandbox':'اللعب الحر', 'timed challenge':'تحدٍّ محدود الوقت', 'strategic':'استراتيجي', 'executive':'تنفيذي', 'simulation':'محاكاة',
-    'enter the kingdom':'ادخل المملكة', 'continue saved mandate':'متابعة الولاية المحفوظة', 'start a new mandate':'ابدأ ولاية جديدة', 'start new mandate':'ابدأ ولاية جديدة', 'keep saved — continue it':'احتفظ بالمحفوظة — تابعها', 'saved ✓':'محفوظ ✓', '← missions':'→ المهام',
+    'enter the kingdom':'ادخل المملكة', 'continue saved mandate':'متابعة الولاية المحفوظة', 'start a new mandate':'ابدأ ولاية جديدة', 'start new…':'ابدأ عالمًا جديدًا…', 'cancel':'إلغاء', 'saved worlds — each has its own save':'العوالم المحفوظة — لكل منها حفظ مستقل', 'start new mandate':'ابدأ ولاية جديدة', 'keep saved — continue it':'احتفظ بالمحفوظة — تابعها', 'saved ✓':'محفوظ ✓', '← missions':'→ المهام',
     'jan 2024 → dec 2030 mandate with expo 2030 and three national challenges.':'ولاية من يناير 2024 إلى ديسمبر 2030 مع إكسبو 2030 وثلاثة تحديات وطنية.',
     'no end date, larger budget. test bold futures.':'بلا تاريخ نهاية وبميزانية أكبر. جرّب مستقبلًا جريئًا.',
     'short scenario, scored on what you achieve in the world.':'سيناريو قصير يُقيَّم بما تحققه في العالم.',
@@ -72,6 +72,11 @@
     [/^Mandate resumed at (.+) — time is paused\. Press 1× to continue\.$/i, m => `استُؤنفت الولاية في ${m[1]} — الوقت متوقف. اضغط 1× للمتابعة.`],
     [/^Saved mandate restored at (.+)\.$/i, m => `استُعيدت الولاية المحفوظة في ${m[1]}.`],
     [/^Continue saved mandate · (.+)$/i, m => `متابعة الولاية المحفوظة · ${m[1]}`],
+    [/^Continue (Campaign|Sandbox|Timed challenge: .+?) · (.+)$/i, m => `متابعة ${worldAr(m[1])} · ${m[2].replace('finished', 'منتهٍ')}`],
+    [/^(Campaign|Sandbox|Timed challenge: .+?) (resumed|restored) at (.+?)(?: — time is paused\. Press 1× to continue)?\.$/i, m => `${worldAr(m[1])}: ${m[2].toLowerCase() === 'resumed' ? 'استُؤنف' : 'استُعيد'} في ${m[3]}${m[4] === undefined && /paused/.test(m[0]) ? '' : ''}.`],
+    [/^Replace (Campaign|Sandbox|Timed challenge: .+)$/i, m => `استبدل ${worldAr(m[1])}`],
+    [/^Keep it — continue (Campaign|Sandbox|Timed challenge: .+)$/i, m => `احتفظ به — تابع ${worldAr(m[1])}`],
+    [/^Starting a new (.+?) replaces your saved (.+?) \((.+?)\)\.(?: Your other saved worlds are not affected: (.+)\.)?$/i, m => `بدء ${worldAr(m[1])} جديد يستبدل ${worldAr(m[2])} المحفوظ (${m[3]}).${m[4] ? ` لا تتأثر عوالمك المحفوظة الأخرى: ${m[4].split(', ').map(worldAr).join('، ')}.` : ''}`],
     [/^This starts a new mandate and replaces your saved one \((.+)\)\.$/i, m => `يبدأ هذا ولاية جديدة ويستبدل ولايتك المحفوظة (${m[1]}).`],
     [/^Planning pause — time is stopped\..*$/i, () => 'توقف للتخطيط — الوقت متوقف. اختر مشروعًا وخصص الأطقم واضغط ابدأ، ثم اضغط 1× لتشغيل الوقت.'],
     [/^Paused while you decide — press 1× to resume time\.$/i, () => 'متوقف أثناء اتخاذ القرار — اضغط 1× لاستئناف الوقت.'],
@@ -85,6 +90,7 @@
     [/^(.+) · (\d+)\/mo$/i, m => `${tr(m[1])} · ${m[2]}/شهر`],
     [/^(.+) · (\d+)%$/, m => P[m[1].trim().toLowerCase()] ? `${tr(m[1])} · ${m[2]}٪` : null]
   ];
+  function worldAr(w){ const t = String(w).trim(); if (/^campaign$/i.test(t)) return 'الحملة'; if (/^sandbox$/i.test(t)) return 'المحاكاة الحرة'; const m = t.match(/^Timed challenge: (.+)$/i); return m ? `التحدي الزمني: ${tr(m[1])}` : t; }
   function translateText(s){
     const t = s.trim(); if (!t || /^[\d\s.,%+−▲▼▬×—·B/:-]+$/.test(t)) return null;
     if (P[t.toLowerCase()]) return s.replace(t, P[t.toLowerCase()]);

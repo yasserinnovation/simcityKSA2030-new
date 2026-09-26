@@ -567,3 +567,5 @@ canvas{touch-action:none}
 @media (max-width:760px){.mn-row button{padding:4px 7px;font-size:10.5px}.mn-save{max-width:92vw}}
 body:has(#upgradesPanel:not(.hidden), #settingsPanel:not(.hidden), #shareModal:not(.hidden), #lensPanel:not(.hidden), #confirmBox) .mode-nav{display:none}   /* modal sheets take focus */
 body:has(#chapter:not(.hidden)) .mode-nav{left:auto;right:auto;transform:none;inset-inline-end:16px}   /* beside the chapter sheet, clear of its close button */
+.saved-worlds{display:grid;gap:6px;justify-items:center;margin:4px 0 10px}.saved-worlds small{font-size:11px;font-weight:800;color:var(--muted);letter-spacing:.04em}.saved-worlds button{min-width:min(460px,90vw)}
+.nat-confirm.pulse{outline:3px solid #f0a33c;outline-offset:2px}

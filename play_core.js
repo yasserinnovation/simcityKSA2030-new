@@ -252,9 +252,7 @@
   G.openNationalSetup = () => {
     G.hideAll(); $('#play').classList.add('hidden'); W.setBeacons(true); W.setProjectLabels(true);
     $('#intro').classList.remove('hidden', 'exit'); G.renderNav('national');
-    const sv = window.VisionNational && VisionNational.savedInfo(), lb = $('#loadBtn');   // a saved mandate is the default way in
-    if (sv) { lb.classList.remove('hidden', 'secondary'); lb.classList.add('primary'); lb.textContent = `Continue saved mandate · ${sv.label}`; $('#beginBtn').classList.replace('primary', 'secondary'); $('#beginBtn').textContent = 'Start a new mandate'; }
-    else { $('#beginBtn').classList.replace('secondary', 'primary'); $('#beginBtn').textContent = 'Enter the Kingdom'; }
+    if (window.VisionNational) VisionNational.prepareSetup();   // one Continue button per saved world
   };
 
   /* ============================ MODE SWITCHER ========================= */
@@ -265,8 +263,9 @@
   function saveStatus(mode){
     if (mode === 'missions') { const S = VM.state; if (S && !S.done && !$('#mhud').classList.contains('hidden')) return G.t('savedMission', {m:G.t(VM.mission(S.mission).title), n:Math.min(S.turn, S.maxTurns)});
       if (S && S.done && !$('#mhud').classList.contains('hidden')) return G.t('savedResults'); }
-    if (mode === 'city') { const c = G.cityStatus && G.cityStatus(); return c ? G.t('savedCity', {d:c.date}) : G.t('savedAuto'); }
-    if (mode === 'national') { const N = window.VisionNational, st = N && N.active ? N.status() : null; return st ? G.t('savedNational', {d:st.date}) : N && N.savedInfo() ? G.t('savedNationalSlot', {d:N.savedInfo().label}) : G.t('nationalNone'); }
+    if (mode === 'city') { const c = G.cityStatus && G.cityStatus(); return c ? G.t(c.dirty ? 'savingCity' : 'savedCity', {d:c.date}) : G.t('savedAuto'); }
+    if (mode === 'national') { const N = window.VisionNational, st = N && N.active ? N.status() : null, ws = N ? N.worlds() : [];
+      return st ? G.t('savedWorld', {w:st.label, d:st.date}) : ws.length ? G.t('savedWorlds', {list:ws.map(w => w.label).join(' · ')}) : G.t('nationalNone'); }
     const r = G.loadRun(); let run = null; try { run = r && r.s ? JSON.parse(r.s) : null; } catch(e) {}
     return run && !run.done ? G.t('savedHomeRun', {m:G.t(VM.mission(run.mission).title), n:run.turn}) : G.t('savedAuto');
   }

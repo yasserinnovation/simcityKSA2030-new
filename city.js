@@ -511,6 +511,15 @@
   function load(txt){ const d = JSON.parse(txt); if (!d || d.v !== VERSION) throw new Error('Incompatible city save'); S = d; S.policy = S.policy || {conserve:false}; S.weather = S.weather || {type:'clear', left:0}; S.spend = S.spend || []; S.missionLog = S.missionLog || []; if (S.invest === undefined) S.invest = null; undo.length = 0; settle(); return S; }
   function dateOf(m = S.month){ return {year:S.startYear + Math.floor(m / 12), month:m % 12}; }
 
-  window.VisionCity = {N, FAC, COST, CAPS, MILESTONES, CHALLENGES, KEY, idx, newCity, preview, apply, canUndo, doUndo, routePreview, addRoute, setRouteFreq, removeRoute,
-    setTax, setFund, setPolicy, takeLoan, compute, settle, CMISSIONS, startMission, abandonMission, missionStatus, acceptOffer, summary, tick, factorDeltas, serialize, load, dateOf, roadPathTiles, get state(){ return S; }, set state(v){ S = v; }};
+  // Save integrity: every successful change through the public API bumps a revision, so the UI can save edits made
+  // while time is paused (not only on month ticks or when leaving). autosaveDue() is the rule: unsaved changes that
+  // have been quiet for `quiet` ms (default 400) are due to be written.
+  let rev = 0, revAt = 0;
+  const changed = r => !(r === false || (r && typeof r === 'object' && r.ok === false));
+  const tracked = f => (...a) => { const r = f(...a); if (changed(r)) { rev++; revAt = Date.now(); } return r; };
+  const autosaveDue = (savedRev, now = Date.now(), quiet = 400) => rev !== savedRev && now - revAt >= quiet;
+
+  window.VisionCity = {N, FAC, COST, CAPS, MILESTONES, CHALLENGES, KEY, idx, newCity:tracked(newCity), preview, apply:tracked(apply), canUndo, doUndo:tracked(doUndo), routePreview, addRoute:tracked(addRoute), setRouteFreq:tracked(setRouteFreq), removeRoute:tracked(removeRoute),
+    setTax:tracked(setTax), setFund:tracked(setFund), setPolicy:tracked(setPolicy), takeLoan:tracked(takeLoan), compute, settle, CMISSIONS, startMission:tracked(startMission), abandonMission:tracked(abandonMission), missionStatus, acceptOffer:tracked(acceptOffer), summary, tick:tracked(tick), factorDeltas, serialize, load:tracked(load), dateOf, roadPathTiles,
+    rev:() => rev, autosaveDue, get state(){ return S; }, set state(v){ S = v; }};
 })();

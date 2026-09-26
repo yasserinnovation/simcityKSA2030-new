@@ -27,6 +27,7 @@
     let loaded = false;
     if (!fresh) for (const key of [VC.KEY, VC.KEY + '.backup']) { if (loaded) break; let s = null; try { s = localStorage.getItem(key); if (s) { VC.load(s); loaded = true; } } catch(e) { try { if (s) localStorage.setItem(VC.KEY + '.unreadable', s); } catch(e2) {} G.toast(t('cityLoadFail')); } }
     if (!loaded) VC.newCity({seed:(Date.now() % 100000) || 7, anchors:anchorsInGrid()});
+    ui.savedRev = loaded ? VC.rev() : -1;   // a loaded city matches its save; a new one is written on the next autosave check
     ui.active = true; ui.speed = 0; ui.tool = 'select'; ui.overlay = null; ui.sel = null; ui.panel = null;
     G.hideAll(); $('#chud').classList.remove('hidden'); $('#play').classList.remove('hidden'); G.renderNav && G.renderNav('city');
     W.setBeacons(false); W.setProjectLabels(false); W.setHazard(null); W.setEntities([]); W.setDynamicLabels([]); W.setMissionScene({links:[], sites:[]}); W.setOverlay([]);
@@ -42,16 +43,23 @@
   // The city saves automatically: every in-game month, when you leave or switch mode, and when the page closes.
   G.cityActive = () => ui.active;
   G.closeCity = next => { if (ui.active) leaveCity(next); };
-  G.cityStatus = () => { try { const d = VC.dateOf(); return {date:`${G.month(d.month, d.year)}`}; } catch(e) { return null; } };
+  G.cityStatus = () => { try { const d = VC.dateOf(); return {date:`${G.month(d.month, d.year)}`, dirty:VC.rev() !== ui.savedRev}; } catch(e) { return null; } };
   addEventListener('pagehide', () => { if (ui.active) save(); });
+  // Edits made while paused (build, demolish, undo, routes, tax, funding, loans) save within about half a second. A timer, not
+  // the animation frame, so it also runs when the tab is in the background.
+  setInterval(() => {
+    if (!ui.active) return;
+    if (VC.rev() !== ui.savedRev && !ui.navDirty) { ui.navDirty = true; G.renderNav && G.renderNav('city'); }   // show "saving changes…"
+    if (VC.autosaveDue(ui.savedRev) && !(ui.saveFailAt && Date.now() - ui.saveFailAt < 5000)) save();
+  }, 250);
   function leaveCity(next){ save(); ui.active = false; W.setDynamicLabels([]); W.setHazard(null); W.setProjectLabels(true); W.onGroundDrag(null); W.onGroundHover(null); W.setCity(null); W.setOverlay([]); W.setEntities([]); W.setMissionLights([]); $('#chud').classList.add('hidden'); if (typeof next === 'function') next(); else G.showMenu(); }
-  function save(){ try { const prev = localStorage.getItem(VC.KEY); if (prev) localStorage.setItem(VC.KEY + '.backup', prev); localStorage.setItem(VC.KEY, VC.serialize());
+  function save(){ try { const prev = localStorage.getItem(VC.KEY); if (prev) localStorage.setItem(VC.KEY + '.backup', prev); const rv = VC.rev(); localStorage.setItem(VC.KEY, VC.serialize()); ui.savedRev = rv; ui.navDirty = false; if (ui.active && G.renderNav) G.renderNav('city');
       const S = VC.state, deltas = VC.factorDeltas(), old = (G.profile.city && G.profile.city.deltas) || [], d = VC.dateOf();
       G.profile.compEvents = G.profile.compEvents || [];
       for (const x of deltas) { const o = old.find(y => y.factor === x.factor), from = o ? o.delta : 0; if (Math.abs(x.delta - from) >= .1) G.profile.compEvents.push({factor:x.factor, from, to:x.delta, why:x.why, source:'city', year:d.year, month:d.month}); }
       for (const o of old) if (!deltas.some(x => x.factor === o.factor)) G.profile.compEvents.push({factor:o.factor, from:o.delta, to:0, why:o.why, source:'city', year:d.year, month:d.month});
       if (G.profile.compEvents.length > 120) G.profile.compEvents = G.profile.compEvents.slice(-120);
-      G.profile.city = {deltas, month:S.month, pop:S.m.pop, caps:S.caps.slice(), transitShare:+(S.m.transitShare || 0).toFixed(3)}; G.saveProfile(); } catch(e) {} }
+      G.profile.city = {deltas, month:S.month, pop:S.m.pop, caps:S.caps.slice(), transitShare:+(S.m.transitShare || 0).toFixed(3)}; G.saveProfile(); ui.saveFailAt = 0; } catch(e) { ui.saveFailAt = Date.now(); } }
   G.citySummary = () => { try { const s = JSON.parse(localStorage.getItem(VC.KEY) || localStorage.getItem(VC.KEY + '.backup')); if (!s) return null; const y = s.startYear + Math.floor(s.month / 12); return {month:s.month, year:y, pop:(s.m || {}).pop || 0}; } catch(e) { return null; } };
 
   /* ============================== RENDERING ============================= */
