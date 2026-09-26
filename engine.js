@@ -21,12 +21,11 @@
   const ANCHOR_SPREAD = 3.4;
   const cityByName = {};
   for (const c of D.cities) { [c.x, c.z] = geo(c.lon, c.lat); cityByName[c.name] = c; }
-  for (const p of D.projects) {
-    let [x, z] = geo(p.lon, p.lat);
-    const a = p.anchor && cityByName[p.anchor];
-    if (a) { const s = p.spread || ANCHOR_SPREAD; x = a.x + (x - a.x) * s; z = a.z + (z - a.z) * s; }
-    p.x = x; p.z = z;
-  }
+  // Positions, footprints and marker pads come from layout.js: Riyadh uses an illustrative district plan (not survey
+  // geography); every project owns a clear footprint that decoration never enters.
+  const LY = window.VisionLayout;
+  for (const p of D.projects) { const q = LY.projects[p.id]; p.x = q.x; p.z = q.z; p.foot = q.r; p.pad = q.pad; }
+  const PIDX = Object.fromEntries(D.projects.map((p, i) => [p.id, i + 1])), PBYIDX = [null, ...D.projects.map(p => p.id)];
   for (const r of Object.values(D.regions)) [r.x, r.z] = geo(r.lon, r.lat);
   const P = id => D.projects.find(p => p.id === id);
   const C = name => cityByName[name];
@@ -185,6 +184,12 @@
       gl_FragColor=vec4(applyAtmos(c,vW),1.0);
     }
   `);
+  const pickProgram = program(`
+    attribute vec3 aPosition; attribute vec3 aColor; uniform mat4 uVP; varying vec3 vC;
+    void main(){ gl_Position=uVP*vec4(aPosition,1.0); vC=aColor; }
+  `, `
+    precision mediump float; varying vec3 vC; void main(){ gl_FragColor=vec4(vC,1.0); }
+  `);
   const pointProgram = program(`
     attribute vec3 aPosition; attribute vec3 aColor; attribute float aSize; uniform mat4 uVP; uniform float uScale; varying vec3 vColor;
     void main(){ vec4 p=uVP*vec4(aPosition,1.0); gl_Position=p; gl_PointSize=aSize*uScale*clamp(13.0/p.w,0.55,2.4); vColor=aColor; }
@@ -195,7 +200,8 @@
 
   /* --------------------------- geometry ----------------------------- */
   const Geo = () => ({p:[], c:[], n:[]});
-  const mesh = Geo(), cloudGeo = Geo(), lines = {p:[], c:[]};
+  const mesh = Geo(), detailMesh = Geo(), cloudGeo = Geo(), lines = {p:[], c:[]};
+  const DETAIL_DIST = 7.2;   // decorative detail appears as the camera approaches a region; the Kingdom overview stays clean
   let target = mesh, lineTarget = lines;
   const norm3 = v => { const l=Math.hypot(v[0],v[1],v[2])||1; return [v[0]/l,v[1]/l,v[2]/l]; };
   function pushV(v,col,n){ target.p.push(v[0],v[1],v[2]); target.c.push(col[0],col[1],col[2]); target.n.push(n[0],n[1],n[2]); }
@@ -346,7 +352,9 @@
   // Keep-out zones so generic city blocks don't sit on top of landmarks.
   const keepOut = [];
   const blocked = (x,z) => keepOut.some(([kx,kz,kr]) => Math.hypot(x-kx,z-kz) < kr);
-  function grove(lon,lat,n,r,kind){const [cx,cz]=geo(lon,lat);for(let i=0;i<n;i++){const a=rng()*6.283,d=Math.sqrt(rng())*r,x=cx+Math.cos(a)*d,z=cz+Math.sin(a)*d;if(!inSaudi(x,z))continue;kind==='palm'?addPalm(x,z,.7+rng()*.5):addTree(x,z,.7+rng()*.5,[.22+rng()*.08,.56+rng()*.14,.26]);}}
+  function grove(lon,lat,n,r,kind){const [cx,cz]=geo(lon,lat),prev=target;target=detailMesh;for(let i=0;i<n;i++){const a=rng()*6.283,d=Math.sqrt(rng())*r,x=cx+Math.cos(a)*d,z=cz+Math.sin(a)*d;if(!inSaudi(x,z)||!LY.decorAllowed(x,z,.055,.05,true))continue;kind==='palm'?addPalm(x,z,.7+rng()*.5):addTree(x,z,.7+rng()*.5,[.22+rng()*.08,.56+rng()*.14,.26]);}target=prev;}
+  // Trees that belong to a project (parks, green belts): inside its own footprint, clear of its marker pad.
+  function ownGrove(p,n,r,kind='tree'){for(let i=0,k=0;i<n*4&&k<n;i++){const a=rng()*6.283,d=Math.sqrt(rng())*r,x=p.x+Math.cos(a)*d,z=p.z+Math.sin(a)*d;if(Math.hypot(x-p.pad[0],z-p.pad[1])<.05)continue;k++;kind==='palm'?addPalm(x,z,.6+rng()*.3):addTree(x,z,.6+rng()*.4,[.22+rng()*.08,.56+rng()*.14,.26]);}}
 
   /* ----------------------------- terrain ---------------------------- */
   const blobs = [ // [lon, lat, rLon, rLat, color, weight]
@@ -452,31 +460,37 @@
     const ry=C('Riyadh'), mk=C('Makkah'), md=C('Madinah'), jd=C('Jeddah'), dm=C('Dammam');
     // Riyadh — Kingdom Centre and Al Faisaliah
     keepOut.push([ry.x,ry.z,.1]);
-    addBox(ry.x-.035,G,ry.z,.04,.36,.06,[.43,.70,.77]);addBox(ry.x+.035,G,ry.z,.04,.36,.06,[.43,.70,.77]);addBox(ry.x,G+.28,ry.z,.11,.03,.06,[.55,.80,.86]);
-    addBox(ry.x+.12,G,ry.z+.04,.045,.30,.045,[.51,.66,.73]);addCone(ry.x+.12,G+.30,ry.z+.04,.03,.09,[.66,.60,.42],8);addOcta(ry.x+.12,G+.26,ry.z+.04,.03,[.89,.69,.23]);
-    for(let i=0;i<9;i++){const a=i/9*6.283,r=.06+rng()*.03;addBox(ry.x+Math.cos(a)*r,G,ry.z+Math.sin(a)*r,.035,.08+rng()*.14,.035,[.62+rng()*.2,.70,.74]);}
+    // Kept compact (≈ .24 high) so the core never hides the districts behind it from the planning cameras.
+    addBox(ry.x-.03,G,ry.z,.035,.24,.05,[.43,.70,.77]);addBox(ry.x+.03,G,ry.z,.035,.24,.05,[.43,.70,.77]);addBox(ry.x,G+.19,ry.z,.095,.025,.05,[.55,.80,.86]);
+    addBox(ry.x+.08,G,ry.z+.04,.04,.19,.04,[.51,.66,.73]);addCone(ry.x+.08,G+.19,ry.z+.04,.026,.06,[.66,.60,.42],8);addOcta(ry.x+.08,G+.165,ry.z+.04,.026,[.89,.69,.23]);
+    for(let i=0;i<9;i++){const a=i/9*6.283,r=.055+rng()*.03;addBox(ry.x+Math.cos(a)*r,G,ry.z+Math.sin(a)*r,.032,.06+rng()*.09,.032,[.62+rng()*.2,.70,.74]);}
     // New Murabba — the Mukaab
-    const mu=P('newmurabba'); keepOut.push([mu.x,mu.z,.12]); addBox(mu.x,G,mu.z,.13,.13,.13,[.86,.58,.22]);addBox(mu.x,G+.13,mu.z,.135,.006,.135,[.98,.82,.40]);
+    const mu=P('newmurabba'); keepOut.push([mu.x,mu.z,.12]); addBox(mu.x,G,mu.z-.01,.09,.11,.09,[.86,.58,.22]);addBox(mu.x,G+.11,mu.z-.01,.095,.006,.095,[.98,.82,.40]);
     // Diriyah — At-Turaif mud brick
     const dr=P('diriyah'); keepOut.push([dr.x,dr.z,.12]);
     for(const [dx,dz,w,h] of [[0,0,.08,.06],[-.06,.01,.05,.045],[.06,.02,.05,.07],[-.03,-.05,.06,.04],[.05,-.05,.06,.035]])addBox(dr.x+dx,G,dr.z+dz,w,h,w,[.68,.45,.26]);
-    addPalm(dr.x-.1,dr.z+.04,.7);addPalm(dr.x+.1,dr.z+.06,.7);addPalm(dr.x,dr.z+.08,.6);
+    addPalm(dr.x-.07,dr.z-.05,.6);addPalm(dr.x+.07,dr.z-.06,.6);addPalm(dr.x,dr.z-.08,.5);
     // Qiddiya — stadium on the Tuwaiq cliffs + coaster
     const qd=P('qiddiya'); keepOut.push([qd.x,qd.z,.14]); addCylinder(qd.x,G,qd.z,.08,.04,[.91,.37,.24],16);addRing(qd.x,G+.041,qd.z,.055,[1,.83,.30],24);
-    for(let i=1;i<16;i++){const f=j=>[qd.x-.12+j*.016,G+.03+Math.sin(j/15*Math.PI*1.8)*.07,qd.z+.1+Math.cos(j/15*Math.PI*1.8)*.04];addLine(f(i-1),f(i),[.92,.25,.22]);}
+    for(let i=1;i<16;i++){const f=j=>[qd.x-.09+j*.012,G+.03+Math.sin(j/15*Math.PI*1.8)*.07,qd.z-.08-Math.cos(j/15*Math.PI*1.8)*.03];addLine(f(i-1),f(i),[.92,.25,.22]);}
     // KSIA runways
     const ks=P('ksip'); keepOut.push([ks.x,ks.z,.16]); for(const o of [-.05,0,.05])addStrip([ks.x-.14,ks.z+o],[ks.x+.14,ks.z+o-.04],.009,G+.006,[.30,.32,.34]); addBox(ks.x,G,ks.z+.08,.1,.025,.03,[.85,.88,.9]);
     // Expo — globe pavilion
-    const ex=P('expo'); keepOut.push([ex.x,ex.z,.12]); addDisc(ex.x,G+.004,ex.z,.1,[.62,.78,.45]); addDome(ex.x,G,ex.z,.055,[.99,.72,.30]); addRing(ex.x,G+.02,ex.z,.085,[1,.9,.5],28);
+    const ex=P('expo'); keepOut.push([ex.x,ex.z,.12]); addDisc(ex.x,G+.004,ex.z,.1,[.62,.78,.45]); addDome(ex.x,G,ex.z-.01,.045,[.99,.72,.30]); addRing(ex.x,G+.02,ex.z,.085,[1,.9,.5],28);
     // King Salman Park and Green Riyadh
-    const pk=P('park'); keepOut.push([pk.x,pk.z,.1]); addDisc(pk.x,G+.004,pk.z,.11,[.46,.72,.36],16); grove(...ungeo(pk.x,pk.z),14,.09,'tree');
-    const gr=P('greenriyadh'); grove(...ungeo(gr.x,gr.z),14,.1,'tree');
-    // Sports Boulevard green spine
-    const sp=P('sports'); addStrip([sp.x-.02,sp.z],[pk.x,pk.z],.012,G+.009,[.42,.72,.36]);
-    // Riyadh Metro lines
-    for(const [a,b,c] of [[[-.25,-.05],[.25,.05],[.49,.35,.86]],[[-.05,-.25],[.05,.25],[.95,.40,.30]],[[-.2,.18],[.2,-.18],[.25,.62,.85]]])addStrip([ry.x+a[0],ry.z+a[1]],[ry.x+b[0],ry.z+b[1]],.006,G+.01,c);
+    const pk=P('park'); keepOut.push([pk.x,pk.z,.1]); addDisc(pk.x,G+.004,pk.z,.105,[.46,.72,.36],16); ownGrove(pk,12,.075);
+    const gr=P('greenriyadh'); addDisc(gr.x,G+.004,gr.z,.095,[.52,.74,.40],16); ownGrove(gr,12,.07);
+    // Sports Boulevard: a green spine with a running track
+    const sp=P('sports'); addStrip([sp.x-.06,sp.z-.02],[sp.x+.06,sp.z-.02],.014,G+.009,[.42,.72,.36]); addRing(sp.x,G+.011,sp.z-.02,.035,[.95,.45,.35],20); addRing(sp.x,G+.011,sp.z-.02,.028,[.98,.98,.95],20);
+    // Riyadh Metro: depot and interchange, with lines running from the core to the depot, the park and New Murabba
+    const mt=P('metro'); addBox(mt.x,G,mt.z-.01,.07,.025,.04,[.62,.55,.86]); addRoof(mt.x,G+.025,mt.z-.01,.07,.012,.04,[.49,.35,.86]);
+    for (const [to,c] of [[mt,[.49,.35,.86]],[pk,[.95,.40,.30]],[mu,[.25,.62,.85]]]) { const dx=to.x-ry.x, dz=to.z-ry.z, L=Math.hypot(dx,dz); addStrip([ry.x+dx/L*.12,ry.z+dz/L*.12],[to.x-dx/L*(to.foot-.01),to.z-dz/L*(to.foot-.01)],.006,G+.01,c); }
     // ROSHN neighbourhood
-    const rs=P('roshn'); keepOut.push([rs.x,rs.z,.1]); for(let i=0;i<9;i++)addHouse(rs.x+(i%3-1)*.045,rs.z+(Math.floor(i/3)-1)*.045,.5,[.95,.88,.70]);
+    const rs=P('roshn'); keepOut.push([rs.x,rs.z,.1]); for(let i=0;i<9;i++)addHouse(rs.x+(i%3-1)*.034,rs.z-.012+(Math.floor(i/3)-1)*.032,.45,[.95,.88,.70]);
+    // District paths: each Riyadh district is joined to the core by a paved path that stops at its footprint edge.
+    for (const p of D.projects.filter(q => q.anchor === 'Riyadh')) { const dx=p.x-ry.x, dz=p.z-ry.z, L=Math.hypot(dx,dz), a=[ry.x+dx/L*.13,ry.z+dz/L*.13], b=[p.x-dx/L*p.foot,p.z-dz/L*p.foot];
+      const clear = D.projects.every(q => q===p || (() => { const t=Math.max(0,Math.min(1,((q.x-a[0])*(b[0]-a[0])+(q.z-a[1])*(b[1]-a[1]))/((b[0]-a[0])**2+(b[1]-a[1])**2))); return Math.hypot(q.x-a[0]-(b[0]-a[0])*t,q.z-a[1]-(b[1]-a[1])*t) > q.foot; })());
+      if (clear) addStrip(a,b,.008,G+.006,[.84,.76,.60]); }
 
     // Makkah — Masjid al-Haram courtyard and the Kaaba
     keepOut.push([mk.x,mk.z,.11]);
@@ -514,14 +528,14 @@
     const ep=P('eastern'); keepOut.push([ep.x,ep.z,.12]); for(let i=0;i<6;i++){addCylinder(ep.x-.06+(i%3)*.05,G,ep.z-.03+Math.floor(i/3)*.06,.018,.05+rng()*.04,[.84,.80,.72],9);} addLine([ep.x+.08,G,ep.z],[ep.x+.08,G+.14,ep.z],[.7,.7,.7]);
     addBox(dm.x+.06,G,dm.z-.02,.05,.02,.12,[.55,.55,.58]); addCrane(dm.x+.07,dm.z-.05,.45,[.3,.6,.85]); addCrane(dm.x+.07,dm.z+.03,.45,[.9,.4,.3]);
     // Renewables — Sudair solar and wind
-    const re=P('renewables'); keepOut.push([re.x,re.z,.12]); addSolar(re.x,re.z,8,6,.03); for(let i=0;i<4;i++)addTurbine(re.x+.14,re.z-.06+i*.04,.6);
+    const re=P('renewables'); keepOut.push([re.x,re.z,.12]); addSolar(re.x-.02,re.z-.03,6,4,.03); for(let i=0;i<3;i++)addTurbine(re.x+.085,re.z-.07+i*.04,.6);
     // Saudi Green Initiative — Al-Ahsa oasis
-    const gi=P('green'); grove(...ungeo(gi.x,gi.z),14,.08,'tree');
+    const gi=P('green'); ownGrove(gi,10,.06);
     // Aseer — Soudah peaks, Jazan port & industry
     const so=P('soudah'); for(let i=0;i<5;i++)addCone(so.x+Math.cos(i*1.3)*.06,G,so.z+Math.sin(i*1.3)*.05,.05,.1+rng()*.06,[.32,.52,.30],7);
     const jz=P('jazan'); keepOut.push([jz.x,jz.z,.08]); for(let i=0;i<4;i++)addCylinder(jz.x-.03+i*.025,G,jz.z,.012,.05,[.82,.82,.78],8); addCrane(jz.x-.04,jz.z+.04,.45);
     // Visible construction activity across the map
-    for (const id of ['expo','newmurabba','neom','qiddiya','masar','jeddahcentral']) { const p=P(id); addCrane(p.x+.07,p.z+.06,.5); }
+    { const prev=target; target=detailMesh; for (const id of ['expo','newmurabba','neom','qiddiya','masar','jeddahcentral']) { const p=P(id); addCrane(p.x-p.foot*.6,p.z-p.foot*.45,.5); } target=prev; }
   }
 
   function buildCities(){
@@ -532,14 +546,18 @@
         const a=rng()*6.283, r=Math.pow(rng(),.75)*R, x=city.x+Math.cos(a)*r, z=city.z+Math.sin(a)*r, k=.55+rng()*.5;
         if (!inSaudi(x,z) || blocked(x,z)) continue;
         const col=pal[Math.floor(rng()*pal.length)];
-        const tall=(1-r/R)*city.size;
-        if (tall>.45 && rng()>.55) addTower(x,z,.035+rng()*.02,.08+rng()*.22*tall,[.52+rng()*.2,.74,.88],rng()>.6?[.85,.9,.95]:null);
-        else addHouse(x,z,k,col,Math.round(rng()*3)*Math.PI/2*.0+(rng()-.5)*.3);
+        const tall=(1-r/R)*city.size, core=LY.insideCore(city.name,x,z);
+        if (core) { if (TOWER_CORES.has(city.name) && rng()>.35) { target=mesh; addTower(x,z,.028+rng()*.016,.06+rng()*.12*Math.max(.4,tall),[.52+rng()*.2,.74,.88],rng()>.6?[.85,.9,.95]:null); } continue; }
+        if (!LY.decorAllowed(x,z,.035,.035)) continue;
+        target=detailMesh; addHouse(x,z,k,col,Math.round(rng()*3)*Math.PI/2*.0+(rng()-.5)*.3);
       }
     }
+    target=mesh;
   }
+  const TOWER_CORES = new Set(['Riyadh','Jeddah','Dammam']);   // Makkah and Madinah cores hold their holy-site landmarks instead
 
-  function buildMarkerRings(){ for (const p of D.projects) addRing(p.x,G+.01,p.z,.05,p.color,20); }
+  // Each project's footprint is outlined on the ground in its colour, so its extent reads at every zoom.
+  function buildMarkerRings(){ for (const p of D.projects) addRing(p.x,G+.008,p.z,p.foot,shade(p.color,.9),28); }
 
   buildTerrain(); buildNetworks(); buildLandmarks(); buildCities(); buildMarkerRings();
 
@@ -582,15 +600,15 @@
     stageMesh.p.length=stageMesh.c.length=stageMesh.n.length=stageLines.p.length=stageLines.c.length=0;
     target=stageMesh; lineTarget=stageLines;
     for (const p of D.projects) {
-      const st=projectState[p.id], k=tierCount(st), d=st.doneKeys||[];
-      if (d.includes('site') || st.active==='site') addDisc(p.x,G+.004,p.z,.075,st.active==='site'?[.72,.52,.34]:[.80,.66,.48],18);   // graded site pad
-      for (let i=0;i<k;i++) addCylinder(p.x,G+i*.012,p.z,.034-i*.004,.012,shade(p.color,.8+i*.06),12);  // one tier per completed package
-      addCylinder(p.x,G+k*.012,p.z,.005,.08+k*.014,[.97,.95,.88],6);
-      if (d.includes('materials') && !d.includes('build')) for (let i=0;i<4;i++) addBox(p.x+.045+(i%2)*.018,G,p.z+.03+Math.floor(i/2)*.018,.014,.012,.014,i%2?[.62,.64,.68]:[.86,.72,.46]);  // stockpiled materials
-      if (st.active==='build') { const h=.04+.14*(st.progress||0); addBox(p.x-.045,G,p.z-.02,.05,h,.05,[.86,.84,.78]); addCrane(p.x-.07,p.z-.06,.4,[.98,.72,.2]);
-        for (let y=.02;y<h;y+=.02) addBox(p.x-.045,G+y,p.z-.02,.056,.002,.056,[.95,.62,.2]); }                       // rising structure with scaffold bands
-      if (st.active==='utility' || d.includes('utility')) for (let i=0;i<3;i++) { addCylinder(p.x+.06+i*.04,G,p.z-.07,.003,.06,[.55,.5,.45],5); }  // utility connection poles
-      if (k>=6) { addCylinder(p.x,G+k*.012,p.z,.03,.006,[1,.82,.3],16); }                                              // operational: gold cap
+      const st=projectState[p.id], k=tierCount(st), d=st.doneKeys||[], [px,pz]=p.pad, f=p.foot;   // progress lives on the marker pad at the footprint's south edge
+      if (d.includes('site') || st.active==='site') addDisc(px,G+.004,pz,.034,st.active==='site'?[.72,.52,.34]:[.80,.66,.48],18);   // graded site pad
+      for (let i=0;i<k;i++) addCylinder(px,G+i*.012,pz,.026-i*.003,.012,shade(p.color,.8+i*.06),12);  // one tier per completed package
+      addCylinder(px,G+k*.012,pz,.005,.08+k*.014,[.97,.95,.88],6);
+      if (d.includes('materials') && !d.includes('build')) for (let i=0;i<4;i++) addBox(px+.03+(i%2)*.014,G,pz-.01+Math.floor(i/2)*.014,.011,.01,.011,i%2?[.62,.64,.68]:[.86,.72,.46]);  // stockpiled materials
+      if (st.active==='build') { const h=.04+.14*(st.progress||0); addBox(p.x+f*.45,G,p.z-f*.1,.04,h,.04,[.86,.84,.78]); addCrane(p.x+f*.6,p.z-f*.45,.4,[.98,.72,.2]);
+        for (let y=.02;y<h;y+=.02) addBox(p.x+f*.45,G+y,p.z-f*.1,.046,.002,.046,[.95,.62,.2]); }                     // rising structure with scaffold bands
+      if (st.active==='utility' || d.includes('utility')) for (let i=0;i<3;i++) { addCylinder(p.x-f*.75+i*.03,G,p.z+f*.35,.003,.06,[.55,.5,.45],5); }  // utility connection poles
+      if (k>=6) { addCylinder(px,G+k*.012,pz,.022,.006,[1,.82,.3],16); }                                               // operational: gold cap
     }
     target=mesh; lineTarget=lines; stageDirty=true;
   }
@@ -732,20 +750,30 @@
     if (geo.n && buf.n) { gl.bindBuffer(gl.ARRAY_BUFFER,buf.n); gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(geo.n),usage); }
     buf.count = geo.p.length/3; return buf;
   }
-  const meshBuf = upload(mesh), cloudBuf = upload(cloudGeo), lineBuf = upload({p:lines.p,c:lines.c}, {p:gl.createBuffer(),c:gl.createBuffer()});
+  // Picking colours: each triangle is tagged with the project whose footprint contains it (0 = not a project).
+  function idColors(geo){ const P3=geo.p, n=P3.length/3, out=new Float32Array(n*3);
+    for (let v=0; v+2<n; v+=3) { const i=v*3, cx=(P3[i]+P3[i+3]+P3[i+6])/3, cz=(P3[i+2]+P3[i+5]+P3[i+8])/3, id=LY.footprintAt(cx,cz), k=id?PIDX[id]:0;
+      if (!k) continue; for (let j=0;j<3;j++){ out[(v+j)*3]=(k&255)/255; out[(v+j)*3+1]=((k>>8)&255)/255; out[(v+j)*3+2]=1; } }
+    return out; }
+  function uploadIds(geo, buf){ buf.id = buf.id || gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,buf.id); gl.bufferData(gl.ARRAY_BUFFER,idColors(geo),gl.STATIC_DRAW); return buf; }
+  const meshBuf = uploadIds(mesh, upload(mesh)), detailBuf = upload(detailMesh), cloudBuf = upload(cloudGeo), lineBuf = upload({p:lines.p,c:lines.c}, {p:gl.createBuffer(),c:gl.createBuffer()});
+  // Top of each project's model (for label placement): the highest vertex inside its footprint.
+  const topY = Object.fromEntries(D.projects.map(p => [p.id, G+.1]));
+  for (let i=0;i<mesh.p.length;i+=3) { const id=LY.footprintAt(mesh.p[i],mesh.p[i+2]); if (id && mesh.p[i+1]>topY[id]) topY[id]=mesh.p[i+1]; }
   let stageBuf = null, stageLineBuf = null, vehBuf = null, missionBuf = null, missionLineBuf = null, cityBuf = null, cityLineBuf = null;
   const waterBuf = {p:gl.createBuffer(), s:gl.createBuffer(), i:gl.createBuffer(), count:WATER.idx.length};
   gl.bindBuffer(gl.ARRAY_BUFFER,waterBuf.p); gl.bufferData(gl.ARRAY_BUFFER,WATER.pos,gl.STATIC_DRAW);
   gl.bindBuffer(gl.ARRAY_BUFFER,waterBuf.s); gl.bufferData(gl.ARRAY_BUFFER,WATER.shore,gl.STATIC_DRAW);
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,waterBuf.i); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,WATER.idx,gl.STATIC_DRAW);
   const dynPB=gl.createBuffer(), dynCB=gl.createBuffer(), dynSB=gl.createBuffer();
-  window.__visionStats={triangles:(meshBuf.count+cloudBuf.count)/3, water:WATER.idx.length/3, lines:lineBuf.count/2};
+  window.__visionStats={triangles:(meshBuf.count+detailBuf.count+cloudBuf.count)/3, detailTriangles:detailBuf.count/3, water:WATER.idx.length/3, lines:lineBuf.count/2};
 
   const U = (prog, names) => Object.fromEntries(names.map(n => [n, gl.getUniformLocation(prog, n)]));
   const loc = {
     m:{pos:gl.getAttribLocation(meshProgram,'aPosition'),col:gl.getAttribLocation(meshProgram,'aColor'),nrm:gl.getAttribLocation(meshProgram,'aNormal'),
        ...U(meshProgram,['uVP','uLightVP','uOffset','uShadow','uSun','uEye','uStorm','uDist','uShadowOn','uTexel','uGlow','uGround','uTime','uTint','uNight'])},
     d:{pos:gl.getAttribLocation(depthProgram,'aPosition'), ...U(depthProgram,['uLightVP','uOffset'])},
+    k:{pos:gl.getAttribLocation(pickProgram,'aPosition'),col:gl.getAttribLocation(pickProgram,'aColor'),uVP:gl.getUniformLocation(pickProgram,'uVP')},
     w:{pos:gl.getAttribLocation(waterProgram,'aPosition'),shore:gl.getAttribLocation(waterProgram,'aShore'), ...U(waterProgram,['uVP','uTime','uSun','uEye','uStorm','uDist','uTint','uNight'])},
     p:{pos:gl.getAttribLocation(pointProgram,'aPosition'),col:gl.getAttribLocation(pointProgram,'aColor'),size:gl.getAttribLocation(pointProgram,'aSize'),vp:gl.getUniformLocation(pointProgram,'uVP'),scale:gl.getUniformLocation(pointProgram,'uScale'),round:gl.getUniformLocation(pointProgram,'uRound')}
   };
@@ -839,15 +867,15 @@
       if (clustered && pr.anchor && !sel && !hov) continue;
       const top=beaconTop(st), pulse=Math.sin(t*.003+pr.x*3)*.01;
       const col = st.health==='blocked'?[.95,.35,.28]:st.health==='waiting'?[1,.72,.2]:st.done>=6?[1,.86,.3]:pr.color;
-      push(pr.x,top+.02+pulse+(sel?.03:0),pr.z,sel?[1,.95,.55]:col,sel?15:hov?13:10);
-      if (st.active) for (let i=0;i<3;i++){const a=t*.0024+i/3*6.283,r=.05;push(pr.x+Math.cos(a)*r,G+.02+i*.01,pr.z+Math.sin(a)*r,pr.color,3.5);}
+      push(pr.pad[0],top+.02+pulse+(sel?.03:0),pr.pad[1],sel?[1,.95,.55]:col,sel?15:hov?13:10);
+      if (st.active) for (let i=0;i<3;i++){const a=t*.0024+i/3*6.283,r=.035;push(pr.pad[0]+Math.cos(a)*r,G+.02+i*.01,pr.pad[1]+Math.sin(a)*r,pr.color,3.5);}
     }
     if (clustered && beaconsOn) for (const cl of clusters) { const pulse=Math.sin(t*.003+cl.x)*.012; push(cl.x,G+.34+pulse,cl.z,[1,.82,.3],19); push(cl.x,G+.34+pulse,cl.z,[1,1,.9],9); }
     roadPaths.forEach((path,r)=>{const L=roadL[r],n=Math.max(4,Math.round(L[L.length-1]*6));for(let i=0;i<n;i++){const dir=i%2,q=((t*.00003*(1+r%3*.3))/L[L.length-1]*3+i/n)%1,[x,z]=along(path,L,dir?q:1-q);push(x,G+.02,z,dir?[1,.92,.45]:[1,.98,.9],3.2);}});
     for (const w of wakes) push(w[0],SEA+.004,w[1],[1,1,1],w[2]);
     const mk=C('Makkah'); for(let i=0;i<48;i++){const a=i*.82+t*.00015,r=.035+(i%5)*.008;push(mk.x+Math.cos(a)*r,G+.012,mk.z+Math.sin(a)*r,[.99,.99,.96],2.2);}
     const hj=P('hajj'); for(let i=0;i<30;i++){const q=((t*.00004)+i/30)%1;push(hj.x+(mk.x-hj.x)*q+Math.sin(i*7)*.01,G+.012,hj.z+(mk.z-hj.z)*q+Math.cos(i*5)*.01,[.99,.99,.96],2.2);}
-    const ry=C('Riyadh'); for(let i=0;i<30;i++){const a=i*2.1+t*.0004,r=.05+(i%6)*.035;push(ry.x+Math.cos(a)*r,G+.02+(i%4)*.02,ry.z+Math.sin(a)*r,[1,.76,.3],3);}
+    const ry=C('Riyadh'); for(let i=0;i<30;i++){const a=i*2.1+t*.0004,r=.03+(i%6)*.016;push(ry.x+Math.cos(a)*r,G+.02+(i%4)*.02,ry.z+Math.sin(a)*r,[1,.76,.3],3);}
     if (hazard && hazard.intensity>.02) {
       const hz=hazard, n=Math.round(520*hz.intensity);
       for(let i=0;i<n;i++){ const q=Math.sqrt((i*17.17+t*.00022)%1), ang=i*2.399+t*.0003, x=hz.x+Math.cos(ang)*q*hz.r, z=hz.z+Math.sin(ang)*q*hz.r*.85;
@@ -880,8 +908,13 @@
   for (const l of D.labels) { const [x,z]=geo(l.lon,l.lat); makeLabel(l.text, l.kind, x, l.kind==='sea'?SEA:l.kind==='place'?G:NEI, z, l.kind==='place'?8:l.kind==='sea'?1:0); }
   for (const c of D.cities) { const L=makeLabel(c.name, 'city pal-'+c.palette+(c.capital?' capital':''), c.x, G+.1, c.z, c.priority||(3+c.size*4)); L.dx=c.dx||0; L.dy=c.dy||0; }
   const projLabel = makeLabel('', 'project', 0, 0, 0, 10);
+  // Honest framing: the Riyadh districts are an illustrative plan, not survey geography.
+  const noteLabel = (() => { const r=C('Riyadh'); const L=makeLabel('Illustrative district plan · not to scale', 'map-note', r.x, G, r.z+.72, 2.5); L.note=true; return L; })();
   const clusterLabels = clusters.map(cl => { const L=makeLabel(cl.anchor+' · '+cl.ids.length+' projects', 'cluster', cl.x, G+.34, cl.z, 9.5); L.cluster=true; return L; });
-  const smallProjLabels = D.projects.map(p => { const L=makeLabel(p.name, 'proj-small', p.x, G+.16, p.z, 1.5); L.small=true; return L; });
+  // Project name labels hold a full and a short variant (each translated once by the Arabic layer); the placer picks the
+  // variant that fits, anchors the label just above the model's real top, and lets the player click it.
+  const smallProjLabels = D.projects.map(p => { const L=makeLabel('', 'proj-small', p.x, G+.16, p.z, 1.5); L.small=true; L.pid=p.id; L.el.dataset.pid=p.id;
+    L.el.innerHTML='<span class="lf"></span><span class="ls"></span>'; L.el.children[0].textContent=p.name; L.el.children[1].textContent=LY.SHORT[p.id]||p.name; return L; });
   const dynLabels = new Map();
   function setDynLabels(list){
     const keep=new Set();
@@ -892,29 +925,55 @@
     for (const [id,L] of dynLabels) if (!keep.has(id)) { L.el.remove(); labels.splice(labels.indexOf(L),1); dynLabels.delete(id); }
   }
   function project(p){const v=M4.transform(vp,p);if(v[3]<=0.01)return null;const nx=v[0]/v[3],ny=v[1]/v[3];return [(nx*.5+.5)*width/dpr,(-ny*.5+.5)*height/dpr,v[2]/v[3]];}
+  // HUD controls that labels must never cover (re-measured a few times a second, not every frame).
+  const OBSTACLES = '#modeNav, .topbar, #navigator, #dock, #bottombar, #messageRibbon, .map-controls, #mcard, #mmeasures, #mMenuBtn, #decision, #planTray, #actionBar, #report, #results, .ctop, #cTools, #cPanel, #menuCard, #profileChip, #langBtn, #soundBtn, #pickChoices, #challengePanel, #challengeTop, #unitBar, #reviewCard, #coach, #banner, #chapter, .sheet:not(.hidden)';
+  let obstacles = [], obstaclesAt = 0;
+  function refreshObstacles(){ obstacles = []; for (const el of document.querySelectorAll(OBSTACLES)) { if (!el.getClientRects().length) continue; const cs=getComputedStyle(el); if (cs.visibility==='hidden' || +cs.opacity===0) continue; const r=el.getBoundingClientRect(); if (r.width>2 && r.height>2) obstacles.push({x:r.left,y:r.top,w:r.width,h:r.height}); } }
+  const hits = (r, q, px=4, py=2) => r.x < q.x+q.w+px && r.x+r.w+px > q.x && r.y < q.y+q.h+py && r.y+r.h+py > q.y;
+  function measure(L){ // (re)measure when the text changes, e.g. after the Arabic layer translates it
+    const txt = L.small ? L.el.children[0].textContent+'|'+L.el.children[1].textContent : L.el.textContent;
+    if (L.mText === txt && L.w) return; L.mText = txt;
+    if (L.small) { L.el.classList.remove('use-short'); L.wF=L.el.offsetWidth||60; L.el.classList.add('use-short'); L.wS=L.el.offsetWidth||40; L.el.classList.remove('use-short'); L.h=L.el.offsetHeight||16; L.w=L.wF; }
+    else { L.w=L.el.offsetWidth||60; L.h=L.el.offsetHeight||18; } }
   function updateLabels(){
-    const far = camera.dist;
-    const placed = [];
-    const order = labels.slice().sort((a,b)=>b.priority-a.priority);
-    for (const L of order) {
-      let show = true, x=L.x, y=L.y, z=L.z;
-      if (L===projLabel) { const id=hoverId||selectedId; const p=id&&P(id); if(!p||!projLabelsOn){show=false;} else { L.el.textContent=p.name; x=p.x; z=p.z; y=G+.2; } }
+    const far = camera.dist, now = performance.now(), cx = innerWidth/2, cy = innerHeight/2, diag = Math.hypot(cx, cy);
+    if (now - obstaclesAt > 350) { obstaclesAt = now; refreshObstacles(); }
+    labelLayer.classList.toggle('selectable', selectable);
+    const focus = hoverId || selectedId, cand = [];
+    for (const L of labels) {
+      let show = true, x=L.x, y=L.y, z=L.z, pri=L.priority;
+      if (L===projLabel) { const p=focus&&P(focus); if(!p||!projLabelsOn){show=false;} else { if (L.el.textContent!==p.name) { L.el.textContent=p.name; } L.el.dataset.pid=p.id; x=p.x; z=p.z; y=topY[p.id]+.035; } }
       else if ((L.cluster||L.small) && !projLabelsOn) show = false;
       else if (L.cluster) show = far > CLUSTER_DIST;
-      else if (L.small) show = far < 4.4 && L.el.textContent!==((P(hoverId||selectedId)||{}).name);
+      else if (L.note) show = projLabelsOn && far < 5.2;
+      else if (L.small) { show = far < 5.2 && L.pid!==focus; y = topY[L.pid]+.03; }
       else if (L.el.classList.contains('country')||L.el.classList.contains('sea')) show = far > 6.5;
       else if (!L.el.classList.contains('capital')) show = far < 24;
       const s = show && project([x,y,z]);
       if (!s || s[2]>1 || s[0]<-60 || s[1]<-30 || s[0]>innerWidth+60 || s[1]>innerHeight+30) { L.el.style.opacity=0; continue; }
-      if (!L.w) { L.w=L.el.offsetWidth||60; L.h=L.el.offsetHeight||18; }
-      if (L===projLabel) { L.w=L.el.offsetWidth; L.h=L.el.offsetHeight; }
-      const lift = L.el.classList.contains('city')||L===projLabel||L.cluster ? 18 : L.small ? 10 : 0;
-      const r = {x:s[0]-L.w/2+(far>7?L.dx:0), y:s[1]-L.h/2-lift+(far>7?L.dy:0), w:L.w, h:L.h};
-      if (L!==projLabel && placed.some(q => r.x < q.x+q.w+4 && r.x+r.w+4 > q.x && r.y < q.y+q.h+2 && r.y+r.h+2 > q.y)) { L.el.style.opacity=0; continue; }
+      if (L.small) pri = 2 + .9 * (1 - Math.min(1, Math.hypot(s[0]-cx, s[1]-cy) / diag));   // nearer the middle of the view = more relevant
+      cand.push({L, s, pri});
+    }
+    cand.sort((a,b) => b.pri - a.pri);
+    const placed = [];
+    for (const {L, s} of cand) {
+      measure(L); if (L===projLabel) { L.w=L.el.offsetWidth; L.h=L.el.offsetHeight; }
+      const lift = L.el.classList.contains('city')||L===projLabel||L.cluster ? 18 : L.small ? 8 : 0;
+      const at = w => ({x:s[0]-w/2+(far>7?L.dx:0), y:s[1]-L.h/2-lift+(far>7?L.dy:0), w, h:L.h});
+      const free = r => !placed.some(q => hits(r, q)) && !obstacles.some(q => hits(r, q, 2, 2));
+      let r = at(L.small ? L.wF : L.w), short = false;
+      if (!free(r) && L.small) { r = at(L.wS); short = true; }        // shorten before giving up
+      if (!free(r)) { L.el.style.opacity=0; continue; }
+      if (L.small) L.el.classList.toggle('use-short', short);
+      L.el.classList.toggle('hot', !!L.pid && L.pid===hoverId || L===projLabel);
       placed.push(r);
       L.el.style.opacity=1; L.el.style.transform=`translate3d(${r.x.toFixed(1)}px,${r.y.toFixed(1)}px,0)`;
     }
   }
+  // Clicking or hovering a project's label acts on that same project.
+  labelLayer.addEventListener('click', e => { const el=e.target.closest('[data-pid]'); if (!el || !selectable) return; hideChoices(); onSelect(P(el.dataset.pid)); });
+  labelLayer.addEventListener('pointerover', e => { const el=e.target.closest('[data-pid]'); if (el && selectable) hoverId=el.dataset.pid; });
+  labelLayer.addEventListener('pointerout', e => { const el=e.target.closest('[data-pid]'); if (el && selectable && hoverId===el.dataset.pid) hoverId=null; });
 
   /* ------------------------------ render ---------------------------- */
   let lastT=performance.now(), frames=0, slowFrames=0;
@@ -926,6 +985,7 @@
   }
   function drawDepth(buf){ if(!buf||!buf.count) return; attr(loc.d.pos,buf.p,3); gl.drawArrays(gl.TRIANGLES,0,buf.count); }
   const shadowsOn = () => shadowsSupported && quality==='high';
+  const detailOn = () => camera.dist < DETAIL_DIST;
   function updateLight(){
     const T=camera.target, h=Math.max(.9, Math.min(11, camera.dist*.62)), texel=2*h/SHADOW_SIZE;
     const c=[Math.round(T[0]/texel)*texel, G, Math.round(T[2]/texel)*texel];
@@ -940,9 +1000,9 @@
     if (hazard) { const d=Math.hypot(camera.target[0]-hazard.x,camera.target[2]-hazard.z); st=Math.max(st,hazard.intensity*Math.max(0,Math.min(1,1.7-d/(hazard.r*2.2)))*(hazard.type==='heat'?.45:1)); const tt=TINTS[hazard.type]||TINTS.dust; for(let i=0;i<3;i++) tint[i]+=(tt[i]-tint[i])*.05; }
     storm+=(st*(directMode?.6:1)-storm)*Math.min(1,dt*.002);
     if (follow) { camera.desired.target[0]=follow[0]; camera.desired.target[2]=follow[1]; }
-    if (stageDirty) { stageBuf=upload(stageMesh, stageBuf, gl.DYNAMIC_DRAW); stageLineBuf=upload({p:stageLines.p,c:stageLines.c}, stageLineBuf||{p:gl.createBuffer(),c:gl.createBuffer()}, gl.DYNAMIC_DRAW); stageDirty=false; }
+    if (stageDirty) { stageBuf=uploadIds(stageMesh, upload(stageMesh, stageBuf, gl.DYNAMIC_DRAW)); stageLineBuf=upload({p:stageLines.p,c:stageLines.c}, stageLineBuf||{p:gl.createBuffer(),c:gl.createBuffer()}, gl.DYNAMIC_DRAW); stageDirty=false; }
     if (cityDirty) { cityBuf=upload(cityMesh, cityBuf, gl.DYNAMIC_DRAW); cityLineBuf=upload({p:cityLines.p,c:cityLines.c}, cityLineBuf||{p:gl.createBuffer(),c:gl.createBuffer()}, gl.DYNAMIC_DRAW); cityDirty=false; }
-    if (missionDirty) { missionBuf=upload(missionMesh, missionBuf, gl.DYNAMIC_DRAW); missionLineBuf=upload({p:missionLines.p,c:missionLines.c}, missionLineBuf||{p:gl.createBuffer(),c:gl.createBuffer()}, gl.DYNAMIC_DRAW); missionDirty=false; }
+    if (missionDirty) { missionBuf=uploadIds(missionMesh, upload(missionMesh, missionBuf, gl.DYNAMIC_DRAW)); missionLineBuf=upload({p:missionLines.p,c:missionLines.c}, missionLineBuf||{p:gl.createBuffer(),c:gl.createBuffer()}, gl.DYNAMIC_DRAW); missionDirty=false; }
     buildVehicles(t); vehBuf=upload(vehGeo, vehBuf, gl.DYNAMIC_DRAW);
     gl.enable(gl.DEPTH_TEST); gl.disable(gl.CULL_FACE);
 
@@ -953,7 +1013,7 @@
       gl.clearColor(1,1,1,1); gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
       gl.useProgram(depthProgram); resetAttribs(); gl.uniformMatrix4fv(loc.d.uLightVP,false,lightVP); gl.uniform3f(loc.d.uOffset,0,0,0);
       gl.disableVertexAttribArray(loc.m.col); gl.disableVertexAttribArray(loc.m.nrm);
-      drawDepth(meshBuf); drawDepth(stageBuf); drawDepth(vehBuf); drawDepth(missionBuf); drawDepth(cityBuf);
+      drawDepth(meshBuf); if (detailOn()) drawDepth(detailBuf); drawDepth(stageBuf); drawDepth(vehBuf); drawDepth(missionBuf); drawDepth(cityBuf);
       gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0,0,width,height);
     }
 
@@ -972,7 +1032,7 @@
     gl.uniform3fv(loc.m.uSun,SUN); gl.uniform3fv(loc.m.uEye,eye); gl.uniform1f(loc.m.uStorm,storm); gl.uniform1f(loc.m.uDist,ed);
     gl.uniform1f(loc.m.uTexel,1/SHADOW_SIZE); gl.uniform1f(loc.m.uGround,G); gl.uniform1f(loc.m.uTime,t*.001); gl.uniform3fv(loc.m.uTint,tint); gl.uniform1f(loc.m.uNight,night);
     gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D,shadowTex); gl.uniform1i(loc.m.uShadow,0);
-    drawMesh(meshBuf); drawMesh(stageBuf,.05); drawMesh(vehBuf,.08); drawMesh(missionBuf,.04); drawMesh(cityBuf,.03);
+    drawMesh(meshBuf); if (detailOn()) drawMesh(detailBuf); drawMesh(stageBuf,.05); drawMesh(vehBuf,.08); drawMesh(missionBuf,.04); drawMesh(cityBuf,.03);
     gl.uniform3f(loc.m.uOffset, Math.sin(t*.00005)*.25, 0, 0); drawMesh(cloudBuf,.42,0); gl.uniform3f(loc.m.uOffset,0,0,0);
     gl.disableVertexAttribArray(loc.m.nrm);
 
@@ -988,10 +1048,14 @@
     const n=dynamicPoints(t); bindAttr(loc.p,dynPB,dynCB);gl.bindBuffer(gl.ARRAY_BUFFER,dynSB);gl.enableVertexAttribArray(loc.p.size);gl.vertexAttribPointer(loc.p.size,1,gl.FLOAT,false,0,0);
     gl.uniform1f(loc.p.round,1);gl.depthMask(false);gl.drawArrays(gl.POINTS,0,n);gl.depthMask(true);gl.disableVertexAttribArray(loc.p.size);gl.disable(gl.BLEND);
     updateLabels(); keyPan(dt);
+    if (pendingHover && performance.now() - pendingHover.t > 90) { const h = pendingHover; pendingHover = null; runHover(h.x, h.y, h.touch); }   // hover picks only once the pointer rests
     requestAnimationFrame(render);
   }
   function buildDynLines(t){
     dynLines.p.length=dynLines.c.length=0; lineTarget=dynLines;
+    if (selectable || selectedId) { const sp=selectedId&&P(selectedId), hp=hoverId&&hoverId!==selectedId&&P(hoverId);
+      if (sp) { addRing(sp.x,G+.014,sp.z,sp.foot+.006,[1,.86,.3],40); addRing(sp.x,G+.016,sp.z,sp.foot+.012,[1,.95,.6],40); }
+      if (hp) addRing(hp.x,G+.014,hp.z,hp.foot+.006,[1,1,1],40); }
     for (const o of overlay) { if (o.noLine) continue; const y=G+.022;
       if (o.dash) { const n=14; for(let i=0;i<n;i+=2){ const a=i/n,b=(i+1)/n; addLine([o.a[0]+(o.b[0]-o.a[0])*a,y,o.a[1]+(o.b[1]-o.a[1])*a],[o.a[0]+(o.b[0]-o.a[0])*b,y,o.a[1]+(o.b[1]-o.a[1])*b],o.color); } continue; }
       addLine([o.a[0],y,o.a[1]],[o.b[0],y,o.b[1]],o.color); addLine([o.a[0],y+.002,o.a[1]+.004],[o.b[0],y+.002,o.b[1]+.004],o.color); if (o.thick) { addLine([o.a[0]+.004,y,o.a[1]],[o.b[0]+.004,y,o.b[1]],o.color); addLine([o.a[0]-.004,y+.001,o.a[1]-.002],[o.b[0]-.004,y+.001,o.b[1]-.002],o.color); } }
@@ -1015,6 +1079,73 @@
     const d=[f[0]+r[0]*ax+u[0]*ay, f[1]+r[1]*ax+u[1]*ay, f[2]+r[2]*ax+u[2]*ay];
     if (d[1] >= -1e-4) return null; const k=(G-eye[1])/d[1]; return [eye[0]+d[0]*k, eye[2]+d[2]*k];
   }
+  // ---- Depth-correct picking: render project IDs (front-most wins) under the pointer, then resolve with layout.js rules.
+  let selectable=false, pendingHover=null, pickFB=null, pickTex=null, pickRB=null, pickW=0, pickH=0;
+  function ensurePickFB(){
+    if (pickFB && pickW===width && pickH===height) return;
+    pickFB=pickFB||gl.createFramebuffer(); pickTex=pickTex||gl.createTexture(); pickRB=pickRB||gl.createRenderbuffer(); pickW=width; pickH=height;
+    gl.bindTexture(gl.TEXTURE_2D,pickTex); gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,width,height,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
+    gl.bindRenderbuffer(gl.RENDERBUFFER,pickRB); gl.renderbufferStorage(gl.RENDERBUFFER,gl.DEPTH_COMPONENT16,width,height);
+    gl.bindFramebuffer(gl.FRAMEBUFFER,pickFB); gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,pickTex,0); gl.framebufferRenderbuffer(gl.FRAMEBUFFER,gl.DEPTH_ATTACHMENT,gl.RENDERBUFFER,pickRB);
+    gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+  }
+  function renderIds(x0, y0, w, h){
+    ensurePickFB(); gl.bindFramebuffer(gl.FRAMEBUFFER,pickFB); gl.viewport(0,0,width,height);
+    gl.enable(gl.SCISSOR_TEST); gl.scissor(x0,y0,w,h); gl.clearColor(0,0,0,0); gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT); gl.enable(gl.DEPTH_TEST); gl.disable(gl.BLEND);
+    gl.useProgram(pickProgram); resetAttribs(); gl.uniformMatrix4fv(loc.k.uVP,false,vp);
+    const draw=(buf, withIds)=>{ if(!buf||!buf.count) return; attr(loc.k.pos,buf.p,3); if (withIds && buf.id) attr(loc.k.col,buf.id,3); else { gl.disableVertexAttribArray(loc.k.col); gl.vertexAttrib3f(loc.k.col,0,0,0); } gl.drawArrays(gl.TRIANGLES,0,buf.count); };
+    draw(meshBuf,1); if (detailOn()) draw(detailBuf,0); draw(stageBuf,1); draw(missionBuf,1); draw(vehBuf,0);   // everything that can hide a project is drawn as an occluder
+    const px=new Uint8Array(w*h*4); gl.readPixels(x0,y0,w,h,gl.RGBA,gl.UNSIGNED_BYTE,px);
+    gl.disable(gl.SCISSOR_TEST); gl.bindFramebuffer(gl.FRAMEBUFFER,null); gl.viewport(0,0,width,height); resetAttribs(); return px;
+  }
+  function measurePick(cx, cy, tol){
+    const R=Math.ceil(tol*dpr), x=Math.round(cx*dpr), y=Math.round(height-cy*dpr), x0=Math.max(0,x-R), y0=Math.max(0,y-R), w=Math.min(width,x+R+1)-x0, h=Math.min(height,y+R+1)-y0;
+    if (w<=0 || h<=0 || !vp) return {center:null, around:[]};
+    const px=renderIds(x0,y0,w,h); let center=null, cd=1e9; const around=[];
+    for (let j=0;j<h;j++) for (let i=0;i<w;i++) { const o=(j*w+i)*4; if (!px[o+2]) continue; const id=PBYIDX[px[o]+px[o+1]*256]; if (!id) continue;
+      const d=Math.hypot(x0+i-x, y0+j-y)/dpr; if (d<=.75 && d<cd) { cd=d; center=id; } if (d<=tol) around.push({id, d}); }
+    return {center, around};
+  }
+  function markerHits(cx, cy, tol){
+    const clustered=camera.dist>CLUSTER_DIST, markers=[], clusterHits=[];
+    if (beaconsOn) for (const pr of D.projects) { if (clustered && pr.anchor) continue; const q=project([pr.pad[0],beaconTop(projectState[pr.id])+.02,pr.pad[1]]); if (!q || q[2]>1) continue; const d=Math.hypot(q[0]-cx,q[1]-cy); if (d<=tol) markers.push({id:pr.id, d}); }
+    if (clustered && beaconsOn) for (const cl of clusters) { const q=project([cl.x,G+.34,cl.z]); if (q && Math.hypot(q[0]-cx,q[1]-cy)<=tol+6) clusterHits.push(cl); }
+    return {markers, clusterHits};
+  }
+  function resolveAt(cx, cy, touch){
+    const m=measurePick(cx, cy, touch?16:6), mk=markerHits(cx, cy, touch?24:14), clustered=camera.dist>CLUSTER_DIST;
+    if (!m.center && !m.around.length && !mk.markers.length && mk.clusterHits.length) return {choose:mk.clusterHits[0].ids.slice()};
+    const nearest = list => list.length ? list.reduce((a,b)=>a.d<=b.d?a:b).id : null;
+    const first = m.center || nearest(m.around) || nearest(mk.markers), fp = first && P(first);
+    const cluster = clustered && fp && fp.anchor ? (clusters.find(c=>c.anchor===fp.anchor)||{}).ids : null;
+    return LY.resolvePick({center:m.center, around:m.around, markers:mk.markers, cluster});
+  }
+  // Cheap CPU pre-check: is the pointer anywhere near a project's on-screen box? Only then run the GPU ID pick.
+  function nearAnyProject(x, y, pad){
+    for (const p of D.projects) { let x0=1e9, y0=1e9, x1=-1e9, y1=-1e9, any=false;
+      for (let i=0;i<8;i++) { const a=i/8*6.283; for (const yy of [G, topY[p.id]]) { const q=project([p.x+Math.cos(a)*p.foot, yy, p.z+Math.sin(a)*p.foot]); if (!q) continue; any=true; x0=Math.min(x0,q[0]); x1=Math.max(x1,q[0]); y0=Math.min(y0,q[1]); y1=Math.max(y1,q[1]); } }
+      const m=project([p.pad[0], beaconTop(projectState[p.id])+.02, p.pad[1]]); if (m) { x0=Math.min(x0,m[0]); x1=Math.max(x1,m[0]); y0=Math.min(y0,m[1]); y1=Math.max(y1,m[1]); }
+      if (any && x>=x0-pad && x<=x1+pad && y>=y0-pad && y<=y1+pad) return true; }
+    return camera.dist > CLUSTER_DIST;   // clustered overview: cluster beacons are handled by the pick itself
+  }
+  function runHover(x, y, touch){ if (!selectable || pointers.size) return; if (!nearAnyProject(x, y, 16)) { hoverId=null; canvas.style.cursor=''; return; }
+    const r=resolveAt(x, y, touch); const id=r ? (r.select || (r.choose && r.choose[0])) : null; hoverId=id||null; canvas.style.cursor=id?'pointer':''; }
+  // Accessible choice list when several projects are under the pointer (instead of silently picking one).
+  const escH = t => String(t).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const choiceEl=document.createElement('div'); choiceEl.id='pickChoices'; choiceEl.className='pick-choices'; choiceEl.hidden=true; choiceEl.setAttribute('role','dialog'); document.body.appendChild(choiceEl);
+  function hideChoices(){ if (!choiceEl.hidden) { choiceEl.hidden=true; choiceEl.innerHTML=''; } }
+  function showChoices(ids, cx, cy){
+    const ar=document.body.classList.contains('national-ar') || document.documentElement.dir==='rtl', tr=t=>ar&&window.VisionNationalAR?(VisionNationalAR.translateText(t)||t):t;
+    choiceEl.setAttribute('aria-label', ar?'اختر مشروعًا':'Choose a project');
+    choiceEl.innerHTML=`<b>${ar?'أي مشروع؟':'Which project?'}</b>`+ids.map(id=>{ const p=P(id); return `<button type="button" data-pid="${id}"><i style="background:rgb(${p.color.map(v=>Math.round(v*255)).join(',')})"></i>${escH(tr(p.name))}</button>`; }).join('')+`<button type="button" class="pc-close" aria-label="${ar?'إغلاق':'Close'}">✕</button>`;
+    choiceEl.hidden=false; const w=choiceEl.offsetWidth, h=choiceEl.offsetHeight;
+    choiceEl.style.left=Math.max(8,Math.min(innerWidth-w-8,cx+12))+'px'; choiceEl.style.top=Math.max(8,Math.min(innerHeight-h-8,cy-h/2))+'px';
+    choiceEl.querySelectorAll('[data-pid]').forEach(b => { b.onclick=()=>{ hideChoices(); onSelect(P(b.dataset.pid)); }; b.onpointerenter=()=>{ hoverId=b.dataset.pid; }; });
+    choiceEl.querySelector('.pc-close').onclick=hideChoices; const f=choiceEl.querySelector('[data-pid]'); if (f) f.focus();
+  }
+  addEventListener('keydown', e => { if (e.key==='Escape' && !choiceEl.hidden) { hideChoices(); e.stopPropagation(); } }, true);
+  addEventListener('pointerdown', e => { if (!choiceEl.hidden && !e.target.closest('#pickChoices')) hideChoices(); }, true);
   function pickProject(cx, cy, radius=26){let best=null,bd=radius;for(const p of D.projects){const st=projectState[p.id],s=project([p.x,G+.1+st.stage*.03,p.z]);if(!s)continue;const d=Math.hypot(s[0]-cx,s[1]-cy);if(d<bd){best=p;bd=d;}}return best;}
   function pan(dx, dy){
     const k=camera.dist*.0011, sa=Math.sin(camera.az), ca=Math.cos(camera.az);
@@ -1031,7 +1162,10 @@
   });
   canvas.addEventListener('pointermove', e=>{
     const prev=pointers.get(e.pointerId);
-    if (!prev) { if (hoverTool) { const g=pickGround(e.clientX,e.clientY); if (g) hoverTool(g[0],g[1]); } const h=pickProject(e.clientX,e.clientY,groundHandler?14:26); hoverId=h?h.id:null; canvas.style.cursor=groundHandler?'crosshair':h?'pointer':''; return; }
+    if (!prev) { if (hoverTool) { const g=pickGround(e.clientX,e.clientY); if (g) hoverTool(g[0],g[1]); }
+      if (groundHandler) { const h=pickProject(e.clientX,e.clientY,14); hoverId=h?h.id:null; canvas.style.cursor='crosshair'; return; }
+      if (selectable) pendingHover={x:e.clientX, y:e.clientY, touch:e.pointerType==='touch', t:performance.now()}; else if (hoverId || canvas.style.cursor) { hoverId=null; canvas.style.cursor=''; }   // the menu map is not interactive: no pointer cue
+      return; }
     const dx=e.clientX-prev.x, dy=e.clientY-prev.y; moved+=Math.abs(dx)+Math.abs(dy); prev.x=e.clientX; prev.y=e.clientY;
     if (dragMode==='tool') { const g=pickGround(e.clientX,e.clientY); if (g) dragTool('move',g[0],g[1]); return; }
     if (dragMode==='pinch'&&pointers.size===2){const [a,b]=[...pointers.values()];const d=Math.hypot(a.x-b.x,a.y-b.y);camera.desired.dist=Math.max(1.6,Math.min(22,pinchDist*pinchStart/Math.max(20,d)));}
@@ -1040,9 +1174,10 @@
   });
   const endPointer=e=>{
     if (dragMode==='tool') { pointers.delete(e.pointerId); dragMode=null; const g=pickGround(e.clientX,e.clientY); dragTool(e.type==='pointerup'?'up':'cancel', g?g[0]:null, g?g[1]:null); return; }
-    const wasClick = pointers.has(e.pointerId) && moved<6 && dragMode!=='pinch';
+    const wasClick = pointers.has(e.pointerId) && moved<(e.pointerType==='touch'?12:6) && dragMode!=='pinch';   // a drag orbits/pans; only a still press is a click
     pointers.delete(e.pointerId); if(!pointers.size) dragMode=null;
-    if (wasClick && e.type==='pointerup' && e.button!==2) { if (groundHandler) { const g=pickGround(e.clientX,e.clientY); if (g && groundHandler({x:g[0],z:g[1],project:pickProject(e.clientX,e.clientY)})) return; } const p=pickProject(e.clientX,e.clientY); if(p) onSelect(p); }
+    if (wasClick && e.type==='pointerup' && e.button!==2) { if (groundHandler) { const g=pickGround(e.clientX,e.clientY); if (g && groundHandler({x:g[0],z:g[1],project:pickProject(e.clientX,e.clientY)})) return; }
+      if (selectable) { const r=resolveAt(e.clientX,e.clientY,e.pointerType==='touch'); if (r && r.select) { hideChoices(); onSelect(P(r.select)); } else if (r && r.choose) showChoices(r.choose,e.clientX,e.clientY); else hideChoices(); } }
   };
   canvas.addEventListener('pointerup', endPointer); canvas.addEventListener('pointercancel', endPointer);
   canvas.addEventListener('pointerleave', ()=>{ if(!pointers.size){hoverId=null;canvas.style.cursor='';} });
@@ -1098,7 +1233,17 @@
     clearSelection(){ selectedId=null; },
     setQuality(q){ setQuality(q); },
     getQuality(){ return quality; },
-    onSelect(fn){ onSelect=fn; }
+    onSelect(fn){ onSelect=fn; },
+    // Only the National Simulation selects projects on the map; the menu map stays inert (no pointer cue, no dead clicks).
+    setSelectable(v){ selectable=!!v; if (!selectable) { hoverId=null; hideChoices(); canvas.style.cursor=groundHandler?'crosshair':''; } labelLayer.classList.toggle('selectable', selectable); },
+    // Test/inspection helpers (read-only): what a click would select, and where each project is actually visible.
+    debug:{
+      pickAt:(x, y, touch) => resolveAt(x, y, !!touch),
+      visiblePixels(id, max=16){ const px=renderIds(0,0,width,height), k=PIDX[id], pts=[]; for (let j=0;j<height;j+=2) for (let i=0;i<width;i+=2) { const o=(j*width+i)*4; if (px[o+2] && px[o]+px[o+1]*256===k) pts.push([i/dpr,(height-j)/dpr]); }
+        if (!pts.length) return []; const mx=pts.reduce((a,p)=>a+p[0],0)/pts.length, my=pts.reduce((a,p)=>a+p[1],0)/pts.length; return pts.sort((a,b)=>Math.hypot(a[0]-mx,a[1]-my)-Math.hypot(b[0]-mx,b[1]-my)).slice(0,max).map(([x,y])=>({x,y})).concat([{count:pts.length}]); },
+      marker(id){ const pr=P(id), q=project([pr.pad[0],beaconTop(projectState[id])+.02,pr.pad[1]]); return q?{x:q[0],y:q[1]}:null; },
+      state:() => ({dist:camera.dist, selectable, hoverId, selectedId, detail:detailOn()})
+    }
   };
   requestAnimationFrame(render);
 })();

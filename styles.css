@@ -569,3 +569,17 @@ body:has(#upgradesPanel:not(.hidden), #settingsPanel:not(.hidden), #shareModal:n
 body:has(#chapter:not(.hidden)) .mode-nav{left:auto;right:auto;transform:none;inset-inline-end:16px}   /* beside the chapter sheet, clear of its close button */
 .saved-worlds{display:grid;gap:6px;justify-items:center;margin:4px 0 10px}.saved-worlds small{font-size:11px;font-weight:800;color:var(--muted);letter-spacing:.04em}.saved-worlds button{min-width:min(460px,90vw)}
 .nat-confirm.pulse{outline:3px solid #f0a33c;outline-offset:2px}
+/* Map labels: full/short variants, clickable project labels, selection cue, illustrative note */
+.map-label.proj-small .ls{display:none}.map-label.proj-small.use-short .lf{display:none}.map-label.proj-small.use-short .ls{display:inline}
+#mapLabels.selectable .map-label[data-pid]{pointer-events:auto;cursor:pointer}
+#mapLabels.selectable .map-label[data-pid]:hover,.map-label.hot{outline:2px solid #f6bd39;outline-offset:1px}
+.map-label.map-note{font-size:10.5px;font-weight:700;color:rgba(64,50,30,.75);background:rgba(255,248,223,.7);border-radius:8px;padding:2px 8px;font-style:italic}
+/* Choice list when several projects are under the pointer */
+.pick-choices[hidden]{display:none!important}
+.pick-choices{position:fixed;z-index:28;min-width:210px;max-width:min(320px,calc(100vw - 16px));background:rgba(255,250,230,.97);border:2px solid #f0c464;border-radius:14px;padding:8px;box-shadow:0 12px 32px rgba(20,50,40,.3);display:grid;gap:4px}
+.pick-choices b{font-size:12px;color:#153f38;padding:2px 4px}
+.pick-choices button{display:flex;align-items:center;gap:8px;min-height:44px;padding:6px 10px;border-radius:10px;border:1px solid #e8e2c8;background:#fffdf3;font:inherit;font-size:13px;font-weight:700;color:#153f38;cursor:pointer;text-align:start}
+.pick-choices button:hover,.pick-choices button:focus-visible{border-color:#f0a33c;outline:none;background:#fff4d8}
+.pick-choices button i{width:12px;height:12px;border-radius:50%;flex:none}
+.pick-choices .pc-close{min-height:44px;justify-content:center;font-weight:800;color:#627a6b}
+@media (max-width:480px){.mn-row{flex-wrap:nowrap}.mn-row button{padding:4px 8px;min-height:36px}.mn-row button:not(.on) .mn-t{display:none}.mn-save{font-size:9.5px}}   /* phones: one compact row, names on the active mode */

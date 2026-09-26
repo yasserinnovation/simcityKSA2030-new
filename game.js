@@ -61,6 +61,8 @@
     $('#intro').classList.add('exit'); setTimeout(() => $('#intro').classList.add('hidden'), 900);
     $('#hud').classList.remove('hidden'); $('#mandateOverlay').classList.add('hidden'); $('#reviewCard').classList.add('hidden'); if ($('#natConfirm')) $('#natConfirm').remove();
     if (window.VNP && VNP.renderNav) VNP.renderNav('national');
+    W.setSelectable(true);   // projects on the map are clickable only in the National Simulation
+    if (innerWidth < 760) for (const id of ['navigator','dock']) { $('#' + id).classList.add('collapsed'); const b = $(`[data-collapse="${id}"]`); if (b) b.setAttribute('aria-expanded', 'false'); }   // phones: start with the map visible
     ['#challengePanel','#challengeTop','#unitBar'].forEach(s => $(s).classList.add('hidden')); ['#navigator','#bottombar'].forEach(s => $(s).classList.remove('hidden'));
     W.onGroundClick(null); W.setHazard(null); W.setEntities([]); W.setDynamicLabels([]);
     const st = S(); st.slot = SV.slotOf(st); $('#modeTag').textContent = `${SIM.DIFFICULTY[st.difficulty].label.toUpperCase()} · ${slotLabel(st.slot).toUpperCase()}`;
@@ -480,7 +482,7 @@
     leave(){
       if (!ui.started) { $('#intro').classList.add('hidden'); return; }
       autosave(); clearTimeout(saveSoon);
-      ui.started = false; ui.speed = 0; ui.selected = null; ui.tool = null; ui.readiness = false; ui.drillFor = null; syncSpeed();
+      ui.started = false; ui.speed = 0; ui.selected = null; ui.tool = null; ui.readiness = false; ui.drillFor = null; syncSpeed(); W.setSelectable(false);
       ['#hud','#intro','#mandateOverlay','#kpiDrill','#reviewCard'].forEach(sel => $(sel) && $(sel).classList.add('hidden'));
       W.clearSelection(); for (const p of D.projects) W.setProjectState(p.id, INITIAL_PS[p.id]);
       W.setOverlay([]); W.setEntities([]); W.setDynamicLabels([]); W.setHazard(null); W.onGroundClick(null);

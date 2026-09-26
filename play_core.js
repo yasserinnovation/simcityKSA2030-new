@@ -78,7 +78,9 @@
   /* =========================== WORLD SCENE =========================== */
   const NP = {};
   G.nodePos = (id, board = VM.board) => { const key = board + ':' + id; if (NP[key]) return NP[key]; const n = VM.BOARDS[board].nodes[id]; if (!n) return [0, 0];
-    if (n.project) { const p = D.projects.find(p => p.id === n.project); NP[key] = [p.x, p.z]; } else NP[key] = W.place(n.lon, n.lat, n.anchor); return NP[key]; };
+    if (n.project) { const p = D.projects.find(p => p.id === n.project); NP[key] = [p.x, p.z]; }
+    else { const q = W.place(n.lon, n.lat, n.anchor); NP[key] = n.core || !window.VisionLayout ? q : window.VisionLayout.clearOf(q[0], q[1]); }   // keep mission-only sites off project footprints
+    return NP[key]; };
   const SITE_OFF = {academy:[-.1,-.11], research:[.11,-.12], warehouse:[.12,.04], wind:[-.12,-.1], hotel:[.1,.07], housing:[-.11,.08], park:[.09,-.1], retrofit:[-.08,-.07], hub:[.13,-.02], shelter:[-.06,.11], medic:[.03,.13], generator:[.12,.11], microgrid:[.12,.11],
     solar:[0,0], storage:[.02,.1], peaker:[-.14,.06], opened:[0,0]};
   const site = (kind, node, extra={}, board) => { const p = G.nodePos(node, board), o = SITE_OFF[kind] || [0,0]; return {kind, x:p[0] + o[0], z:p[1] + o[1], ...extra}; };
@@ -273,7 +275,7 @@
     if (mode) G.mode = mode;
     const nav = $('#modeNav'); if (!nav) return;
     nav.className = 'mode-nav glass mode-' + G.mode + (G.mode === 'national' && !$('#hud').classList.contains('hidden') ? ' in-hud' : '') + (G.mode === 'city' ? ' in-city' : '');
-    nav.innerHTML = `<div class="mn-row" role="tablist">${MODES.map(([id, ic, k]) => `<button role="tab" data-go="${id}" class="${G.mode === id ? 'on' : ''}" aria-selected="${G.mode === id}">${ic} ${esc(G.t(k))}</button>`).join('')}</div>
+    nav.innerHTML = `<div class="mn-row" role="tablist">${MODES.map(([id, ic, k]) => `<button role="tab" data-go="${id}" class="${G.mode === id ? 'on' : ''}" aria-selected="${G.mode === id}" aria-label="${esc(G.t(k))}" title="${esc(G.t(k))}">${ic} <span class="mn-t">${esc(G.t(k))}</span></button>`).join('')}</div>
       <small class="mn-save" title="${esc(G.t('savePolicy'))}">💾 ${esc(saveStatus(G.mode))}</small>`;
     $$('#modeNav [data-go]').forEach(b => b.onclick = () => G.go(b.dataset.go));
   };
