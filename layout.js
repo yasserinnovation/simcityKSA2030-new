@@ -39,15 +39,15 @@
   const RIYADH_PLAN = {
     newmurabba:{at:[-.16,-.61], r:.10},
     roshn:     {at:[.17,-.61],  r:.09},
-    ksip:      {at:[.55,-.64],  r:.13, pad:[.52,-.56]},
-    expo:      {at:[.60,-.37],  r:.075},
+    ksip:      {at:[.55,-.64],  r:.13, pad:[.55,-.53]},              // marker south of the terminal
+    expo:      {at:[.60,-.37],  r:.075, pad:[.642,-.328]},   // marker at the south-east corner, clear of the pavilion
     metro:     {at:[0,.22],     r:.06, pad:[.035,.245]},
-    park:      {at:[.30,.02],   r:.10},
+    park:      {at:[.27,.035],  r:.10},                              // close to downtown, still a clear gap
     diriyah:   {at:[-.52,-.09], r:.09},
     sports:    {at:[-.18,-.20], ribbon:{pts:[[-.40,-.20],[-.20,-.20],[0,-.20],[.20,-.20],[.40,-.20]], hw:.03}, pad:[-.26,-.20]},
     renewables:{at:[-.47,-.62], r:.10},
     qiddiya:   {at:[-.56,.44],  r:.10},
-    greenriyadh:{at:[.34,.44],  ribbon:{pts:[[.12,.40],[.26,.43],[.40,.47],[.56,.44],[.70,.48],[.86,.46]], hw:.07}, pad:[.30,.44]}
+    greenriyadh:{at:[.34,.45],  ribbon:{pts:[[.14,.42],[.26,.44],[.40,.48],[.56,.45],[.70,.49],[.86,.47]], hw:.09}, pad:[.30,.45]}
   };
   // Roads that legitimately enter a footprint because they serve it (downtown and the metro station sit on King Fahd
   // Road; Sports Boulevard bridges it).

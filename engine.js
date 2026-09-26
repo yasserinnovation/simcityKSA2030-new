@@ -469,30 +469,123 @@
         if (LY.cityRoadDist(x,z) < .03 || Math.hypot(x-p.pad[0],z-p.pad[1]) < .045) continue; addTree(x,z,k,[.22+rng()*.08,.56+rng()*.14,.26]); } } }
   function polyStrip(pts, w, y, col){ for (let i=1;i<pts.length;i++) addStrip(pts[i-1],pts[i],w,y,col); }
   function polyLine(pts, y, col, off=0){ for (let i=1;i<pts.length;i++){ const a=pts[i-1], b=pts[i], L=Math.hypot(b[0]-a[0],b[1]-a[1])||1, nx=-(b[1]-a[1])/L*off, nz=(b[0]-a[0])/L*off; addLine([a[0]+nx,y,a[1]+nz],[b[0]+nx,y,b[1]+nz],col); } }
+  // ★ Downtown: the split-top tower just east of King Fahd Road, Al Faisaliah to the west, and glass towers stepping down
+  // to the edge on a few downtown streets. King Fahd Road runs clear through the middle; both icons keep clear air around them.
+  const KC = {dx:.045, dz:-.01, h:.42};                                   // split-top tower: position and height (label sits above it)
+  function riyadhDowntown(ry, rn){
+    keepOut.push([ry.x,ry.z,LY.RIYADH_CORE.r]);
+    const kx=ry.x+KC.dx, kz=ry.z+KC.dz, H=KC.h, y0=H*.56, n=28, glass=[.50,.72,.82], edge=[.78,.90,.95];
+    addBox(kx,G,kz,.074,.012,.052,[.80,.80,.78]);                                                         // podium
+    for (let i=0;i<n;i++){ const ya=H*i/n, yb=H*(i+1)/n, ym=(ya+yb)/2, t=ym/H;
+      const W=.027*(1-.32*t*t), D=.019*(1-.3*t);                                                            // outer half-width tapers towards the top
+      if (ym<y0) { addBox(kx,G+.012+ya,kz,2*W,yb-ya,2*D,i%4===3?edge:glass); continue; }
+      const g=.021*Math.sqrt((ym-y0)/(H-y0));                                                               // the parabolic opening widens upwards
+      if (W-g < .0025) continue;
+      for (const sg of [-1,1]) addBox(kx+sg*(W+g)/2,G+.012+ya,kz,W-g,yb-ya,2*D,i%4===3?edge:glass); }
+    { const yb=y0+(H-y0)*.66, W=.027*(1-.32*((yb)/H)**2); addBox(kx,G+.012+yb,kz,2*W-.003,.008,.014,[.92,.95,.97]); }   // skybridge across the opening
+    const fx=ry.x-.052, fz=ry.z+.03;                                                                        // Al Faisaliah: slim square pyramid, gold globe, spire
+    addBox(fx,G,fz,.05,.01,.05,[.80,.80,.78]); addCone(fx,G+.01,fz,.03,.29,[.58,.72,.78],4); addOcta(fx,G+.215,fz,.017,[.96,.76,.26]); addCylinder(fx,G+.29,fz,.002,.035,[.85,.85,.85],4);
+    // downtown streets (they explain the blocks) and towers stepping down from the centre
+    lineTarget=lines; for (const o of [-.078,-.052,.052,.078]) { addStrip([ry.x+o,ry.z-.1],[ry.x+o,ry.z+.1],.003,G+.004,[.62,.60,.58]); addStrip([ry.x-.1,ry.z+o],[ry.x-.024,ry.z+o],.003,G+.004,[.62,.60,.58]); addStrip([ry.x+.024,ry.z+o],[ry.x+.1,ry.z+o],.003,G+.004,[.62,.60,.58]); }
+    const pal=[[.48,.70,.86],[.40,.62,.74],[.62,.76,.84],[.70,.74,.78],[.52,.80,.82],[.80,.76,.66]];
+    for (let gx=-5; gx<=5; gx++) for (let gz=-5; gz<=5; gz++) { const x=ry.x+gx*.021+(rn()-.5)*.004, z=ry.z+gz*.021+(rn()-.5)*.004, d=Math.hypot(x-ry.x,z-ry.z);
+      if (d > .11 || Math.abs(x-ry.x) < .024) continue;                                   // King Fahd Road runs clear through downtown
+      if (Math.abs(x-kx) < .045 && Math.abs(z-kz) < .04) continue;                          // clear air around the split-top
+      if (Math.abs(x-fx) < .032 && Math.abs(z-fz) < .032) continue;                         // and around Al Faisaliah
+      if ([-.078,-.052,.052,.078].some(o => Math.abs(x-ry.x-o) < .006 || Math.abs(z-ry.z-o) < .006)) continue;   // not on a street
+      const k=Math.pow(1-d/.12,1.1), h=.04+.27*k*(.5+rn()*.5), w=.012+rn()*.007, col=pal[Math.floor(rn()*pal.length)];
+      if (h > .12 && rn() > .5) { addBox(x,G,z,w+.004,h*.55,w+.004,col); addTower(x,z,w*.8,h,shade(col,1.08),rn()>.5?[.88,.92,.96]:null); }   // setback tower
+      else addTower(x,z,w,h,col,rn()>.72?[.85,.9,.95]:null); }
+  }
+  // Expo 2030: its own paved, hedged parcel south of the airport — a large golden ring pavilion (lattice ribs, crown ring,
+  // glass dome) on a central plaza, six exhibition pavilions around it, gardens between, and a footpath to the airport.
+  function riyadhExpo(rn, ks){
+    const ex=P('expo'), R0=ex.foot; keepOut.push([ex.x,ex.z,R0]);
+    addDisc(ex.x,G+.003,ex.z,R0-.002,[.86,.82,.72],32); addRing(ex.x,G+.006,ex.z,R0-.004,[.34,.58,.30],40);                      // parcel paving + hedge line
+    addDisc(ex.x,G+.004,ex.z,.046,[.93,.90,.82],28);                                                                           // central plaza
+    const gold=[.95,.73,.24], deep=[.82,.56,.16];
+    addCylinder(ex.x,G,ex.z,.036,.008,[.96,.93,.86],28);                                                                        // plinth
+    for (let i=0;i<28;i++){ const a=i/28*6.283, r=.034; addBox(ex.x+Math.cos(a)*r,G+.008,ex.z+Math.sin(a)*r,.0035,.03,.0035,i%2?gold:deep,-a); }   // lattice ribs
+    for (let i=0;i<36;i++){ const a=(i+.5)/36*6.283; addBox(ex.x+Math.cos(a)*.0355,G+.038,ex.z+Math.sin(a)*.0355,.0075,.006,.0065,gold,-a); }   // open crown ring
+    addDome(ex.x,G+.008,ex.z,.024,[.72,.84,.86]); addCylinder(ex.x,G+.008,ex.z,.03,.002,[.93,.90,.82],24);                    // glass dome in an open court
+    for (let i=0;i<6;i++){ const a=i/6*6.283+.52, x=ex.x+Math.cos(a)*.058, z=ex.z+Math.sin(a)*.058;                               // exhibition pavilions
+      if (Math.hypot(x-ex.pad[0],z-ex.pad[1])<.03) continue;
+      if (i%3===0) { addBox(x,G,z,.018,.012,.018,[.95,.95,.96],a); addBox(x,G+.012,z,.02,.003,.02,[.30,.62,.78],a); }
+      else if (i%3===1) { addCylinder(x,G,z,.01,.01,[.94,.94,.95],12); addDome(x,G+.01,z,.01,[.55,.78,.72]); }
+      else { addBox(x,G,z,.022,.009,.012,[.93,.90,.84],a+1.57); addBox(x,G+.009,z,.024,.003,.014,[.86,.52,.34],a+1.57); } }
+    for (let i=0;i<6;i++){ const a=i/6*6.283; const x=ex.x+Math.cos(a)*.047, z=ex.z+Math.sin(a)*.047;                              // gardens between pavilions
+      addDisc(x,G+.005,z,.008,[.46,.72,.38],10); addTree(x,z,.22,[.24,.58,.30]); }
+    addStrip([ex.x-.012,ex.z-R0],[ks.x-.012,ks.z+ks.foot],.004,G+.006,[.90,.84,.66]);                                           // footpath to the airport
+  }
+  // King Salman International Airport: broad and low — two long runways with centre lines and thresholds, a parallel
+  // taxiway with connectors, an apron, a long terminal with four piers and a slim tower, and the Metro's terminal stop.
+  function riyadhAirport(ks){
+    keepOut.push([ks.x,ks.z,ks.foot]);
+    const asphalt=[.30,.31,.33], taxi=[.44,.45,.47], apron=[.70,.71,.72], white=[.96,.96,.94];
+    addDisc(ks.x,G+.002,ks.z,ks.foot-.004,[.82,.76,.62],32);                                                    // airfield ground
+    for (const [dz, L] of [[-.075,.105],[-.02,.115]]) {                                                        // runways
+      addStrip([ks.x-L,ks.z+dz],[ks.x+L,ks.z+dz],.011,G+.005,asphalt);
+      for (let t=-L+.02;t<L-.02;t+=.022) addBox(ks.x+t+.006,G+.0062,ks.z+dz,.011,.0008,.0015,white);          // centre-line dashes
+      for (const e of [-1,1]) for (let k=-2;k<=2;k++) addBox(ks.x+e*(L-.008),G+.0062,ks.z+dz+k*.004,.01,.0008,.002,white); }   // threshold bars
+    addStrip([ks.x-.1,ks.z+.012],[ks.x+.1,ks.z+.012],.0045,G+.0055,taxi);                                    // parallel taxiway
+    for (const t of [-.085,-.03,.03,.085]) { addStrip([ks.x+t,ks.z-.075],[ks.x+t,ks.z+.012],.003,G+.0056,taxi); addStrip([ks.x+t,ks.z+.012],[ks.x+t,ks.z+.03],.003,G+.0056,taxi); }
+    addBox(ks.x,G+.002,ks.z+.042,.17,.004,.03,apron);                                                          // apron
+    addBox(ks.x,G,ks.z+.068,.13,.014,.02,[.90,.92,.94]); addBox(ks.x,G+.014,ks.z+.068,.134,.004,.024,[.55,.72,.86]);   // terminal, blue roof
+    for (const t of [-.045,-.015,.015,.045]) addBox(ks.x+t,G,ks.z+.047,.008,.008,.022,[.92,.93,.95]);         // piers to the apron
+    addCylinder(ks.x+.075,G,ks.z+.06,.004,.05,[.90,.90,.92],8); addCylinder(ks.x+.075,G+.05,ks.z+.06,.009,.008,[.45,.62,.74],10);   // control tower
+    const plane=(x,z,rot,k=1)=>{ addBox(x,G+.006,z,.024*k,.004,.005*k,white,rot); addBox(x,G+.007,z,.006*k,.002,.03*k,white,rot); addBox(x+Math.cos(rot)*.011*k,G+.008,z+Math.sin(rot)*.011*k,.003*k,.006,.011*k,white,rot); };
+    for (const t of [-.045,-.015,.015,.045]) plane(ks.x+t,ks.z+.03,Math.PI/2,.85);                              // parked at the piers
+    plane(ks.x-.05,ks.z-.075,0,1.1);                                                                            // one on the runway
+    const me=LY.METRO_ROUTE[LY.METRO_ROUTE.length-1]; addBox(me[0],G,me[1],.02,.012,.012,[.95,.96,.98]); addBox(me[0],G+.012,me[1],.022,.003,.014,[.20,.42,.82]);   // Metro terminal stop
+  }
+  // King Salman Park: a bounded, designed landscape beside downtown — hedge edge, lawns in two greens, an irregular lake
+  // with a bridge, looping paths, clumps of shade trees and a white pavilion; a planted promenade links it to downtown.
+  function riyadhPark(pk, ry, rn){
+    const R0=pk.foot-.004; keepOut.push([pk.x,pk.z,pk.foot]);
+    addDisc(pk.x,G+.003,pk.z,R0,[.47,.72,.36],36); addRing(pk.x,G+.006,pk.z,R0,[.22,.46,.24],48);
+    for (const [dx,dz,r,c] of [[-.03,-.03,.045,[.58,.80,.44]],[.035,-.02,.035,[.52,.76,.40]],[-.01,.04,.04,[.56,.79,.43]]]) addDisc(pk.x+dx,G+.004,pk.z+dz,r,c,24);   // lawns
+    const lake=[[.02,.015,.024],[.04,.03,.018],[.005,.035,.014]]; for (const [dx,dz,r] of lake) addDisc(pk.x+dx,G+.005,pk.z+dz,r,[.30,.62,.84],20);
+    addBox(pk.x+.022,G+.007,pk.z+.035,.006,.003,.03,[.92,.88,.78]);                                                     // footbridge over the lake
+    lineTarget=lines; const loop=[]; for (let i=0;i<=40;i++){ const a=i/40*6.283, r=.07+.012*Math.sin(a*3); loop.push([pk.x+Math.cos(a)*r,pk.z+Math.sin(a)*r*.9]); }
+    polyStrip(loop,.0025,G+.006,[.93,.87,.70]);                                                                          // loop path
+    polyStrip([[pk.x-.09,pk.z+.01],[pk.x-.04,pk.z+.005],[pk.x,pk.z-.01],[pk.x+.03,pk.z-.05],[pk.x+.05,pk.z-.075]],.002,G+.006,[.93,.87,.70]);   // cross path
+    addCylinder(pk.x-.045,G,pk.z+.035,.012,.006,[.96,.95,.92],14); addDome(pk.x-.045,G+.006,pk.z+.035,.011,[.97,.97,.95]);   // pavilion
+    const clumps=[[-.055,-.05],[.0,-.075],[.06,-.055],[.075,.02],[.05,.07],[-.03,.075],[-.08,.02]];
+    for (const [cx,cz] of clumps) for (let i=0;i<5;i++){ const x=pk.x+cx+(rn()-.5)*.03, z=pk.z+cz+(rn()-.5)*.025;
+      if (Math.hypot(x-pk.x,z-pk.z) > R0-.008 || Math.hypot(x-pk.pad[0],z-pk.pad[1]) < .035) continue; addTree(x,z,.3+rn()*.22,[.18+rn()*.1,.50+rn()*.16,.24]); }
+    const x0=ry.x+LY.RIYADH_CORE.r+.004, x1=pk.x-pk.foot+.004;                                                         // promenade to downtown
+    addStrip([x0,pk.z],[x1,pk.z],.008,G+.005,[.52,.74,.40]); addStrip([x0,pk.z],[x1,pk.z],.002,G+.006,[.93,.87,.70]);
+    for (let x=x0+.006; x<x1-.004; x+=.014) for (const sg of [-1,1]) addTree(x,pk.z+sg*.0065,.2,[.24,.56,.28]);
+  }
+  // Green Riyadh: a wide, continuous ecological corridor along a meandering river — wetlands, sandy banks, native
+  // flat-canopy trees and palms, trails on both banks and footbridges — running east beyond the plan. Distinct from the park.
+  function riyadhGreen(rn){
+    const gr=P('greenriyadh'), hw=gr.ribbon.hw, pts=gr.ribbon.pts;
+    polyStrip(pts,hw,G+.003,[.62,.74,.46]); polyStrip(pts,hw*.72,G+.004,[.52,.70,.38]);                                   // outer scrub, inner meadow
+    for (const q of pts.slice(1,-1)) { addDisc(q[0],G+.003,q[1],hw,[.62,.74,.46],18); addDisc(q[0],G+.004,q[1],hw*.72,[.52,.70,.38],16); }   // rounded bends
+    const mw=[]; for (let i=1;i<pts.length;i++) for (let t=0;t<1;t+=.125){ const x=pts[i-1][0]+(pts[i][0]-pts[i-1][0])*t, z=pts[i-1][1]+(pts[i][1]-pts[i-1][1])*t; mw.push([x, z+Math.sin(x*24)*.03]); }
+    mw.push(pts[pts.length-1]);
+    polyStrip(mw,.022,G+.0045,[.86,.80,.62]); polyStrip(mw,.014,G+.0055,[.26,.58,.82]);                                 // sandy banks, river
+    for (let i=3;i<mw.length;i+=7) addDisc(mw[i][0],G+.005,mw[i][1]+(i%2?.028:-.028),.016,[.44,.70,.62],14);             // wetlands
+    lineTarget=lines; polyLine(pts,G+.007,[.93,.86,.66],hw*.82); polyLine(pts,G+.007,[.93,.86,.66],-hw*.82);             // trails
+    for (const i of [5,15,26,36]) if (mw[i]) { const a=mw[i-1], b=mw[i+1]||mw[i], rot=Math.atan2(b[1]-a[1],b[0]-a[0]); addBox(mw[i][0],G+.008,mw[i][1],.036,.003,.008,[.84,.70,.50],-rot+Math.PI/2); }   // footbridges
+    for (let i=1;i<pts.length;i++){ const a=pts[i-1], b=pts[i], L=Math.hypot(b[0]-a[0],b[1]-a[1]), nx=-(b[1]-a[1])/L, nz=(b[0]-a[0])/L;
+      for (let t=.012;t<L;t+=.026) for (const sg of [-1,1]) { const off=hw*(.35+rn()*.4)*sg, x=a[0]+(b[0]-a[0])*t/L+nx*off, z=a[1]+(b[1]-a[1])*t/L+nz*off;
+        if (LY.polyDist(x,z,mw) < .026 || Math.hypot(x-gr.pad[0],z-gr.pad[1]) < .04 || LY.cityRoadDist(x,z) < .02) continue;
+        const r=rn(); if (r<.45) addGhaf(x,z,.45+rn()*.25); else if (r<.7) addPalm(x,z,.42+rn()*.15); else addTree(x,z,.3+rn()*.2,[.30+rn()*.08,.56+rn()*.1,.28]); } }
+  }
   function buildRiyadh(){
     const ry=C('Riyadh'), rn=mulberry32(2030);
-    // ★ Downtown: a split-top tower just east of King Fahd Road, Al Faisaliah to the west, glass towers stepping down to the edge.
-    keepOut.push([ry.x,ry.z,LY.RIYADH_CORE.r]);
-    const kx=ry.x+.045, kz=ry.z-.01;
-    addBox(kx,G,kz,.05,.15,.05,[.40,.66,.74]); addBox(kx-.017,G,kz,.022,.30,.046,[.45,.72,.80]); addBox(kx+.017,G,kz,.022,.30,.046,[.45,.72,.80]); addBox(kx,G+.235,kz,.056,.016,.04,[.62,.84,.90]);
-    addBox(ry.x-.05,G,ry.z+.03,.032,.20,.032,[.55,.70,.76]); addCone(ry.x-.05,G+.20,ry.z+.03,.02,.055,[.66,.62,.46],8); addOcta(ry.x-.05,G+.175,ry.z+.03,.019,[.95,.74,.25]);
-    for (let gx=-4; gx<=4; gx++) for (let gz=-4; gz<=4; gz++) { const x=ry.x+gx*.026, z=ry.z+gz*.026, d=Math.hypot(x-ry.x,z-ry.z);
-      if (d > .105 || Math.abs(x-ry.x) < .022) continue;                                  // King Fahd Road runs clear through downtown
-      if (Math.abs(x-kx) < .04 && Math.abs(z-kz) < .035) continue;                          // the split-top keeps clear air around it
-      if (Math.abs(x-(ry.x-.05)) < .025 && Math.abs(z-(ry.z+.03)) < .025) continue;
-      const h=.04+.17*Math.pow(1-d/.115,1.3)*(.65+rn()*.35); addTower(x,z,.016+rn()*.004,h,[.48+rn()*.2,.70+rn()*.06,.86],rn()>.7?[.85,.9,.95]:null); }
+    riyadhDowntown(ry, rn);
     // Riyadh Metro: a broad curved canopy over King Fahd Road; blue rails around King Salman Park and north to the airport.
     const mt=P('metro'); addDisc(mt.x,G+.003,mt.z,.056,[.86,.84,.80],22);
     for (let i=0;i<=12;i++){ const a=Math.PI*i/12, x=mt.x+Math.cos(a)*.048, z=mt.z-.004+Math.sin(a)*.012; addBox(x,G+.026+Math.sin(a)*.006,z,.011,.005,.034,[.95,.97,.99]); }
     for (const dx of [-.046,.046]) addBox(mt.x+dx,G,mt.z,.005,.026,.03,[.78,.80,.86]);
-    polyStrip(LY.METRO_ROUTE,.0045,G+.009,[.28,.34,.52]);
-    lineTarget=lines; polyLine(LY.METRO_ROUTE,G+.012,[.45,.78,1],.0025); polyLine(LY.METRO_ROUTE,G+.012,[.45,.78,1],-.0025);
-    // King Salman Park: bounded organic landscape — lawns, layered canopies, winding paths, water and a pavilion.
-    const pk=P('park'); addDisc(pk.x,G+.004,pk.z,.098,[.44,.70,.34],30); addDisc(pk.x-.02,G+.005,pk.z-.03,.04,[.56,.80,.44],18);
-    addDisc(pk.x+.03,G+.006,pk.z+.02,.03,[.30,.62,.84],18); addDome(pk.x-.035,G,pk.z+.035,.014,[.96,.96,.94]);
-    for (let i=1;i<24;i++){ const f=j=>[pk.x-.08+j*.0069,G+.007,pk.z+Math.sin(j*.45)*.03]; addLine(f(i-1),f(i),[.92,.84,.62]); }
-    for (let i=0,k=0;i<120&&k<26;i++){ const a=rn()*6.283, d=Math.sqrt(rn())*.086, x=pk.x+Math.cos(a)*d, z=pk.z+Math.sin(a)*d;
-      if (Math.hypot(x-(pk.x+.03),z-(pk.z+.02))<.04 || Math.hypot(x-(pk.x-.035),z-(pk.z+.035))<.028 || Math.hypot(x-pk.pad[0],z-pk.pad[1])<.045) continue; k++; addTree(x,z,.45+rn()*.35,[.18+rn()*.1,.52+rn()*.18,.24]); }
+    const MR=LY.METRO_ROUTE; polyStrip(MR,.0075,G+.008,[.93,.94,.96]); polyStrip(MR,.0055,G+.009,[.14,.30,.66]);          // trackbed with white edges
+    for (const q of MR.slice(1,-1)) { addDisc(q[0],G+.008,q[1],.0075,[.93,.94,.96],12); addDisc(q[0],G+.009,q[1],.0055,[.14,.30,.66],12); }   // smooth bends
+    lineTarget=lines; polyLine(MR,G+.0105,[.50,.80,1],.0022); polyLine(MR,G+.0105,[.50,.80,1],-.0022);
+    for (const q of [MR[2], MR[5]]) { addBox(q[0],G,q[1],.02,.011,.012,[.95,.96,.98]); addBox(q[0],G+.011,q[1],.024,.003,.016,[.20,.42,.82]); }   // intermediate stations
+    const pk=P('park'); riyadhPark(pk, ry, rn);
     // New Murabba: one monumental gold cube in a landscaped square, low buildings around it, clear space on every side.
     const mu=P('newmurabba'); keepOut.push([mu.x,mu.z,mu.foot]); addBox(mu.x,G+.002,mu.z,.15,.004,.15,[.62,.78,.48]); addBox(mu.x,G+.003,mu.z,.11,.004,.11,[.90,.86,.74]);
     addBox(mu.x,G,mu.z-.006,.084,.084,.084,[.88,.62,.20]); addBox(mu.x,G+.084,mu.z-.006,.086,.004,.086,[.99,.84,.40]);
@@ -502,18 +595,8 @@
     const rs=P('roshn'); keepOut.push([rs.x,rs.z,rs.foot]);
     for (let i=-2;i<=2;i++) for (let j=-2;j<=2;j++){ const x=rs.x+i*.03, z=rs.z+j*.03; if (Math.hypot(x-rs.x,z-rs.z)>.072 || Math.hypot(x-rs.pad[0],z-rs.pad[1])<.04) continue; addHouse(x,z,.32,[.96,.90,.74]); }
     for (let i=-2;i<=2;i++){ addTree(rs.x+i*.03,rs.z-.015,.28,[.24,.60,.30]); }
-    // King Salman International Airport: low and broad — runways, taxiway, terminal and a few aircraft.
-    const ks=P('ksip'); keepOut.push([ks.x,ks.z,ks.foot]);
-    for (const dz of [-.05,.0]) { addStrip([ks.x-.105,ks.z+dz],[ks.x+.105,ks.z+dz],.009,G+.005,[.30,.32,.34]); for (let t=-.09;t<.09;t+=.03) addLine([ks.x+t,G+.007,ks.z+dz],[ks.x+t+.014,G+.007,ks.z+dz],[.95,.95,.9]); }
-    addStrip([ks.x-.06,ks.z+.03],[ks.x+.06,ks.z+.03],.004,G+.005,[.40,.42,.44]);
-    addBox(ks.x-.01,G,ks.z+.065,.08,.018,.022,[.86,.89,.92]); addBox(ks.x-.01,G+.018,ks.z+.065,.084,.004,.026,[.62,.74,.86]);
-    for (const [dx,dz] of [[.04,.045],[-.05,.04],[.07,-.05]]) { addBox(ks.x+dx,G+.004,ks.z+dz,.022,.004,.005,[.97,.97,.98]); addBox(ks.x+dx,G+.004,ks.z+dz,.005,.004,.018,[.97,.97,.98]); }
-    // Expo 2030: a circular golden pavilion with smaller exhibition buildings, plazas and gardens; a path to the airport.
-    const ex=P('expo'); keepOut.push([ex.x,ex.z,ex.foot]); addDisc(ex.x,G+.004,ex.z,.07,[.84,.80,.70],24);
-    addCylinder(ex.x,G,ex.z,.032,.03,[.95,.72,.22],24); addDome(ex.x,G+.022,ex.z,.022,[.99,.84,.40]); addRing(ex.x,G+.031,ex.z,.034,[1,.9,.5],24);
-    for (let i=0;i<5;i++){ const a=i/5*6.283+.6; addBox(ex.x+Math.cos(a)*.054,G,ex.z+Math.sin(a)*.054,.016,.014,.016,[.93,.93,.95]); }
-    for (let i=0;i<4;i++){ const a=i/4*6.283+.2; addDisc(ex.x+Math.cos(a)*.046,G+.005,ex.z+Math.sin(a)*.046,.009,[.46,.72,.38],10); }
-    addStrip([ex.x-.012,ex.z-ex.foot],[ks.x-.012,ks.z+ks.foot],.004,G+.006,[.90,.84,.66]);   // pedestrian link across King Salman Road
+    const ks=P('ksip'); riyadhAirport(ks);
+    riyadhExpo(rn, ks);
     // Diriyah: compact warm-earth heritage blocks and courtyards beside the wadi, an escarpment behind King Khalid Road.
     const dr=P('diriyah'); keepOut.push([dr.x,dr.z,dr.foot]);
     for (const [dx,dz,w,h] of [[0,0,.04,.035],[-.035,.012,.028,.028],[.034,.018,.03,.04],[-.018,-.036,.034,.026],[.03,-.03,.026,.03],[-.05,-.02,.02,.022],[.01,.042,.03,.024],[.052,-.004,.018,.03]])
@@ -539,24 +622,36 @@
     { const RG=LY.RIDGES; for (let i=1;i<RG.length;i++){ const a=RG[i-1], b=RG[i], L=Math.hypot(b[0]-a[0],b[1]-a[1]), rot=Math.atan2(b[1]-a[1],b[0]-a[0]);
         for (let t=0;t<L;t+=.045){ const x=a[0]+(b[0]-a[0])*t/L, z=a[1]+(b[1]-a[1])*t/L; for (const [o,h] of [[0,.05],[.04,.034],[.08,.018]]) { const xx=x+Math.sin(rot)*o, zz=z-Math.cos(rot)*o;   // stepped terraces, highest on the city side
           if (!LY.decorAllowed(xx,zz,.02,.035)) continue; const hh=h+rn()*.008; addBox(xx,G,zz,.052,hh,.042,[.74+rn()*.05,.52,.34],-rot); addBox(xx,G+hh,zz,.046,.003,.036,[.84,.64,.44],-rot); } } } }
-    // Green Riyadh: a broad ecological corridor — meandering water, planted banks, trails and footbridges — continuing off-frame.
-    const gr=P('greenriyadh'); polyStrip(gr.ribbon.pts,.066,G+.004,[.50,.74,.40]);
-    const mw=[]; { const pts=gr.ribbon.pts; for (let i=1;i<pts.length;i++) for (let t=0;t<1;t+=.2){ const x=pts[i-1][0]+(pts[i][0]-pts[i-1][0])*t, z=pts[i-1][1]+(pts[i][1]-pts[i-1][1])*t; mw.push([x, z+Math.sin(x*28)*.022]); } }
-    polyStrip(mw,.011,G+.006,[.28,.60,.82]); lineTarget=lines; polyLine(gr.ribbon.pts,G+.008,[.93,.86,.66],.05);
-    ownRibbonTrees(gr,.04,.042,.42); for (const i of [4,11,18]) if (mw[i]) addBox(mw[i][0],G+.01,mw[i][1],.012,.004,.03,[.86,.72,.52]);
+    riyadhGreen(rn);
     // Short access spurs join each district to its road (none cross another parcel).
     for (const [p, tz] of [[mu,-.48],[rs,-.48],[re,-.48]]) addStrip([p.x,p.z+p.foot],[p.x,ry.z+tz],.005,G+.006,[.60,.54,.46]);
     addStrip([dr.x+dr.foot,dr.z],[ry.x-.40,dr.z],.005,G+.006,[.60,.54,.46]);
-    addStrip([pk.x-pk.foot,pk.z],[ry.x+LY.RIYADH_CORE.r+.02,pk.z],.004,G+.006,[.90,.84,.66]);
     // Honest framing is added as a map label ("Illustrative district plan · not to scale").
   }
-  // Riyadh's residential fabric: low blocks on a planned grid in the space between corridors and parcels (detail mesh).
+  // Riyadh's residential fabric. Inside the ring of named roads: flat, low city blocks between local streets (every
+  // 0.09, meeting the main roads) — they explain the city's structure without standing up against the landmarks; a few
+  // blocks near the centre carry small homes. Beyond the roads: a light scatter only. Everything keeps clear of parcels,
+  // routes and the wadi.
   function riyadhBlocks(){
-    const ry=C('Riyadh'), rn=mulberry32(77), prev=target; target=detailMesh;
-    for (let dx=-.82; dx<=.84; dx+=.045) for (let dz=-.9; dz<=.86; dz+=.045) {
-      const x=ry.x+dx+(rn()-.5)*.008, z=ry.z+dz+(rn()-.5)*.008, d=Math.hypot(dx,dz);
-      if (dx < -.72 || rn() > .46*(1-d/1.05) || !LY.decorAllowed(x,z,.035,.04) || LY.polyDist(x,z,LY.RIDGES) < .09 || LY.inReserved(x,z,.03)) continue;
-      addHouse(x,z,.30+rn()*.08,[.86+rn()*.04,.80+rn()*.04,.70],0); }   // smaller, sandier than ROSHN's cream homes
+    const ry=C('Riyadh'), rn=mulberry32(77), prev=target, c=.045, S=2*c;
+    const urban = (dx,dz) => dx > -.62 && dx < .8 && dz > -.46 && dz < .38;
+    const open = (x,z,m) => LY.decorAllowed(x,z,m,.03) && LY.polyDist(x,z,LY.RIDGES) >= .09 && !LY.inReserved(x,z,.03);
+    for (let i=-7;i<=9;i++) for (let j=-11;j<=9;j++) for (const vert of [true,false]) {                        // local streets
+      const ax=vert?i*S:j*c, az=vert?j*c:i*S, bx=vert?ax:ax+c, bz=vert?az+c:az; if (!urban(ax,az)||!urban(bx,bz)) continue;
+      const mx=ry.x+(ax+bx)/2, mz=ry.z+(az+bz)/2;
+      if (!open(mx,mz,.02) || LY.cityRoadDist(mx,mz) < .012) continue;
+      addStrip([ry.x+ax,ry.z+az],[ry.x+bx,ry.z+bz],.003,G+.0035,[.70,.66,.60]); }
+    const sand=[[.86,.78,.64],[.83,.75,.61],[.88,.81,.68]];
+    for (let i=-7;i<=8;i++) for (let j=-6;j<=5;j++) {                                                          // blocks between the streets
+      const dx=(i+.5)*S, dz=(j+.5)*S, x=ry.x+dx, z=ry.z+dz, d=Math.hypot(dx,dz), h=S*.38;
+      if (!urban(dx,dz) || rn() > .92-.4*d || ![[-h,-h],[h,-h],[-h,h],[h,h],[0,0]].every(([ox,oz]) => open(x+ox,z+oz,.02))) continue;
+      addBox(x,G+.0015,z,S*.8,.004+.004*rn(),S*.8,sand[Math.floor(rn()*3)]);
+      if (d < .42 && rn() < .35) { target=detailMesh; addHouse(x-.016,z+.012,.22,[.90,.84,.72],0); addHouse(x+.016,z-.012,.22,[.90,.84,.72],0); target=prev; } }
+    target=detailMesh;
+    for (let dx=-.82; dx<=.84; dx+=c) for (let dz=-.9; dz<=.86; dz+=c) {                                    // light scatter outside the roads
+      const x=ry.x+dx+(rn()-.5)*.01, z=ry.z+dz+(rn()-.5)*.01;
+      if (urban(dx,dz) || dx < -.72 || rn() > .08 || !open(x,z,.05)) continue;
+      addHouse(x,z,.22+rn()*.04,[.86,.79,.66],0); }
     target=prev;
   }
   function buildLandmarks(){
@@ -605,7 +700,7 @@
     const so=P('soudah'); for(let i=0;i<5;i++)addCone(so.x+Math.cos(i*1.3)*.06,G,so.z+Math.sin(i*1.3)*.05,.05,.1+rng()*.06,[.32,.52,.30],7);
     const jz=P('jazan'); keepOut.push([jz.x,jz.z,.08]); for(let i=0;i<4;i++)addCylinder(jz.x-.03+i*.025,G,jz.z,.012,.05,[.82,.82,.78],8); addCrane(jz.x-.04,jz.z+.04,.45);
     // Visible construction activity across the map
-    { const prev=target; target=detailMesh; for (const id of ['expo','newmurabba','neom','qiddiya','masar','jeddahcentral']) { const p=P(id); addCrane(p.x-p.foot*.6,p.z-p.foot*.45,.5); } target=prev; }
+    { const prev=target; target=detailMesh; for (const id of ['neom','masar','jeddahcentral']) { const p=P(id); addCrane(p.x-p.foot*.6,p.z-p.foot*.45,.5); } target=prev; }
   }
 
   function buildCities(){
@@ -665,7 +760,10 @@
   /* ---------------------- per-project stage mesh -------------------- */
   const projectState = {}; for (const p of D.projects) projectState[p.id] = {stage:p.stage, done:p.stage===2?3:1, doneKeys:p.stage===2?['design','site','materials']:['design'], progress:0};
   const tierCount = st => Math.max(0, Math.min(6, st.done ?? (st.stage||1)));
-  const beaconTop = st => { const k=tierCount(st); return G + k*.012 + .08 + k*.014; };
+  // Marker stalks: short on the Riyadh plan so they never stand in front of the landmark they label.
+  const lowStalk = id => !!(id && LY.projects[id] && LY.projects[id].illustrative);
+  const stalkH = (k, id) => lowStalk(id) ? .02 + k*.004 : .08 + k*.014;
+  const beaconTop = (st, id) => { const k=tierCount(st); return G + k*.012 + stalkH(k, id); };
   const stageMesh = Geo(), stageLines = {p:[], c:[]};
   let stageDirty = true;
   function buildStageMesh(){
@@ -675,7 +773,7 @@
       const st=projectState[p.id], k=tierCount(st), d=st.doneKeys||[], [px,pz]=p.pad, f=p.foot;   // progress lives on the marker pad at the footprint's south edge
       if (d.includes('site') || st.active==='site') addDisc(px,G+.004,pz,.034,st.active==='site'?[.72,.52,.34]:[.80,.66,.48],18);   // graded site pad
       for (let i=0;i<k;i++) addCylinder(px,G+i*.012,pz,.026-i*.003,.012,shade(p.color,.8+i*.06),12);  // one tier per completed package
-      addCylinder(px,G+k*.012,pz,.005,.08+k*.014,[.97,.95,.88],6);
+      addCylinder(px,G+k*.012,pz,.005,stalkH(k,p.id),[.97,.95,.88],6);
       if (d.includes('materials') && !d.includes('build')) for (let i=0;i<4;i++) addBox(px+.03+(i%2)*.014,G,pz-.01+Math.floor(i/2)*.014,.011,.01,.011,i%2?[.62,.64,.68]:[.86,.72,.46]);  // stockpiled materials
       if (st.active==='build') { const h=.04+.14*(st.progress||0); addBox(p.x+f*.45,G,p.z-f*.1,.04,h,.04,[.86,.84,.78]); addCrane(p.x+f*.6,p.z-f*.45,.4,[.98,.72,.2]);
         for (let y=.02;y<h;y+=.02) addBox(p.x+f*.45,G+y,p.z-f*.1,.046,.002,.046,[.95,.62,.2]); }                     // rising structure with scaffold bands
@@ -946,7 +1044,7 @@
       const st=projectState[pr.id], sel=selectedId===pr.id, hov=hoverId===pr.id, tiers=tierCount(st);
       if (!beaconsOn && !sel) continue;
       if (clustered && pr.cl && !sel && !hov) continue;
-      const top=beaconTop(st), pulse=Math.sin(t*.003+pr.x*3)*.01;
+      const top=beaconTop(st,pr.id), pulse=Math.sin(t*.003+pr.x*3)*.01;
       const col = st.health==='blocked'?[.95,.35,.28]:st.health==='waiting'?[1,.72,.2]:st.done>=6?[1,.86,.3]:pr.color;
       push(pr.pad[0],top+.02+pulse+(sel?.03:0),pr.pad[1],sel?[1,.95,.55]:col,sel?15:hov?13:10);
       if (st.active) for (let i=0;i<3;i++){const a=t*.0024+i/3*6.283,r=.035;push(pr.pad[0]+Math.cos(a)*r,G+.02+i*.01,pr.pad[1]+Math.sin(a)*r,pr.color,3.5);}
@@ -956,7 +1054,7 @@
     for (const w of wakes) push(w[0],SEA+.004,w[1],[1,1,1],w[2]);
     const mk=C('Makkah'); for(let i=0;i<48;i++){const a=i*.82+t*.00015,r=.035+(i%5)*.008;push(mk.x+Math.cos(a)*r,G+.012,mk.z+Math.sin(a)*r,[.99,.99,.96],2.2);}
     const hj=P('hajj'); for(let i=0;i<30;i++){const q=((t*.00004)+i/30)%1;push(hj.x+(mk.x-hj.x)*q+Math.sin(i*7)*.01,G+.012,hj.z+(mk.z-hj.z)*q+Math.cos(i*5)*.01,[.99,.99,.96],2.2);}
-    { const MR=LY.METRO_ROUTE, ML=pathLen(MR); for (let k=0;k<3;k++) for (let j=0;j<4;j++){ const q=((t*.00005)+k/3+j*.004)%1, [x,z]=along(MR,ML,q); push(x,G+.016,z,[.55,.85,1],3.4); } }
+    { const MR=LY.METRO_ROUTE, ML=pathLen(MR); for (let k=0;k<3;k++) for (let j=0;j<4;j++){ const q=((t*.00005)+k/3+j*.004)%1, [x,z]=along(MR,ML,q); push(x,G+.016,z,[.62,.90,1],4.8); } }
     const ry=C('Riyadh'); for(let i=0;i<30;i++){const a=i*2.1+t*.0004,r=.03+(i%6)*.016;push(ry.x+Math.cos(a)*r,G+.02+(i%4)*.02,ry.z+Math.sin(a)*r,[1,.76,.3],3);}
     if (hazard && hazard.plumes) {   // exposure-driven dust: a plume at each site in proportion to its simulated exposure, plus light haze
       const hz=hazard;
@@ -1002,7 +1100,7 @@
   const ROAD_LABEL_AT = {kingFahd:[0,-.37], kingSalman:[-.46,-.48], kingKhalid:[-.70,-.62], northRing:[-.58,-.26]};
   const roadLabels = LY.CITY_ROADS.filter(r => ROAD_LABEL_AT[r.id]).map(r => { const [x,z]=LY.R(...ROAD_LABEL_AT[r.id]); const L=makeLabel(r.name.en, 'road-name', x, G+.01, z, 1.2); L.road=true; return L; });
   // ★ Riyadh sits just above the split-top tower (never over its silhouette) and selects the downtown place.
-  { const L=labels.find(q => q.base==='Riyadh' && q.el.classList.contains('city')); if (L) { L.x=C('Riyadh').x+.045; L.y=G+.36; L.el.dataset.pid=CORE_ID; } }
+  { const L=labels.find(q => q.base==='Riyadh' && q.el.classList.contains('city')); if (L) { L.x=C('Riyadh').x+KC.dx; L.z=C('Riyadh').z+KC.dz; L.y=G+KC.h+.03; /* just above the tip: clear of the tower, not drifting over districts to the north */ L.el.dataset.pid=CORE_ID; } }
   const clusterLabels = clusters.map(cl => { const L=makeLabel(cl.anchor+' · '+cl.ids.length+' projects', 'cluster', cl.x, G+.34, cl.z, 9.5); L.cluster=true; return L; });
   // Project name labels hold a full and a short variant (each translated once by the Arabic layer); the placer picks the
   // variant that fits, anchors the label just above the model's real top, and lets the player click it.
@@ -1041,7 +1139,7 @@
       else if (L.cluster) show = far > CLUSTER_DIST;
       else if (L.note) show = projLabelsOn && far < 5.2;
       else if (L.road) show = projLabelsOn && far < 4.2;
-      else if (L.small) { show = far < 5.2 && L.pid!==focus; y = topY[L.pid]+.03; }
+      else if (L.small) { show = far < 5.2 && L.pid!==focus; y = topY[L.pid]+.012; }
       else if (L.el.classList.contains('country')||L.el.classList.contains('sea')) show = far > 6.5;
       else if (!L.el.classList.contains('capital')) show = far < 24;
       const s = show && project([x,y,z]);
@@ -1057,10 +1155,10 @@
       const at = w => ({x:s[0]-w/2+(far>7?L.dx:0), y:s[1]-L.h/2-lift+(far>7?L.dy:0), w, h:L.h});
       const free = r => !placed.some(q => hits(r, q)) && !obstacles.some(q => hits(r, q, 2, 2));
       let r = at(L.small ? L.wF : L.w), short = false;
-      if (L.note || L.road) r.x = Math.max(6, Math.min(innerWidth - r.w - 6, r.x));   // map notes and road names stay fully on screen
+      if (L.note || L.road || L.small) r.x = Math.max(6, Math.min(innerWidth - r.w - 6, r.x));   // notes, road names and project labels stay fully on screen
       if (!free(r) && L.small) { r = at(L.wS); short = true; }        // shorten before giving up
-      if (!free(r) && L.small) { const b = r;                           // then nudge the short label just above, below or beside its marker
-        for (const [dx, dy] of [[0, -(L.h + 5)], [0, L.h + 5], [-(b.w / 2 + 12), 0], [b.w / 2 + 12, 0]]) { const c = {...b, x:b.x + dx, y:b.y + dy}; if (free(c)) { r = c; break; } } }
+      if (!free(r) && L.small) { const b = r;                           // then nudge the short label just below, beside or (last) above its marker
+        for (const [dx, dy] of [[0, L.h + 5], [-(b.w / 2 + 12), 0], [b.w / 2 + 12, 0], [0, -(L.h + 5)]]) { const c = {...b, x:Math.max(6, Math.min(innerWidth - b.w - 6, b.x + dx)), y:b.y + dy}; if (free(c)) { r = c; break; } } }
       if (!free(r)) { L.el.style.opacity=0; continue; }
       if (L.small) L.el.classList.toggle('use-short', short);
       L.el.classList.toggle('hot', !!L.pid && L.pid===hoverId || L===projLabel);
@@ -1210,7 +1308,7 @@
   }
   function markerHits(cx, cy, tol){
     const clustered=camera.dist>CLUSTER_DIST, markers=[], clusterHits=[];
-    if (beaconsOn) for (const pr of D.projects) { if (clustered && pr.cl) continue; const q=project([pr.pad[0],beaconTop(projectState[pr.id])+.02,pr.pad[1]]); if (!q || q[2]>1) continue; const d=Math.hypot(q[0]-cx,q[1]-cy); if (d<=tol) markers.push({id:pr.id, d}); }
+    if (beaconsOn) for (const pr of D.projects) { if (clustered && pr.cl) continue; const q=project([pr.pad[0],beaconTop(projectState[pr.id],pr.id)+.02,pr.pad[1]]); if (!q || q[2]>1) continue; const d=Math.hypot(q[0]-cx,q[1]-cy); if (d<=tol) markers.push({id:pr.id, d}); }
     if (clustered && beaconsOn) for (const cl of clusters) { const q=project([cl.x,G+.34,cl.z]); if (q && Math.hypot(q[0]-cx,q[1]-cy)<=tol+6) clusterHits.push(cl); }
     return {markers, clusterHits};
   }
@@ -1228,7 +1326,7 @@
     for (const p of D.projects.concat(extra)) { let x0=1e9, y0=1e9, x1=-1e9, y1=-1e9, any=false;
       const ring = p.ribbon ? p.ribbon.pts.flatMap(q => [[q[0],q[1]-p.ribbon.hw],[q[0],q[1]+p.ribbon.hw]]) : Array.from({length:8}, (_, i) => [p.x+Math.cos(i/8*6.283)*p.foot, p.z+Math.sin(i/8*6.283)*p.foot]);
       for (const [rx,rz] of ring) { for (const yy of [G, topY[p.id]||G+.3]) { const q=project([rx, yy, rz]); if (!q) continue; any=true; x0=Math.min(x0,q[0]); x1=Math.max(x1,q[0]); y0=Math.min(y0,q[1]); y1=Math.max(y1,q[1]); } }
-      const m=p.core ? null : project([p.pad[0], beaconTop(projectState[p.id])+.02, p.pad[1]]); if (m) { x0=Math.min(x0,m[0]); x1=Math.max(x1,m[0]); y0=Math.min(y0,m[1]); y1=Math.max(y1,m[1]); }
+      const m=p.core ? null : project([p.pad[0], beaconTop(projectState[p.id],p.id)+.02, p.pad[1]]); if (m) { x0=Math.min(x0,m[0]); x1=Math.max(x1,m[0]); y0=Math.min(y0,m[1]); y1=Math.max(y1,m[1]); }
       if (any && x>=x0-pad && x<=x1+pad && y>=y0-pad && y<=y1+pad) return true; }
     return camera.dist > CLUSTER_DIST;   // clustered overview: cluster beacons are handled by the pick itself
   }
@@ -1348,7 +1446,7 @@
       pickAt:(x, y, touch) => resolveAt(x, y, !!touch),
       visiblePixels(id, max=16){ const px=renderIds(0,0,width,height), k=PIDX[id], pts=[]; for (let j=0;j<height;j+=2) for (let i=0;i<width;i+=2) { const o=(j*width+i)*4; if (px[o+2] && px[o]+px[o+1]*256===k) pts.push([i/dpr,(height-j)/dpr]); }
         if (!pts.length) return []; const mx=pts.reduce((a,p)=>a+p[0],0)/pts.length, my=pts.reduce((a,p)=>a+p[1],0)/pts.length; return pts.sort((a,b)=>Math.hypot(a[0]-mx,a[1]-my)-Math.hypot(b[0]-mx,b[1]-my)).slice(0,max).map(([x,y])=>({x,y})).concat([{count:pts.length}]); },
-      marker(id){ const pr=P(id), q=project([pr.pad[0],beaconTop(projectState[id])+.02,pr.pad[1]]); return q?{x:q[0],y:q[1]}:null; },
+      marker(id){ const pr=P(id), q=project([pr.pad[0],beaconTop(projectState[id],id)+.02,pr.pad[1]]); return q?{x:q[0],y:q[1]}:null; },
       screen(x,z,y=G){ const q=project([x,y,z]); return q?{x:q[0],y:q[1]}:null; },   // where a ground point is drawn (tests)
       state:() => ({dist:camera.dist, selectable, hoverId, selectedId, detail:detailOn()})
     }
