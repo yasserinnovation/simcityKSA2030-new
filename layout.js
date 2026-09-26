@@ -167,7 +167,7 @@
   // lon/lat and world coordinates, so distances, exposure and outcomes do not change.
   const MISSION_SITES = {'riyadh:dryport':R(.72,-.13), 'riyadh:eastgate':R(.86,-.31), 'riyadh:westgate':R(-.62,.31)};
   const CHALLENGE_SITES = {sandstorm:{ksia:R(.54,-.575), 'expo-site':R(.60,-.35), 'murabba-site':R(-.16,-.555), 'sub-east':R(.70,.02),
-    freight:R(.90,-.27), 'metro-ops':R(.03,.235), _base:R(.62,.12)}};
+    freight:R(.90,-.27), 'metro-ops':R(.03,.235), _base:R(.82,.12)}};
 
   // Route a mission line between two plan points (spur → named roads → spur). Road corridors (viaRoads) always follow
   // the plan's roads unless that is a long detour and the straight line is clear; other lines go straight when that
@@ -223,7 +223,44 @@
     routeCache.set(key, out); return out;
   }
 
+  // ---------------------------------------------------------------- simulation frame → drawn plan (presentation only)
+  // A stateless, continuous map fitted to known pairs {s: simulated position, v: drawn position}: piecewise-affine over
+  // a Delaunay triangulation of the pairs plus four distant frame corners (mapped by the least-squares affine fit), so
+  // every pair lands exactly on its drawn place and the map covers the whole world. It never folds as long as no
+  // triangle flips (checked: `folds` lists any that do). Units and storm tracks are drawn through it; simulated
+  // positions never change, and the same state always draws the same picture.
+  function solveLinear(A, b){ const n = b.length, M = A.map((r, i) => [...r, b[i]]);
+    for (let i = 0; i < n; i++) { let p = i; for (let k = i + 1; k < n; k++) if (Math.abs(M[k][i]) > Math.abs(M[p][i])) p = k; [M[i], M[p]] = [M[p], M[i]];
+      for (let k = 0; k < n; k++) if (k !== i) { const f = M[k][i] / M[i][i]; for (let j = i; j <= n; j++) M[k][j] -= f * M[i][j]; } }
+    return M.map((r, i) => r[n] / r[i]); }
+  function delaunay(P){
+    const cc = (a, b, c) => { const d = 2 * (a[0] * (b[1] - c[1]) + b[0] * (c[1] - a[1]) + c[0] * (a[1] - b[1])), A2 = a[0] ** 2 + a[1] ** 2, B2 = b[0] ** 2 + b[1] ** 2, C2 = c[0] ** 2 + c[1] ** 2;
+      const x = (A2 * (b[1] - c[1]) + B2 * (c[1] - a[1]) + C2 * (a[1] - b[1])) / d, z = (A2 * (c[0] - b[0]) + B2 * (a[0] - c[0]) + C2 * (b[0] - a[0])) / d; return [x, z, (a[0] - x) ** 2 + (a[1] - z) ** 2]; };
+    const S = [[-1e3, -1e3], [1e3, -1e3], [0, 1e3]], pts = [...P, ...S], n = P.length; let tris = [[n, n + 1, n + 2]];
+    for (let i = 0; i < n; i++) { const p = pts[i], bad = [], keep = [];
+      for (const t of tris) { const c = cc(pts[t[0]], pts[t[1]], pts[t[2]]); ((p[0] - c[0]) ** 2 + (p[1] - c[1]) ** 2 < c[2] ? bad : keep).push(t); }
+      const edges = []; for (const t of bad) for (const e of [[t[0], t[1]], [t[1], t[2]], [t[2], t[0]]]) { const j = edges.findIndex(f => f[0] === e[1] && f[1] === e[0]); if (j >= 0) edges.splice(j, 1); else edges.push(e); }
+      tris = keep.concat(edges.map(e => [e[0], e[1], i])); }
+    return tris.filter(t => t.every(i => i < n));
+  }
+  function planWarp(pairs){
+    const A = [[0,0,0],[0,0,0],[0,0,0]], bx = [0,0,0], bz = [0,0,0];
+    for (const {s, v} of pairs) { const r = [s[0], s[1], 1]; for (let i = 0; i < 3; i++) { for (let j = 0; j < 3; j++) A[i][j] += r[i] * r[j]; bx[i] += r[i] * v[0]; bz[i] += r[i] * v[1]; } }
+    const X = solveLinear(A, bx), Z = solveLinear(A, bz), aff = p => [X[0] * p[0] + X[1] * p[1] + X[2], Z[0] * p[0] + Z[1] * p[1] + Z[2]];
+    const cx = pairs.reduce((t, p) => t + p.s[0], 0) / pairs.length, cz = pairs.reduce((t, p) => t + p.s[1], 0) / pairs.length;
+    const frame = [[-8, -8], [8, -8], [8, 8], [-8, 8]].map(([dx, dz]) => { const s = [cx + dx, cz + dz]; return {s, v:aff(s)}; });
+    const all = [...pairs, ...frame], tris = delaunay(all.map(p => p.s));
+    const area = (a, b, c) => (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+    const folds = tris.filter(t => Math.sign(area(...t.map(i => all[i].s))) !== Math.sign(area(...t.map(i => all[i].v))));
+    const bary = (p, a, b, c) => { const d = area(a, b, c), u = area(p, b, c) / d, v = area(a, p, c) / d; return [u, v, 1 - u - v]; };
+    const through = (p, from, to) => { let best = null, bw = -Infinity;          // the containing triangle (or, at the rim, the nearest)
+      for (const t of tris) { const w = bary(p, ...t.map(i => all[i][from])), m = Math.min(...w); if (m > bw) { bw = m; best = {t, w}; } if (m >= -1e-12) break; }
+      return [0, 1].map(k => best.t.reduce((acc, i, j) => acc + best.w[j] * all[i][to][k], 0)); };
+    const scale = Math.sqrt(Math.abs(X[0] * Z[1] - X[1] * Z[0]));
+    return {fwd:p => through(p, 's', 'v'), inv:v => through(v, 'v', 's'), scale, folds:folds.length, foldIds:folds.map(t => t.map(i => all[i].id || (i >= pairs.length ? 'frame' : i))), tris:tris.length};
+  }
+
   window.VisionLayout = {GAP, ROAD_CLEAR, FOOT, CORE, RIYADH_PLAN, NUDGE, ROAD_SERVED, ON_ROAD, SHORT, RIYADH_CORE, CITY_ROADS:cityRoads, METRO_ROUTE, WADI, RIDGES,
     CITY_GRID, cityAnchorFrame, legacy, projects, cores, roads, intercity, rails, geo, R, polyDist, footDist, footprintAt, decorAllowed, insideCore, roadDist, cityRoadDist,
-    clearOf, reservedRects, inReserved, resolvePick, MISSION_SITES, CHALLENGE_SITES, routeBetween};
+    clearOf, reservedRects, inReserved, resolvePick, MISSION_SITES, CHALLENGE_SITES, routeBetween, planWarp};
 })();

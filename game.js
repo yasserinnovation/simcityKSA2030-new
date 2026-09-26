@@ -268,7 +268,8 @@
 
   /* ============================== LAYERS ============================== */
   $$('[data-layer]').forEach(b => b.onclick = () => { const l = b.dataset.layer; ui.layers.has(l) ? ui.layers.delete(l) : ui.layers.add(l); b.classList.toggle('active', ui.layers.has(l)); pushWorld(); });
-  const gwPos = id => { const g = SIM.GATEWAYS.find(x => x.id === id); return W.place(g.lon, g.lat, g.anchor); };
+  // The Riyadh Dry Port is drawn at its place on the district plan (same site as in Missions); travel times use real km.
+  const gwPos = id => { const g = SIM.GATEWAYS.find(x => x.id === id), fixed = id === 'riyadh' && window.VisionLayout && VisionLayout.MISSION_SITES['riyadh:dryport']; return fixed ? [...fixed] : W.place(g.lon, g.lat, g.anchor); };
   function pushWorld(){
     if (!ui.started) return;
     const st = S(), ov = [];
@@ -313,19 +314,18 @@
   function currentChallengeDef(){ const st = S(); const id = st.challenge ? st.challenge.id : st.advisory ? st.advisory.id : null; return id ? {id, c:SIM.CHALLENGES[id]} : null; }
   // Timed-challenge assets are drawn at their place on the district plan (layout CHALLENGE_SITES). The simulation keeps
   // its own world positions for storm exposure and unit reach, so the challenge plays and scores exactly as before.
+  // Units and dispatch points go through a stateless sim→plan map fitted to the assets and the unit base, so a refresh
+  // redraws every unit exactly where it was (layout planWarp: exact at each site, continuous, never folds).
   const chSites = () => { const cd = currentChallengeDef(); return (cd && window.VisionLayout && VisionLayout.CHALLENGE_SITES[cd.id]) || {}; };
   const visAsset = a => chSites()[a.id] || a.pos;
-  const visTarget = (u, assets) => { const a = u.assetId && assets.find(x => x.id === u.assetId); if (!a) return u.target; const v = visAsset(a); return [v[0] + u.target[0] - a.pos[0], v[1] + u.target[1] - a.pos[1]]; };
-  // A unit is drawn travelling from where it was last shown to its target's plan position, in step with its simulated travel.
-  const unitVis = new Map();
-  function visUnit(u, key, assets){
-    if (!u.target) return u.pos;
-    const T = visTarget(u, assets), k = u.target.join(), d = Math.hypot(u.pos[0] - u.target[0], u.pos[1] - u.target[1]);
-    let r = unitVis.get(key);
-    if (!r || r.k !== k) { const from = r ? r.last : d < .005 ? T : (chSites()._base || u.pos); r = {k, fromVis:from, fromSim:[...u.pos], last:from}; unitVis.set(key, r); }
-    const d0 = Math.hypot(r.fromSim[0] - u.target[0], r.fromSim[1] - u.target[1]), f = d0 < 1e-6 ? 1 : Math.max(0, Math.min(1, 1 - d / d0));
-    r.last = [r.fromVis[0] + (T[0] - r.fromVis[0]) * f, r.fromVis[1] + (T[1] - r.fromVis[1]) * f]; return r.last;
+  const warps = {};
+  function chWarp(){
+    const cd = currentChallengeDef(); if (!cd) return null; const sites = chSites(); if (!sites._base) return null;
+    if (warps[cd.id]) return warps[cd.id];
+    const as = SIM.challengeAssets(cd.id), base = [as.reduce((t, a) => t + a.pos[0], 0) / as.length + .35, as.reduce((t, a) => t + a.pos[1], 0) / as.length + .3];   // = sim baseFor()
+    return warps[cd.id] = VisionLayout.planWarp([...as.map(a => ({s:a.pos, v:sites[a.id]})), {s:base, v:sites._base}]);
   }
+  const toPlan = p => { const w = chWarp(); return w ? w.fwd(p) : p; }, fromPlan = v => { const w = chWarp(); return w ? w.inv(v) : v; };
   const centroid = as => { const ps = as.map(visAsset); return [ps.reduce((a, p) => a + p[0], 0) / ps.length, ps.reduce((a, p) => a + p[1], 0) / ps.length]; };
   function openReadiness(){
     const cd = currentChallengeDef(); if (!cd) return;
@@ -393,7 +393,7 @@
       let best = null, near = null, bd = .3;
       for (const a of assets) { const v = visAsset(a), d = Math.hypot(v[0] - x, v[1] - z); if (d < bd) { bd = d; near = a; if (def.supports.includes(a.kind)) best = a; } }
       if (near && !best) { setMessage(`${def.name} cannot support ${near.name} — try a ${near.kind === 'grid' ? 'grid crew' : 'matching unit'}.`, 'DISPATCH'); return true; }
-      let pos = best ? [best.pos[0] + (Math.random() - .5) * .05, best.pos[1] + (Math.random() - .5) * .05] : [x, z];
+      let pos = best ? [best.pos[0] + (Math.random() - .5) * .05, best.pos[1] + (Math.random() - .5) * .05] : fromPlan([x, z]);   // open ground: the simulated point drawn under the click
       // Open ground must not silently cover an asset whose simulated position lies under the click but is drawn elsewhere.
       if (!best) for (const a of assets) { const d = Math.hypot(pos[0] - a.pos[0], pos[1] - a.pos[1]); if (d < .18) { const k = .18 / Math.max(d, 1e-6); pos = d > 1e-6 ? [a.pos[0] + (pos[0] - a.pos[0]) * k, a.pos[1] + (pos[1] - a.pos[1]) * k] : [a.pos[0] + .18, a.pos[1]]; } }
       if (SIM.dispatch(ui.tool, pos, best ? best.id : null)) setMessage(best ? `${def.name} heading to ${best.name}.` : `${def.name} heading to the selected point.`, st.challenge ? 'DISPATCH' : 'READINESS');
@@ -405,7 +405,7 @@
     const st = S(); if (!st.challenge) return;
     const d = st.challenge.units.find(u => u.drone); if (!d) return;
     if (!d.pos) { setMessage('Dispatch the survey drone first: it is selected — click a place on the map.', 'FIELD VIEW'); if (ui.tool !== d.type) selectTool(d.type); return; }
-    const dv = visUnit(d, 'u' + st.challenge.units.indexOf(d), st.challenge.assets); ui.droneFollow = !ui.droneFollow; W.setDirectMode(ui.droneFollow, dv[0], dv[1]); renderUnitBar();
+    const dv = toPlan(d.pos); ui.droneFollow = !ui.droneFollow; W.setDirectMode(ui.droneFollow, dv[0], dv[1]); renderUnitBar();
   }
   function renderChallengePanel(){
     const st = S(), cd = currentChallengeDef(); if (!cd) return;
@@ -414,7 +414,7 @@
     if (panel.dataset.state !== (live ? 'live' : 'ready') + cd.id || !panel.querySelector('.objectives')) {
       panel.dataset.state = (live ? 'live' : 'ready') + cd.id;
       panel.innerHTML = `<div class="panel-head"><div><small>${live ? 'LIVE NATIONAL CHALLENGE' : 'READINESS · EXPECTED ' + SIM.dateOf(st.advisory.starts).toUpperCase()}</small><b>${esc(c.name)}</b></div>${live?'':'<button class="collapse-btn" id="closeReady" title="Back to the portfolio">×</button>'}</div>
-        <div class="panel-body"><p class="brief">${esc(c.brief)}</p><h4>Objectives · keep services running</h4><ul class="objectives"></ul>
+        <div class="panel-body"><p class="brief">${esc(c.brief)}</p><h4>Objectives · keep services running</h4>${live && cd.id === 'sandstorm' ? '<p class="hint">Dust plumes and orange rings show where the storm reaches each service now.</p>' : ''}<ul class="objectives"></ul>
         ${live ? `<h4>Operations</h4>${c.toggles.map(t => `<label class="toggle"><input type="checkbox" data-toggle="${t.id}" /><span><b>${esc(t.name)}</b><small>${esc(t.note)}</small></span></label>`).join('')}` : '<p class="hint">Units placed during readiness start on site, so they skip the travel time. Strategic time keeps running.</p>'}</div>`;
       panel.querySelectorAll('[data-toggle]').forEach(i => i.onchange = () => SIM.setToggle(i.dataset.toggle, i.checked));
       const cr = $('#closeReady'); if (cr) cr.onclick = closeReadiness;
@@ -434,13 +434,19 @@
     if (!cd || (!st.challenge && !ui.readiness)) return;
     const ents = [], labs = [], assets = st.challenge ? st.challenge.assets : SIM.challengeAssets(cd.id);
     for (const a of assets) { const cont = st.challenge ? a.continuity : 100, col = cont > 75 ? [.3,.85,.45] : cont > 45 ? [1,.75,.2] : [.95,.35,.3];
-      const v = visAsset(a); ents.push({x:v[0], z:v[1], y:G_UP, color:col, size:13, ring:.16, ringColor:col, pulse:!!(st.challenge && a.exposure > .1)});
-      labs.push({id:'a-' + a.id, text:`${a.name} · ${Math.round(cont)}%`, x:v[0], z:v[1], cls:'asset ' + (cont > 75 ? 'ok' : cont > 45 ? 'mid' : 'low')}); }
+      const v = visAsset(a), dust = st.challenge && a.exposure > .08 ? a.exposure : 0;   // .08 = the simulation's own threshold for losing continuity
+      ents.push({x:v[0], z:v[1], y:G_UP, color:col, size:13, ring:.16, ringColor:col, pulse:!!dust});
+      if (dust) ents.push({x:v[0], z:v[1], y:G_UP - .02, color:[.86,.52,.22], size:0, ring:.04 + .1 * dust, ringColor:[.93,.55,.2]});   // exposure overlay: ring grows with simulated exposure
+      labs.push({id:'a-' + a.id, text:`${a.name} · ${Math.round(cont)}%${dust ? ` · dust ${Math.round(dust * 100)}%` : ''}`, x:v[0], z:v[1], cls:'asset ' + (cont > 75 ? 'ok' : cont > 45 ? 'mid' : 'low')}); }
     const units = st.challenge ? st.challenge.units.map((u, i) => ({u, key:'u' + i})).filter(x => x.u.pos) : (st.advisory.prepared || []).map((p, i) => ({key:'p' + i, u:{pos:p.pos, target:p.pos, assetId:p.assetId, color:cd.c.units.find(u => u.type === p.type).color}}));
-    for (const {u, key} of units) { const v = visUnit(u, key, assets), T = u.target ? visTarget(u, assets) : null;
+    for (const {u} of units) { const v = toPlan(u.pos), T = u.target ? toPlan(u.target) : null;
       ents.push({x:v[0], z:v[1], y:G_UP + .05, color:u.color, size:u.drone ? 10 : 12, path: T && Math.hypot(T[0]-v[0], T[1]-v[1]) > .01 ? T : null}); }
-    W.setEntities(ents); W.setDynamicLabels(labs); W.setHazard(st.challenge ? st.challenge.hazard : null);
-    if (ui.droneFollow && st.challenge) { const d = st.challenge.units.find(u => u.drone && u.pos); if (d) { const v = visUnit(d, 'u' + st.challenge.units.indexOf(d), assets); W.followPoint(v[0], v[1]); } }
+    // The dust is drawn from the simulation's per-site exposure (plumes where the storm reaches a service), with a light
+    // ambient haze for intensity: no single drawn cloud could match the relocated sites, so none is implied.
+    const hz = st.challenge && st.challenge.hazard, [hx, hz2] = centroid(assets);
+    W.setEntities(ents); W.setDynamicLabels(labs);
+    W.setHazard(hz ? {type:hz.type, intensity:hz.intensity, x:hx, z:hz2, r:1.05, plumes:assets.map(a => { const v = visAsset(a); return {x:v[0], z:v[1], e:a.exposure || 0}; })} : null);
+    if (ui.droneFollow && st.challenge) { const d = st.challenge.units.find(u => u.drone && u.pos); if (d) { const v = toPlan(d.pos); W.followPoint(v[0], v[1]); } }
   }
 
   /* ============================ OUTCOMES ============================== */

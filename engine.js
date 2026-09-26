@@ -958,7 +958,13 @@
     const hj=P('hajj'); for(let i=0;i<30;i++){const q=((t*.00004)+i/30)%1;push(hj.x+(mk.x-hj.x)*q+Math.sin(i*7)*.01,G+.012,hj.z+(mk.z-hj.z)*q+Math.cos(i*5)*.01,[.99,.99,.96],2.2);}
     { const MR=LY.METRO_ROUTE, ML=pathLen(MR); for (let k=0;k<3;k++) for (let j=0;j<4;j++){ const q=((t*.00005)+k/3+j*.004)%1, [x,z]=along(MR,ML,q); push(x,G+.016,z,[.55,.85,1],3.4); } }
     const ry=C('Riyadh'); for(let i=0;i<30;i++){const a=i*2.1+t*.0004,r=.03+(i%6)*.016;push(ry.x+Math.cos(a)*r,G+.02+(i%4)*.02,ry.z+Math.sin(a)*r,[1,.76,.3],3);}
-    if (hazard && hazard.intensity>.02) {
+    if (hazard && hazard.plumes) {   // exposure-driven dust: a plume at each site in proportion to its simulated exposure, plus light haze
+      const hz=hazard;
+      for (const pl of hz.plumes) { const n=Math.round(150*pl.e); for(let i=0;i<n;i++){ const q=Math.sqrt((i*17.17+t*.0003)%1), ang=i*2.399+t*.0004, r=.05+.13*pl.e;
+        push(pl.x+Math.cos(ang)*q*r, G+.03+((i%11)/11)*(.18+.3*pl.e), pl.z+Math.sin(ang)*q*r*.85, i%3?[.80,.56,.30]:[.70,.46,.24], 3+(i%4)*1.4); } }
+      const na=Math.round(160*hz.intensity); for(let i=0;i<na;i++){ const q=Math.sqrt((i*13.31+t*.00012)%1), ang=i*2.399+t*.0001;
+        push(hz.x+Math.cos(ang)*q*hz.r, G+.05+((i%7)/7)*.4, hz.z+Math.sin(ang)*q*hz.r*.85, [.84,.66,.44], 2.2); } }
+    else if (hazard && hazard.intensity>.02) {
       const hz=hazard, n=Math.round(520*hz.intensity);
       for(let i=0;i<n;i++){ const q=Math.sqrt((i*17.17+t*.00022)%1), ang=i*2.399+t*.0003, x=hz.x+Math.cos(ang)*q*hz.r, z=hz.z+Math.sin(ang)*q*hz.r*.85;
         if (hz.type==='rain') push(x,G+.02+(((i*.37)+t*.0012)%1)*.5,z,[.72,.82,.95],2.4);
@@ -1090,7 +1096,7 @@
     // Adaptive quality: drop shadows/tilt-shift automatically on slow machines.
     if (quality==='high' && ++frames>90 && frames<400) { if (dt>45) slowFrames++; if (slowFrames>60) setQuality('low', true); }
     resize(); updateCamera(dt); let st=stormTarget;
-    if (hazard) { const d=Math.hypot(camera.target[0]-hazard.x,camera.target[2]-hazard.z); st=Math.max(st,hazard.intensity*Math.max(0,Math.min(1,1.7-d/(hazard.r*2.2)))*(hazard.type==='heat'?.45:1)); const tt=TINTS[hazard.type]||TINTS.dust; for(let i=0;i<3;i++) tint[i]+=(tt[i]-tint[i])*.05; }
+    if (hazard) { const d=Math.hypot(camera.target[0]-hazard.x,camera.target[2]-hazard.z); st=Math.max(st,(hazard.plumes?.55:1)*hazard.intensity*Math.max(0,Math.min(1,1.7-d/(hazard.r*2.2)))*(hazard.type==='heat'?.45:1)); const tt=TINTS[hazard.type]||TINTS.dust; for(let i=0;i<3;i++) tint[i]+=(tt[i]-tint[i])*.05; }
     storm+=(st*(directMode?.6:1)-storm)*Math.min(1,dt*.002);
     if (follow) { camera.desired.target[0]=follow[0]; camera.desired.target[2]=follow[1]; }
     if (stageDirty) { stageBuf=uploadIds(stageMesh, upload(stageMesh, stageBuf, gl.DYNAMIC_DRAW)); stageLineBuf=upload({p:stageLines.p,c:stageLines.c}, stageLineBuf||{p:gl.createBuffer(),c:gl.createBuffer()}, gl.DYNAMIC_DRAW); stageDirty=false; }
@@ -1156,7 +1162,7 @@
       addLine([o.a[0],y,o.a[1]],[o.b[0],y,o.b[1]],o.color); addLine([o.a[0],y+.002,o.a[1]+.004],[o.b[0],y+.002,o.b[1]+.004],o.color); if (o.thick) { addLine([o.a[0]+.004,y,o.a[1]],[o.b[0]+.004,y,o.b[1]],o.color); addLine([o.a[0]-.004,y+.001,o.a[1]-.002],[o.b[0]-.004,y+.001,o.b[1]-.002],o.color); } } }
     for (const e of entities) { if (e.ring) addRing(e.x,G+.012,e.z,e.ring,e.ringColor||e.color,28);
       if (e.path) { const n=10; for(let i=0;i<n;i+=2){ const a=i/n,b=(i+1)/n; addLine([e.x+(e.path[0]-e.x)*a,G+.03,e.z+(e.path[1]-e.z)*a],[e.x+(e.path[0]-e.x)*b,G+.03,e.z+(e.path[1]-e.z)*b],e.color); } } }
-    if (hazard && hazard.intensity>.02) { addRing(hazard.x,G+.015,hazard.z,hazard.r,[1,.55,.3],48); addRing(hazard.x,G+.015,hazard.z,hazard.r*(.55+.05*Math.sin(t*.004)),[1,.72,.4],40); }
+    if (hazard && !hazard.plumes && hazard.intensity>.02) { addRing(hazard.x,G+.015,hazard.z,hazard.r,[1,.55,.3],48); addRing(hazard.x,G+.015,hazard.z,hazard.r*(.55+.05*Math.sin(t*.004)),[1,.72,.4],40); }
     lineTarget=lines;
   }
   function setQuality(q, auto){
@@ -1343,6 +1349,7 @@
       visiblePixels(id, max=16){ const px=renderIds(0,0,width,height), k=PIDX[id], pts=[]; for (let j=0;j<height;j+=2) for (let i=0;i<width;i+=2) { const o=(j*width+i)*4; if (px[o+2] && px[o]+px[o+1]*256===k) pts.push([i/dpr,(height-j)/dpr]); }
         if (!pts.length) return []; const mx=pts.reduce((a,p)=>a+p[0],0)/pts.length, my=pts.reduce((a,p)=>a+p[1],0)/pts.length; return pts.sort((a,b)=>Math.hypot(a[0]-mx,a[1]-my)-Math.hypot(b[0]-mx,b[1]-my)).slice(0,max).map(([x,y])=>({x,y})).concat([{count:pts.length}]); },
       marker(id){ const pr=P(id), q=project([pr.pad[0],beaconTop(projectState[id])+.02,pr.pad[1]]); return q?{x:q[0],y:q[1]}:null; },
+      screen(x,z,y=G){ const q=project([x,y,z]); return q?{x:q[0],y:q[1]}:null; },   // where a ground point is drawn (tests)
       state:() => ({dist:camera.dist, selectable, hoverId, selectedId, detail:detailOn()})
     }
   };

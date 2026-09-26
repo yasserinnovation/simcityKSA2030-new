@@ -31,7 +31,7 @@
     G.hideAll(); $('#mhud').classList.remove('hidden', 'ended', 'cine'); ['#results','#report','#decision','#moment','#pauseMenu'].forEach(s => $(s).classList.add('hidden'));
     W.setBeacons(false); W.setProjectLabels(false); W.setNight(0);
     const an = VM.BOARDS[VM.board].anchor;
-    const pts = M().storm ? M().stormPath.map(([lo, la]) => W.place(lo, la, an)) : Object.keys(VM.NODE_DEF).filter(id => (!VM.NODE_DEF[id].energySite || M().energy) && !VM.NODE_DEF[id].far).map(id => G.nodePos(id));
+    const pts = Object.keys(VM.NODE_DEF).filter(id => (!VM.NODE_DEF[id].energySite || M().energy) && !VM.NODE_DEF[id].far).map(id => G.nodePos(id));
     const cx = pts.reduce((a, p) => a + p[0], 0) / pts.length, cz = pts.reduce((a, p) => a + p[1], 0) / pts.length;
     const span = Math.max(...pts.map(p => Math.hypot(p[0] - cx, p[1] - cz)));
     ui.home = [cx, cz, Math.max(2.2, span * 2.6)];
@@ -164,25 +164,25 @@
   }
   function renderStorm(){
     const s = S(); if (!s.storm) { W.setHazard(null); return; }
-    const wpk = G.worldPerKm(), st = s.storm, ph = st.phase;
-    const pos = i => { const c = VM.stormCenter(i); return W.place(c.lon, c.lat, VM.BOARDS[VM.board].anchor); };
-    if (ph >= 1) { const to = pos(ph - 1); const from = ui.hazardAnim || to; animateHazard(from, to, st.sev[ph - 1], st.radius * wpk, M().hazard || 'dust'); ui.hazardAnim = to; }
+    const st = s.storm, ph = st.phase, twin = G.profile.upgrades.includes('twin'), ids = Object.keys(VM.NODE_DEF);
+    // Which districts a storm phase reaches is decided in real kilometres (mission.js: within 1.2× the storm radius).
+    // The district plan does not keep real distances between districts, so the map shows exactly those districts —
+    // dust on the ones hit now, rings on the ones the forecast covers — instead of a drawn circle that could mislead.
+    const within = (i, k) => ids.filter(id => !VM.NODE_DEF[id].far && VM.km(VM.NODE_DEF[id], VM.stormCenter(i)) < st.radius * k);
+    const drawn = ids.filter(id => !VM.NODE_DEF[id].far).map(id => G.nodePos(id)), cx = drawn.reduce((t, p) => t + p[0], 0) / drawn.length, cz = drawn.reduce((t, p) => t + p[1], 0) / drawn.length;
+    if (ph >= 1) { const sev = st.sev[ph - 1] || 0;
+      W.setHazard({x:cx, z:cz, r:Math.max(...drawn.map(p => Math.hypot(p[0] - cx, p[1] - cz))) + .2, type:M().hazard || 'dust', intensity:sev,
+        plumes:within(ph - 1, 1.2).map(id => { const p = G.nodePos(id); return {x:p[0], z:p[1], e:Math.max(.35, sev)}; })}); }
     else W.setHazard(null);
-    // Forecast cone: next phase (and the one after with Digital Twin)
-    const ents = [];
-    const fut = G.profile.upgrades.includes('twin') ? [ph, ph + 1] : [ph];
-    fut.forEach((i, k) => { if (i >= st.path.length) return; const p = pos(i); ents.push({x:p[0], z:p[1], y:W.ground + .03, color:[1,.6,.3], size:10, ring:st.radius * wpk * (G.profile.upgrades.includes('twin') ? 1 : 1.35), ringColor:k ? [1,.75,.45] : [1,.5,.25], pulse:true}); });
+    // Forecast: with the Digital Twin the next two phases exactly; without it, every district the next phase might reach.
+    const ents = [], fut = twin ? [ph, ph + 1] : [ph];
+    fut.forEach((i, k) => { if (i >= st.path.length) return;
+      for (const id of within(i, twin ? 1.2 : 1.2 * 1.35)) { const p = G.nodePos(id); ents.push({x:p[0], z:p[1], y:W.ground + .03, color:[1,.6,.3], size:0, ring:.1 + k * .035, ringColor:k ? [1,.75,.45] : [1,.5,.25], pulse:true}); } });
     W.setEntities(currentEntities().concat(ents));
   }
   let lastEnts = [];
   const _setE = W.setEntities; W.setEntities = list => { lastEnts = list; _setE(list); };
   const currentEntities = () => lastEnts;
-  function animateHazard(from, to, sev, r, type='dust'){
-    const t0 = performance.now(), dur = 1200;
-    const step = () => { const k = Math.min(1, (performance.now() - t0) / dur), e = k * k * (3 - 2 * k);
-      W.setHazard({x:from[0] + (to[0] - from[0]) * e, z:from[1] + (to[1] - from[1]) * e, r, type, intensity:sev}); if (k < 1) requestAnimationFrame(step); };
-    step();
-  }
 
   /* ============================ DECISIONS ============================ */
   function selectAction(id){
