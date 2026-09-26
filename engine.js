@@ -34,7 +34,7 @@
   // The Riyadh planning view is north-up and frames the whole district plan (presentation only; data.js is unchanged).
   { const [x, z] = LY.R(.03, -.06); Object.assign(D.regions.riyadh, {x, z, az:0, el:1.02, dist:3.35, fitWidth:true}); }
   // Every regional plan is framed north-up the same way (regions.js cameras).
-  for (const [k, v] of Object.entries(LY.REGION_VIEWS || {})) if (D.regions[k]) Object.assign(D.regions[k], {x:v.camera.x, z:v.camera.z, az:0, el:1.02, dist:v.camera.dist, fitWidth:true});
+  for (const [k, v] of Object.entries(LY.REGION_VIEWS || {})) if (D.regions[k]) Object.assign(D.regions[k], {x:v.camera.x, z:v.camera.z, az:0, el:1.02, dist:v.camera.dist, fitWidth:true, phoneFit:v.camera.phoneFit || 1.5});
   const P = id => D.projects.find(p => p.id === id);
   const C = name => cityByName[name];
   const pt = w => typeof w === 'string' ? [C(w).x, C(w).z] : geo(w[0], w[1]);
@@ -1376,7 +1376,15 @@
   const clusterLabels = clusters.map(cl => { const L=makeLabel(cl.anchor+' · '+cl.ids.length+' projects', 'cluster', cl.x, G+.34, cl.z, 9.5); L.cluster=true; return L; });
   // Project name labels hold a full and a short variant (each translated once by the Arabic layer); the placer picks the
   // variant that fits, anchors the label just above the model's real top, and lets the player click it.
-  const ESSENTIAL_LABELS = new Set(['sports', 'newmurabba', 'ksip', 'expo', 'metro']);   // kept visible first when space is tight
+  const ESSENTIAL_LABELS = new Set(['sports', 'newmurabba', 'ksip', 'expo', 'metro', 'masar', 'redsea']);   // kept visible first when space is tight
+  // A hidden label must not catch clicks: at opacity 0 it would still sit where it was last drawn and swallow clicks meant
+  // for the map (or for another region's landmark). It fades out, then leaves hit-testing entirely.
+  // Screen-anchor points of every landmark (project footprints and city/district places) — see updateLabels().
+  const LANDMARK_POINTS = [
+    ...D.projects.map(p => [p.id, p.ribbon ? p.ribbon.pts.flatMap((q, i, a) => i ? [[(a[i-1][0] + q[0]) / 2, (a[i-1][1] + q[1]) / 2], q] : [q]).concat([p.pad]) : [[p.x, p.z], p.pad]]),
+    ...Object.values(LY.places || {}).map(q => [q.id, [[q.x, q.z]]]),
+    [CORE_ID, [[LY.RIYADH_CORE.x, LY.RIYADH_CORE.z]]]];
+  const hideLabel = L => { L.el.style.opacity=0; L.el.style.pointerEvents='none'; };
   const mapName = p => (LY.MAP_NAME && LY.MAP_NAME[p.id] && LY.MAP_NAME[p.id].en) || p.name;   // e.g. 'Jubail - Energy & Industry'
   const smallProjLabels = D.projects.map(p => { const L=makeLabel('', 'proj-small', p.x, G+.16, p.z, 1.5); L.small=true; L.pid=p.id; L.el.dataset.pid=p.id;
     L.el.innerHTML='<span class="lf"></span><span class="ls"></span>'; L.el.children[0].textContent=mapName(p); L.el.children[1].textContent=LY.SHORT[p.id]||mapName(p); return L; });
@@ -1404,7 +1412,7 @@
     const far = camera.dist, now = performance.now(), cx = innerWidth/2, cy = innerHeight/2, diag = Math.hypot(cx, cy);
     if (now - obstaclesAt > 350) { obstaclesAt = now; refreshObstacles(); }
     labelLayer.classList.toggle('selectable', selectable && !groundHandler);   // while a dispatch/placement tool is active, clicks go to the ground
-    const focus = hoverId || selectedId, cand = [];
+    const focus = (hoverViaLabel ? null : hoverId) || selectedId, cand = [];
     for (const L of labels) {
       let show = true, x=L.x, y=L.y, z=L.z, pri=L.priority;
       if (L===projLabel) { const p=focus&&P(focus); if(!p||!projLabelsOn){show=false;} else { if (L.el.textContent!==mapName(p)) { L.el.textContent=mapName(p); } L.el.dataset.pid=p.id; x=p.x; z=p.z; y=topY[p.id]+.035; } }
@@ -1419,34 +1427,42 @@
       else if (L.el.classList.contains('country')||L.el.classList.contains('sea')) show = far > 6.5;
       else if (!L.el.classList.contains('capital')) show = far < 24;
       const s = show && project([x,y,z]);
-      if (!s || s[2]>1 || s[0]<-60 || s[1]<-30 || s[0]>innerWidth+60 || s[1]>innerHeight+30) { L.el.style.opacity=0; continue; }
+      if (!s || s[2]>1 || s[0]<-60 || s[1]<-30 || s[0]>innerWidth+60 || s[1]>innerHeight+30) { hideLabel(L); continue; }
       if (L.small) pri = 2 + .9 * (1 - Math.min(1, Math.hypot(s[0]-cx, s[1]-cy) / diag)) + (ESSENTIAL_LABELS.has(L.pid) ? 1 : 0);   // nearer the middle = more relevant; key districts first
       cand.push({L, s, pri});
     }
     cand.sort((a,b) => b.pri - a.pri);
     const placed = [];
+    // Where each landmark is drawn on screen (its centre, marker and, for corridors, points along it). A clickable label
+    // may cover its own landmark but never another one, so a click where a landmark is drawn always selects that landmark.
+    const anchors = [];
+    for (const [id, pts] of LANDMARK_POINTS) for (const q of pts) { const a = project([q[0], G + .01, q[1]]); if (a && a[2] <= 1 && a[0] > -20 && a[0] < innerWidth + 20 && a[1] > -20 && a[1] < innerHeight + 20) anchors.push([id, a[0], a[1]]); }
+    const coversOther = (r, pid) => anchors.some(([id, x, y]) => id !== pid && x > r.x - 4 && x < r.x + r.w + 4 && y > r.y - 4 && y < r.y + r.h + 4);
     for (const {L, s} of cand) {
       measure(L); if (L===projLabel) { L.w=L.el.offsetWidth; L.h=L.el.offsetHeight; }
       const lift = L.el.classList.contains('city')||L===projLabel||L.cluster ? 18 : L.small ? 8 : 0;
       const at = w => ({x:Math.max(6, Math.min(innerWidth - w - 6, s[0]-w/2+(far>7?L.dx:0))), y:s[1]-L.h/2-lift+(far>7?L.dy:0), w, h:L.h});   // every label stays fully on screen
-      const free = r => !placed.some(q => hits(r, q)) && !obstacles.some(q => hits(r, q, 2, 2));
+      const free = r => !placed.some(q => hits(r, q)) && !obstacles.some(q => hits(r, q, 2, 2)) && !(L.pid && coversOther(r, L.pid));
       let r = at(L.small ? L.wF : L.w), short = false;
       if (!free(r) && L.small) { r = at(L.wS); short = true; }        // shorten before giving up
-      if (!free(r) && L.small) { const b = r;                           // then nudge the short label just below, beside or (last) above its marker
-        for (const [dx, dy] of [[0, L.h + 5], [-(b.w / 2 + 12), 0], [b.w / 2 + 12, 0], [0, -(L.h + 5)]]) { const c = {...b, x:Math.max(6, Math.min(innerWidth - b.w - 6, b.x + dx)), y:b.y + dy}; if (free(c)) { r = c; break; } } }
-      if (!free(r)) { L.el.style.opacity=0; continue; }
+      if (!free(r) && L.pid) { const b = r, H = L.h + 5, Wd = b.w / 2 + 12;   // then nudge it round its marker: above and beside first, below (over its own model) last
+        for (const [dx, dy] of [[0, -H], [-Wd, 0], [Wd, 0], [-Wd, -H], [Wd, -H], [0, -2 * H], [-2 * Wd, 0], [2 * Wd, 0], [-Wd, -2 * H], [Wd, -2 * H], [-Wd, H], [Wd, H], [0, H], [0, 2 * H]]) { const c = {...b, x:Math.max(6, Math.min(innerWidth - b.w - 6, b.x + dx)), y:b.y + dy}; if (free(c)) { r = c; break; } } }
+      if (!free(r)) { hideLabel(L); continue; }
       if (L.small) L.el.classList.toggle('use-short', short);
       L.el.classList.toggle('hot', !!L.pid && L.pid===hoverId || L===projLabel);
       placed.push(r);
-      L.el.style.opacity=1; L.el.style.transform=`translate3d(${r.x.toFixed(1)}px,${r.y.toFixed(1)}px,0)`;
+      L.el.style.opacity=1; L.el.style.visibility=''; L.el.style.pointerEvents=''; L.el.style.transform=`translate3d(${r.x.toFixed(1)}px,${r.y.toFixed(1)}px,0)`;
     }
   }
   // Clicking or hovering a project's label acts on that same project.
   labelLayer.addEventListener('click', e => { const rg=e.target.closest('[data-region]'); if (rg) { hideChoices(); onRegion(rg.dataset.region); return; }
     const el=e.target.closest('[data-pid]'); if (!el || !selectable) return; hideChoices(); pickSelect(el.dataset.pid); });
-  function pickSelect(id){ if (id===CORE_ID) { selectedId=null; onPlace('riyadh'); } else if (String(id).startsWith('place:')) { selectedId=null; onPlace(id); } else onSelect(P(id)); }
-  labelLayer.addEventListener('pointerover', e => { const el=e.target.closest('[data-pid]'); if (el && selectable) hoverId=el.dataset.pid; });
-  labelLayer.addEventListener('pointerout', e => { const el=e.target.closest('[data-pid]'); if (el && selectable && hoverId===el.dataset.pid) hoverId=null; });
+  let lastPick=null;   // last map selection (tests)
+  const regionFit = r => r.fitWidth ? Math.min(r.phoneFit || 1.5, Math.max(1, Math.sqrt(1.1/(innerWidth/innerHeight)))) : 1;   // tall plans need less pull-back   // portrait screens: keep the whole plan in frame
+  function pickSelect(id){ lastPick=id; if (id===CORE_ID) { selectedId=null; onPlace('riyadh'); } else if (String(id).startsWith('place:')) { selectedId=null; onPlace(id); } else onSelect(P(id)); }
+  let hoverViaLabel=false;   // hovering a label keeps that label in place, so a click lands where the pointer is
+  labelLayer.addEventListener('pointerover', e => { const el=e.target.closest('[data-pid]'); if (el && selectable) { hoverId=el.dataset.pid; hoverViaLabel=true; } });
+  labelLayer.addEventListener('pointerout', e => { const el=e.target.closest('[data-pid]'); if (el && selectable && hoverId===el.dataset.pid) { hoverId=null; hoverViaLabel=false; } });
 
   /* ------------------------------ render ---------------------------- */
   let lastT=performance.now(), frames=0, slowFrames=0;
@@ -1607,7 +1623,7 @@
       if (any && x>=x0-pad && x<=x1+pad && y>=y0-pad && y<=y1+pad) return true; }
     return camera.dist > CLUSTER_DIST;   // clustered overview: cluster beacons are handled by the pick itself
   }
-  function runHover(x, y, touch){ if (!selectable || pointers.size) return; if (!nearAnyProject(x, y, 16)) { hoverId=null; canvas.style.cursor=''; return; }
+  function runHover(x, y, touch){ if (!selectable || pointers.size) return; hoverViaLabel=false; if (!nearAnyProject(x, y, 16)) { hoverId=null; canvas.style.cursor=''; return; }
     const r=resolveAt(x, y, touch); const id=r ? (r.select || (r.choose && r.choose[0])) : null; hoverId=id||null; canvas.style.cursor=id?'pointer':''; }
   // Accessible choice list when several projects are under the pointer (instead of silently picking one).
   const escH = t => String(t).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -1677,8 +1693,7 @@
     start(){ setDesired(K.az,K.el,K.dist,K.x,K.z); },
     focusProject(p){ selectedId=p.id; directMode=false; follow=null; setDesired(.3,.8,2.3,p.x,p.z,.02); },
     focusRegion(id){ const r=D.regions[id]||K; selectedId=null; directMode=false;
-      const fit = r.fitWidth ? Math.min(1.5, Math.max(1, Math.sqrt(1.1/(innerWidth/innerHeight)))) : 1;   // portrait screens: keep the whole Riyadh plan in frame
-      setDesired(r.az,r.el,r.dist*fit,r.x,r.z); },
+      setDesired(r.az,r.el,r.dist*regionFit(r),r.x,r.z); },
     overview(){ selectedId=null; directMode=false; follow=null; stormTarget=0; setDesired(K.az,K.el,K.dist,K.x,K.z); },
     // World coordinates for simulation data (same anchor spread as projects)
     place(lon, lat, anchor){ let [x,z]=geo(lon,lat); const a=anchor&&C(anchor); if(a){x=a.x+(x-a.x)*ANCHOR_SPREAD;z=a.z+(z-a.z)*ANCHOR_SPREAD;} return [x,z]; },
@@ -1726,6 +1741,8 @@
         if (!pts.length) return []; const mx=pts.reduce((a,p)=>a+p[0],0)/pts.length, my=pts.reduce((a,p)=>a+p[1],0)/pts.length; return pts.sort((a,b)=>Math.hypot(a[0]-mx,a[1]-my)-Math.hypot(b[0]-mx,b[1]-my)).slice(0,max).map(([x,y])=>({x,y})).concat([{count:pts.length}]); },
       marker(id){ const pr=P(id), q=project([pr.pad[0],beaconTop(projectState[id],id)+.02,pr.pad[1]]); return q?{x:q[0],y:q[1]}:null; },
       screen(x,z,y=G){ const q=project([x,y,z]); return q?{x:q[0],y:q[1]}:null; },   // where a ground point is drawn (tests)
+      lastPick(){ return lastPick; }, clearPick(){ lastPick=null; },
+      regionView(id){ const r=D.regions[id]; selectedId=null; directMode=false; follow=null; const d=r.dist*regionFit(r); setDesired(r.az,r.el,d,r.x,r.z,0); camera.az=r.az; camera.el=r.el; camera.dist=d; camera.target=[r.x,0,r.z]; },   // a region's default view, instantly
       state:() => ({dist:camera.dist, selectable, hoverId, selectedId, detail:detailOn()})
     }
   };

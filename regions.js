@@ -51,7 +51,7 @@
     // ------------------------------------------------------------------ WESTERN CORRIDOR (western.png)
     west: {
       name:N('Western Corridor', 'الممر الغربي'), reference:'western.png',
-      bounds:{x0:-3.45, x1:-1.95, z0:-.42, z1:1.84}, camera:{x:-2.36, z:.60, dist:3.6}, kingdomLabel:[-1.85, .45],
+      bounds:{x0:-3.45, x1:-1.95, z0:-.42, z1:1.84}, camera:{x:-2.36, z:.60, dist:3.6, phoneFit:1.1}, kingdomLabel:[-1.85, .45],
       projects:{
         madinah:      {at:[-2.472, -.115], r:.04, cl:'Madinah'},
         ceer:         {at:W(.80, .06), r:.06, cl:'Jeddah', label:N('KAEC / Ceer', 'مدينة الملك عبدالله الاقتصادية / سير')},
@@ -87,7 +87,7 @@
     // ------------------------------------------------------------------ NEOM / NORTHWEST (neom.png)
     northwest: {
       name:N('NEOM & Northwest', 'نيوم والشمال الغربي'), reference:'neom.png',
-      bounds:{x0:-4.92, x1:-3.12, z0:-2.62, z1:-.46}, camera:{x:-4.02, z:-1.60, dist:3.7}, kingdomLabel:[-3.25, -2.45],
+      bounds:{x0:-4.92, x1:-3.12, z0:-2.62, z1:-.46}, camera:{x:-4.02, z:-1.60, dist:3.7, phoneFit:1.2}, kingdomLabel:[-3.25, -2.45],
       heading:{text:N('NEOM', 'نيوم'), at:[-4.62, -2.14]},
       projects:{
         neom:     {at:[-4.44, -2.10], ribbon:{pts:[[-4.765,-2.02],[-4.44,-2.10],[-4.12,-2.18]], hw:.008}, pad:[-4.44, -2.098], cl:'Tabuk'},
