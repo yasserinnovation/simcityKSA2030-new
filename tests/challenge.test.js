@@ -1,6 +1,6 @@
 // node tests/challenge.test.js — the Riyadh sandstorm challenge: plan-drawn asset positions never change its simulation.
 global.window = {};
-require('../data.js'); require('../layout.js'); require('../sim.js');
+require('../data.js'); require('../regions.js'); require('../layout.js'); require('../sim.js');
 const D = window.VISION_DATA, L = window.VisionLayout, SIM = window.VisionSim;
 let fails = 0; const ok = (l, c, info='') => { if (!c) fails++; console.log(`${c ? 'PASS' : 'FAIL'}  ${l.padEnd(74)} ${info}`); };
 // The same world placement as engine.js W.place (lon/lat spread 3.4× around the anchor city) — the simulation's frame.
@@ -61,6 +61,15 @@ ok('A unit on site is drawn exactly at its drawn asset; at base, at the drawn ba
     && re.units.filter(u => u.target && u.assetId).every(u => { const t = WP.fwd(u.target), v = S[u.assetId]; return Math.hypot(t[0] - v[0], t[1] - v[1]) < .06; }));
   const resumed = finish();
   ok('Finishing after reload gives the same result as never stopping', !!straight && straight === resumed, `${straight} vs ${resumed}`); }
+
+
+// ---- Jeddah rainfall and Hajj heat: every asset is drawn on the Western Corridor plan, on land
+{ const SA = D.saudi.map(([a, b]) => L.geo(a, b)), pip = (x, z) => { let c = false; for (let i = 0, j = SA.length - 1; i < SA.length; j = i++) { const [xi, zi] = SA[i], [xj, zj] = SA[j]; if ((zi > z) !== (zj > z) && x < (xj - xi) * (z - zi) / (zj - zi) + xi) c = !c; } return c; };
+  for (const id of ['rainfall', 'hajj']) { const C2 = SIM.CHALLENGES[id], S2 = L.CHALLENGE_SITES[id];
+    ok(`${id}: every asset (and the unit base) has a place on the Western Corridor plan, on land`, C2.assets.every(a => S2[a.id] && pip(...S2[a.id]) && L.planAt(...S2[a.id]) === 'west') && pip(...S2._base)); }
+  const as = SIM.challengeAssets('hajj'), base = [as.reduce((t, a) => t + a.pos[0], 0) / as.length + .35, as.reduce((t, a) => t + a.pos[1], 0) / as.length + .3];
+  ok('hajj: the unit map is a faithful scaled copy (never folds)', L.planWarp([...as.map(a => ({s:a.pos, v:L.CHALLENGE_SITES.hajj[a.id]})), {s:base, v:L.CHALLENGE_SITES.hajj._base}]).folds === 0);
+  ok('Makkah challenge assets are drawn inland, never on the coast', Object.values(L.CHALLENGE_SITES.hajj).every(q => q[0] - window.VisionRegions.coastW(q[1]) > .25)); }
 
 
 console.log(fails ? `\n${fails} FAILED` : '\nAll challenge tests passed');

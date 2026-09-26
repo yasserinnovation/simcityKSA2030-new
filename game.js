@@ -155,8 +155,15 @@
   }
   W.onSelect(p => { if (ui.started && !ui.tool) selectProject(p.id); });
   // Clicking downtown Riyadh (the skyline or its label) opens the Riyadh planning view; it is a place, not a project.
-  W.onPlace(id => { if (!ui.started || ui.tool) return; const b = $(`[data-region="${id}"]`); if (b) b.onclick(); else W.focusRegion(id);
+  W.onPlace(id => { if (!ui.started || ui.tool) return;
+    // A city or district on a regional plan: move in on it and say which projects are there (the Riyadh skyline opens its region).
+    const q = window.VisionLayout && VisionLayout.places[id];
+    if (q) { W.focusPoint(q.x, q.z, 1.6, .9); const reg = VisionLayout.REGION_VIEWS[q.region], names = q.projects.map(pid => P(pid) && P(pid).name).filter(Boolean);
+      setMessage(`${q.name.en} — ${reg ? reg.name.en : ''}. ${names.length ? 'Projects here: ' + names.join(', ') + '.' : 'No national project here yet.'}`, q.name.en.toUpperCase()); return; }
+    const b = $(`[data-region="${id}"]`); if (b) b.onclick(); else W.focusRegion(id);
     setMessage('Riyadh planning view — pick a district on the map or in the project list.', 'RIYADH'); });
+  // Region names on the national view take you into that region (same as the region buttons).
+  W.onRegion(id => { const b = $(`#regionBar [data-region="${id}"], [data-region="${id}"]:is(button)`); if (b && b.offsetParent) b.onclick(); else W.focusRegion(id); });
 
   /* ========================= OPERATIONS DOCK ========================== */
   function renderDock(){
@@ -314,18 +321,33 @@
   function currentChallengeDef(){ const st = S(); const id = st.challenge ? st.challenge.id : st.advisory ? st.advisory.id : null; return id ? {id, c:SIM.CHALLENGES[id]} : null; }
   // Timed-challenge assets are drawn at their place on the district plan (layout CHALLENGE_SITES). The simulation keeps
   // its own world positions for storm exposure and unit reach, so the challenge plays and scores exactly as before.
-  // Units and dispatch points go through a stateless sim→plan map fitted to the assets and the unit base, so a refresh
-  // redraws every unit exactly where it was (layout planWarp: exact at each site, continuous, never folds).
+  // Units and dispatch points are drawn through a stateless sim→plan map, so a refresh redraws every unit exactly where
+  // it was: the fitted piecewise map (layout planWarp: exact at each site, continuous) when it does not fold; otherwise,
+  // for each unit, the similarity that carries its route (unit base → target) onto the drawn base and drawn target.
   const chSites = () => { const cd = currentChallengeDef(); return (cd && window.VisionLayout && VisionLayout.CHALLENGE_SITES[cd.id]) || {}; };
   const visAsset = a => chSites()[a.id] || a.pos;
-  const warps = {};
-  function chWarp(){
+  const maps = {};
+  const simil = (a0, a1, b0, b1) => { const ax = a1[0] - a0[0], az = a1[1] - a0[1], bx = b1[0] - b0[0], bz = b1[1] - b0[1], d = ax * ax + az * az;
+    if (d < 1e-12) return p => [b0[0] + p[0] - a0[0], b0[1] + p[1] - a0[1]];
+    const c = (ax * bx + az * bz) / d, s = (ax * bz - az * bx) / d; return p => { const dx = p[0] - a0[0], dz = p[1] - a0[1]; return [b0[0] + c * dx - s * dz, b0[1] + s * dx + c * dz]; }; };
+  function chMap(){
     const cd = currentChallengeDef(); if (!cd) return null; const sites = chSites(); if (!sites._base) return null;
-    if (warps[cd.id]) return warps[cd.id];
+    if (maps[cd.id]) return maps[cd.id];
     const as = SIM.challengeAssets(cd.id), base = [as.reduce((t, a) => t + a.pos[0], 0) / as.length + .35, as.reduce((t, a) => t + a.pos[1], 0) / as.length + .3];   // = sim baseFor()
-    return warps[cd.id] = VisionLayout.planWarp([...as.map(a => ({s:a.pos, v:sites[a.id]})), {s:base, v:sites._base}]);
+    const pairs = [...as.map(a => ({s:a.pos, v:sites[a.id]})), {s:base, v:sites._base}], w = VisionLayout.planWarp(pairs);
+    // global least-squares similarity (for open-ground points when the piecewise map would fold)
+    const ms = [0, 1].map(k => pairs.reduce((t, p) => t + p.s[k], 0) / pairs.length), mv = [0, 1].map(k => pairs.reduce((t, p) => t + p.v[k], 0) / pairs.length);
+    let n = 0, sc = 0, ss = 0; for (const p of pairs) { const dx = p.s[0] - ms[0], dz = p.s[1] - ms[1], vx = p.v[0] - mv[0], vz = p.v[1] - mv[1]; n += dx * dx + dz * dz; sc += dx * vx + dz * vz; ss += dx * vz - dz * vx; }
+    const c = sc / n, sn = ss / n, det = c * c + sn * sn;
+    const G = p => { const dx = p[0] - ms[0], dz = p[1] - ms[1]; return [mv[0] + c * dx - sn * dz, mv[1] + sn * dx + c * dz]; };
+    const Gi = v => { const x = v[0] - mv[0], z = v[1] - mv[1]; return [ms[0] + (c * x + sn * z) / det, ms[1] + (-sn * x + c * z) / det]; };
+    return maps[cd.id] = {w, folds:w.folds > 0, base, vbase:sites._base, G, Gi, sites, assets:as};
   }
-  const toPlan = p => { const w = chWarp(); return w ? w.fwd(p) : p; }, fromPlan = v => { const w = chWarp(); return w ? w.inv(v) : v; };
+  const drawnTarget = u => { const m = chMap(); if (!m) return u.target; if (!m.folds) return m.w.fwd(u.target);
+    const a = u.assetId && m.assets.find(x => x.id === u.assetId); if (a) return [m.sites[a.id][0] + u.target[0] - a.pos[0], m.sites[a.id][1] + u.target[1] - a.pos[1]]; return m.G(u.target); };
+  const unitAt = u => { const m = chMap(); if (!m) return u.pos; if (!m.folds || !u.target) return m.folds ? m.G(u.pos) : m.w.fwd(u.pos);
+    return simil(m.base, u.target, m.vbase, drawnTarget(u))(u.pos); };
+  const fromPlan = v => { const m = chMap(); return !m ? v : m.folds ? m.Gi(v) : m.w.inv(v); };
   const centroid = as => { const ps = as.map(visAsset); return [ps.reduce((a, p) => a + p[0], 0) / ps.length, ps.reduce((a, p) => a + p[1], 0) / ps.length]; };
   function openReadiness(){
     const cd = currentChallengeDef(); if (!cd) return;
@@ -405,7 +427,7 @@
     const st = S(); if (!st.challenge) return;
     const d = st.challenge.units.find(u => u.drone); if (!d) return;
     if (!d.pos) { setMessage('Dispatch the survey drone first: it is selected — click a place on the map.', 'FIELD VIEW'); if (ui.tool !== d.type) selectTool(d.type); return; }
-    const dv = toPlan(d.pos); ui.droneFollow = !ui.droneFollow; W.setDirectMode(ui.droneFollow, dv[0], dv[1]); renderUnitBar();
+    const dv = unitAt(d); ui.droneFollow = !ui.droneFollow; W.setDirectMode(ui.droneFollow, dv[0], dv[1]); renderUnitBar();
   }
   function renderChallengePanel(){
     const st = S(), cd = currentChallengeDef(); if (!cd) return;
@@ -414,7 +436,7 @@
     if (panel.dataset.state !== (live ? 'live' : 'ready') + cd.id || !panel.querySelector('.objectives')) {
       panel.dataset.state = (live ? 'live' : 'ready') + cd.id;
       panel.innerHTML = `<div class="panel-head"><div><small>${live ? 'LIVE NATIONAL CHALLENGE' : 'READINESS · EXPECTED ' + SIM.dateOf(st.advisory.starts).toUpperCase()}</small><b>${esc(c.name)}</b></div>${live?'':'<button class="collapse-btn" id="closeReady" title="Back to the portfolio">×</button>'}</div>
-        <div class="panel-body"><p class="brief">${esc(c.brief)}</p><h4>Objectives · keep services running</h4>${live && cd.id === 'sandstorm' ? '<p class="hint">Dust plumes and orange rings show where the storm reaches each service now.</p>' : ''}<ul class="objectives"></ul>
+        <div class="panel-body"><p class="brief">${esc(c.brief)}</p><h4>Objectives · keep services running</h4>${live && chSites()._base ? `<p class="hint">${({dust:'Dust plumes and orange rings show where the storm reaches each service now.', rain:'Rain and orange rings show where the rain bands reach each service now.', heat:'Heat shimmer and orange rings show where the heat reaches each service now.'})[c.hazard.type] || ''}</p>` : ''}<ul class="objectives"></ul>
         ${live ? `<h4>Operations</h4>${c.toggles.map(t => `<label class="toggle"><input type="checkbox" data-toggle="${t.id}" /><span><b>${esc(t.name)}</b><small>${esc(t.note)}</small></span></label>`).join('')}` : '<p class="hint">Units placed during readiness start on site, so they skip the travel time. Strategic time keeps running.</p>'}</div>`;
       panel.querySelectorAll('[data-toggle]').forEach(i => i.onchange = () => SIM.setToggle(i.dataset.toggle, i.checked));
       const cr = $('#closeReady'); if (cr) cr.onclick = closeReadiness;
@@ -437,16 +459,16 @@
       const v = visAsset(a), dust = st.challenge && a.exposure > .08 ? a.exposure : 0;   // .08 = the simulation's own threshold for losing continuity
       ents.push({x:v[0], z:v[1], y:G_UP, color:col, size:13, ring:.16, ringColor:col, pulse:!!dust});
       if (dust) ents.push({x:v[0], z:v[1], y:G_UP - .02, color:[.86,.52,.22], size:0, ring:.04 + .1 * dust, ringColor:[.93,.55,.2]});   // exposure overlay: ring grows with simulated exposure
-      labs.push({id:'a-' + a.id, text:`${a.name} · ${Math.round(cont)}%${dust ? ` · dust ${Math.round(dust * 100)}%` : ''}`, x:v[0], z:v[1], cls:'asset ' + (cont > 75 ? 'ok' : cont > 45 ? 'mid' : 'low')}); }
+      labs.push({id:'a-' + a.id, text:`${a.name} · ${Math.round(cont)}%${dust ? ` · ${({rain:'rain', heat:'heat'})[cd.c.hazard.type] || 'dust'} ${Math.round(dust * 100)}%` : ''}`, x:v[0], z:v[1], cls:'asset ' + (cont > 75 ? 'ok' : cont > 45 ? 'mid' : 'low')}); }
     const units = st.challenge ? st.challenge.units.map((u, i) => ({u, key:'u' + i})).filter(x => x.u.pos) : (st.advisory.prepared || []).map((p, i) => ({key:'p' + i, u:{pos:p.pos, target:p.pos, assetId:p.assetId, color:cd.c.units.find(u => u.type === p.type).color}}));
-    for (const {u} of units) { const v = toPlan(u.pos), T = u.target ? toPlan(u.target) : null;
+    for (const {u} of units) { const v = unitAt(u), T = u.target ? drawnTarget(u) : null;
       ents.push({x:v[0], z:v[1], y:G_UP + .05, color:u.color, size:u.drone ? 10 : 12, path: T && Math.hypot(T[0]-v[0], T[1]-v[1]) > .01 ? T : null}); }
     // The dust is drawn from the simulation's per-site exposure (plumes where the storm reaches a service), with a light
     // ambient haze for intensity: no single drawn cloud could match the relocated sites, so none is implied.
     const hz = st.challenge && st.challenge.hazard, [hx, hz2] = centroid(assets);
     W.setEntities(ents); W.setDynamicLabels(labs);
     W.setHazard(hz ? {type:hz.type, intensity:hz.intensity, x:hx, z:hz2, r:1.05, plumes:assets.map(a => { const v = visAsset(a); return {x:v[0], z:v[1], e:a.exposure || 0}; })} : null);
-    if (ui.droneFollow && st.challenge) { const d = st.challenge.units.find(u => u.drone && u.pos); if (d) { const v = toPlan(d.pos); W.followPoint(v[0], v[1]); } }
+    if (ui.droneFollow && st.challenge) { const d = st.challenge.units.find(u => u.drone && u.pos); if (d) { const v = unitAt(d); W.followPoint(v[0], v[1]); } }
   }
 
   /* ============================ OUTCOMES ============================== */

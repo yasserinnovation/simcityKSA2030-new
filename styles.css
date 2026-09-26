@@ -586,3 +586,10 @@ body:has(#chapter:not(.hidden)) .mode-nav{left:auto;right:auto;transform:none;in
 .pick-choices .pc-close{min-height:44px;justify-content:center;font-weight:800;color:#627a6b}
 @media (max-width:480px){.mn-row{flex-wrap:nowrap}.mn-row button{padding:4px 8px;min-height:36px}.mn-row button:not(.on) .mn-t{display:none}.mn-save{font-size:9.5px}}   /* phones: one compact row, names on the active mode */
 .map-label.road-name{font-size:9.5px;font-weight:700;letter-spacing:.04em;color:#fff8df;background:rgba(70,62,54,.62);border-radius:6px;padding:1px 6px}
+
+/* Regional plans: district labels, subtle regional headings, region names on the national view */
+.map-label.place{font-size:10.5px;padding:2px 8px}
+#mapLabels .map-label[data-pid].place,#mapLabels .map-label.city[data-pid]{pointer-events:auto;cursor:pointer}
+.map-label.region-heading{background:none;box-shadow:none;border:0;color:rgba(21,63,56,.55);font-size:13px;font-weight:900;letter-spacing:.32em;text-transform:uppercase}
+.map-label.region-name{pointer-events:auto;cursor:pointer;background:rgba(255,248,223,.92);color:#153f38;border:2px solid #f0c464;border-radius:12px;padding:4px 11px;font-size:12px;font-weight:900;box-shadow:0 4px 12px rgba(18,52,44,.22)}
+.map-label.region-name:hover{background:#fff4d8;border-color:#f0a33c}

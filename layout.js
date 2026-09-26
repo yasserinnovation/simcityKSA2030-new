@@ -11,6 +11,9 @@
 (() => {
   'use strict';
   const D = window.VISION_DATA;
+  // Regional plans (regions.js) — loaded before this file in the page; required directly in headless tests.
+  const RG = window.VisionRegions || (typeof require === 'function' ? (require('./regions.js'), window.VisionRegions) : null);
+  const PLANS = RG ? RG.PLANS : {};
   const PJ = D.projection, KX = PJ.scale * Math.cos(PJ.lat0 * Math.PI / 180), KZ = PJ.scale;
   const geo = (lon, lat) => [(lon - PJ.lon0) * KX, -(lat - PJ.lat0) * KZ];
   const ANCHOR_SPREAD = 3.4;
@@ -59,8 +62,8 @@
   const CORE = {Jeddah:.06, Makkah:.11, Madinah:.10, Dammam:.08};
   const NUDGE = {madinah:[.24,.02], jeddahcentral:[.12,-.16], hajj:[.10,.12], masar:[-.08,.30]};
   const ROAD_SERVED = new Set(['alula','madinah','jeddahcentral','haramain','ceer','lucid','jazan','soudah','green','neom','oxagon','hajj','masar']);
-  const SHORT = {ksip:'KSIA Airport', hajj:'Hajj', haramain:'Haramain Rail', jazan:'Jazan Industry', lucid:'EV Factory', renewables:'Renewables',
-    green:'Green Initiative', eastern:'East Energy', ceer:'Ceer', hydrogen:'NEOM H2', roshn:'ROSHN', alula:'AlUla', expo:'Expo 2030', park:'KS Park',
+  const SHORT = {ksip:'KSIA Airport', hajj:'Holy Sites', haramain:'Haramain Rail', jazan:'Jazan Industry', lucid:'EV Factory', renewables:'Renewables',
+    green:'Al Ahsa', eastern:'Jubail', ceer:'Ceer', hydrogen:'Green Hydrogen', roshn:'ROSHN', alula:'AlUla', expo:'Expo 2030', park:'KS Park',
     greenriyadh:'Green Riyadh', newmurabba:'New Murabba', metro:'Metro', sports:'Sports Blvd', qiddiya:'Qiddiya', jeddahcentral:'Jeddah Central',
     madinah:'Rua Al Madinah', masar:'Masar', soudah:'Soudah', redsea:'Red Sea', amaala:'AMAALA', trojena:'Trojena', oxagon:'Oxagon', neom:'THE LINE', sindalah:'Sindalah', diriyah:'Diriyah'};
 
@@ -82,17 +85,37 @@
       projects[p.id] = {id:p.id, x, z, r, ribbon, pad, illustrative:true};
       continue;
     }
+    const reg = Object.keys(PLANS).find(k => PLANS[k].projects[p.id]);
+    if (reg) {                                                           // a regional plan (absolute world position)
+      const q = PLANS[reg].projects[p.id], [x, z] = q.at, ribbon = q.ribbon ? {pts:q.ribbon.pts.map(v => [...v]), hw:q.ribbon.hw} : null, r = q.r || .06;
+      projects[p.id] = {id:p.id, x, z, r, ribbon, pad:q.pad ? [...q.pad] : [x, z + r * .72], illustrative:true, region:reg, cl:q.cl, sea:!!q.sea};
+      continue;
+    }
     let [x, z] = legacy[p.id];
     if (NUDGE[p.id]) { x += NUDGE[p.id][0]; z += NUDGE[p.id][1]; }
     const r = FOOT[p.id] || DEFAULT_R;
     projects[p.id] = {id:p.id, x, z, r, ribbon:null, pad:[x, z + r * .72], illustrative:false};
   }
-  const cores = [{name:'Riyadh', x:RIYADH_CORE.x, z:RIYADH_CORE.z, r:RIYADH_CORE.r}, ...Object.entries(CORE).map(([name, r]) => ({name, x:cities[name].x, z:cities[name].z, r}))];
+  for (const id of Object.keys(RIYADH_PLAN)) if (projects[id]) { projects[id].region = 'riyadh'; projects[id].cl = 'Riyadh'; }
+  // Places: cities and districts drawn on a regional plan that are not projects (Dammam, Jeddah, Makkah…). They have a
+  // footprint and a click target of their own; selecting one shows its name and the projects around it.
+  const places = {};
+  for (const [reg, P] of Object.entries(PLANS)) for (const [id, q] of Object.entries(P.places))
+    places['place:' + id] = {id:'place:' + id, key:id, region:reg, x:q.at[0], z:q.at[1], r:q.r, name:q.name, city:q.city || null, projects:q.projects || []};
+  // Where a city is drawn: its place on a regional plan, else its mapped position (the data never changes).
+  const cityDisplay = {}; for (const c of Object.values(cities)) cityDisplay[c.name] = [c.x, c.z];
+  for (const p of Object.values(places)) if (p.city) cityDisplay[p.city] = [p.x, p.z];
+  for (const [reg, P] of Object.entries(PLANS)) for (const [id, q] of Object.entries(P.projects)) if (q.cl && !Object.values(places).some(pl => pl.city === q.cl)) cityDisplay[q.cl] = cityDisplay[q.cl];
+  cityDisplay.AlUla = PLANS.northwest ? [...PLANS.northwest.projects.alula.at] : cityDisplay.AlUla;
+  const inBounds = (b, x, z, pad = 0) => x > b.x0 - pad && x < b.x1 + pad && z > b.z0 - pad && z < b.z1 + pad;
+  const planAt = (x, z, pad = 0) => Object.keys(PLANS).find(k => inBounds(PLANS[k].bounds, x, z, pad)) || null;
+  const cityPlan = name => Object.keys(PLANS).find(k => Object.values(PLANS[k].places).some(q => q.city === name) || (name === 'AlUla' && k === 'northwest')) || null;
+  const cores = [{name:'Riyadh', x:RIYADH_CORE.x, z:RIYADH_CORE.z, r:RIYADH_CORE.r}];
 
   // Intercity roads and rails that reach Riyadh join the plan at a gate on a named road instead of cutting across it.
   const GATES = [R(.85,-.26), R(-.70,-.95), R(-.68,.25), R(0,.85), R(0,-.95), R(.85,-.48), R(-.85,-.48)];
   function gateToward(other){ let best = null, bd = Infinity; for (const g of GATES) { const d = Math.hypot(g[0] - other[0], g[1] - other[1]); if (d < bd) { bd = d; best = g; } } return best; }
-  const toPts = r => r.map(w => typeof w === 'string' ? [cities[w].x, cities[w].z] : geo(w[0], w[1]));
+  const toPts = r => r.map(w => typeof w === 'string' ? [cities[w].x, cities[w].z] : w.world ? [...w.world] : geo(w[0], w[1]));
   // A gate segment that would cross a Riyadh footprint gets one waypoint around it (on the side away from the plan centre).
   function detour(a, b){
     for (const p of Object.values(projects)) { if (!p.illustrative || p.ribbon) continue;
@@ -105,9 +128,35 @@
     for (let i = 0; i < pts.length; i++) if (r[i] === 'Riyadh') { const nb = pts[i + 1] || pts[i - 1]; pts[i] = gateToward(nb);
       const extra = detour(pts[i], nb); if (extra.length) { pts = i === 0 ? [pts[0], ...extra, ...pts.slice(1)] : [...pts.slice(0, i), ...extra, ...pts.slice(i)]; } }
     return pts; }); }
-  const intercity = remap(D.roads), rails = remap(D.rails);
+  // Intercity roads and rails that reach a regional plan stop at one of its gates; the plan's own highways and railways
+  // carry them to the city, so no intercity line crosses a regional landmark. A route wholly inside one plan is drawn by
+  // that plan; a route passing through a plan is split at its entry and exit gates.
+  const worldOf = w => typeof w === 'string' ? [cities[w].x, cities[w].z] : w.world ? w.world : geo(w[0], w[1]);
+  const planOf = w => typeof w === 'string' ? (w === 'Riyadh' ? null : cityPlan(w)) : w.world ? null : planAt(...geo(w[0], w[1]));
+  function gateFor(plan, kind, city, toward){ const all = PLANS[plan].gates.filter(g => g.kind === kind), named = all.filter(g => city && g.cities.includes(city));
+    let best = null, bd = Infinity; for (const g of (named.length ? named : all)) { const d = Math.hypot(g.pt[0] - toward[0], g.pt[1] - toward[1]); if (d < bd) { bd = d; best = g.pt; } }
+    return best && {world:[...best]}; }
+  function splitAtPlans(list, kind){ const out = [];
+    for (const r of list) {
+      const src = r.map(w => ({w, plan:planOf(w)}));
+      if (src.every(s => s.plan) && new Set(src.map(s => s.plan)).size === 1) continue;
+      let cur = [];
+      for (let i = 0; i < src.length;) {
+        if (!src[i].plan) { cur.push(src[i].w); i++; continue; }
+        let j = i; while (j + 1 < src.length && src[j + 1].plan === src[i].plan) j++;
+        const plan = src[i].plan, cityOf = s => typeof s.w === 'string' ? s.w : null;
+        if (i > 0) { const g = gateFor(plan, kind, cityOf(src[i]), worldOf(src[i - 1].w)); if (g) cur.push(g); if (cur.length > 1) out.push(cur); cur = []; }
+        if (j + 1 < src.length) { const g = gateFor(plan, kind, cityOf(src[j]), worldOf(src[j + 1].w)); if (g) cur = [g]; }
+        i = j + 1;
+      }
+      if (cur.length > 1) out.push(cur);
+    }
+    return out; }
+  const intercity = remap(splitAtPlans(D.roads, 'road')), rails = remap(splitAtPlans(D.rails, 'rail'));
   const cityRoads = CITY_ROADS.map(r => ({...r}));
-  const roads = [...intercity, ...cityRoads.map(r => r.pts)];            // everything decoration must keep off
+  // Regional highways, railways, the causeway and boat routes (drawn by the engine; decoration keeps off the land ones).
+  const planRoads = []; for (const [reg, P] of Object.entries(PLANS)) for (const r of P.roads) planRoads.push({...r, region:reg, pts:r.pts.map(v => [...v])});
+  const roads = [...intercity, ...cityRoads.map(r => r.pts), ...planRoads.filter(r => r.kind !== 'boat').map(r => r.pts)];   // everything decoration must keep off
   const roadDist = (x, z) => { let d = Infinity; for (const r of roads) d = Math.min(d, polyDist(x, z, r)); return d; };
   const cityRoadDist = (x, z, except = []) => { let d = Infinity; for (const r of cityRoads) if (!except.includes(r.id)) d = Math.min(d, polyDist(x, z, r.pts) - r.w / 2); return d; };
 
@@ -118,6 +167,7 @@
     let best = null, bd = Infinity;
     for (const p of Object.values(projects)) { const d = footDist(p, x, z); if (d < 0 && d < bd) { bd = d; best = p.id; } }
     if (best) return best;
+    for (const p of Object.values(places)) if (Math.hypot(x - p.x, z - p.z) < p.r) return p.id;       // a city or district on a regional plan
     if (polyDist(x, z, METRO_ROUTE) < .014) return 'metro';                                        // the rail is part of the Metro
     if (Math.hypot(x - RIYADH_CORE.x, z - RIYADH_CORE.z) < RIYADH_CORE.r) return RIYADH_CORE.id;   // the skyline
     return null;
@@ -128,6 +178,7 @@
     for (const p of Object.values(projects)) { if (footDist(p, x, z) < margin) return false;
       if (tall && !p.ribbon && z > p.z && z - p.z < p.r + .16 && Math.abs(x - p.x) < p.r + .03) return false; }
     for (const c of cores) if (Math.hypot(x - c.x, z - c.z) < c.r + margin * .5) return false;
+    for (const p of Object.values(places)) if (Math.hypot(x - p.x, z - p.z) < p.r + margin) return false;
     if (polyDist(x, z, METRO_ROUTE) < .02 + margin * .5 || polyDist(x, z, WADI) < .03) return false;
     return roadDist(x, z) >= roadClear;
   }
@@ -165,9 +216,9 @@
   // ---------------------------------------------------------------- mission and challenge sites (presentation only)
   // Mission-only sites and timed-challenge assets are drawn at these plan positions. Their simulation keeps its own
   // lon/lat and world coordinates, so distances, exposure and outcomes do not change.
-  const MISSION_SITES = {'riyadh:dryport':R(.72,-.13), 'riyadh:eastgate':R(.86,-.31), 'riyadh:westgate':R(-.62,.31)};
+  const MISSION_SITES = {'riyadh:dryport':R(.72,-.13), 'riyadh:eastgate':R(.86,-.31), 'riyadh:westgate':R(-.62,.31), ...(RG ? RG.SITES : {})};
   const CHALLENGE_SITES = {sandstorm:{ksia:R(.54,-.575), 'expo-site':R(.60,-.35), 'murabba-site':R(-.16,-.555), 'sub-east':R(.70,.02),
-    freight:R(.90,-.27), 'metro-ops':R(.03,.235), _base:R(.82,.12)}};
+    freight:R(.90,-.27), 'metro-ops':R(.03,.235), _base:R(.82,.12)}, ...(RG ? RG.CHALLENGE : {})};
 
   // Route a mission line between two plan points (spur → named roads → spur). Road corridors (viaRoads) always follow
   // the plan's roads unless that is a long detour and the straight line is clear; other lines go straight when that
@@ -260,7 +311,12 @@
     return {fwd:p => through(p, 's', 'v'), inv:v => through(v, 'v', 's'), scale, folds:folds.length, foldIds:folds.map(t => t.map(i => all[i].id || (i >= pairs.length ? 'frame' : i))), tris:tris.length};
   }
 
+  // Map-label names where the project name alone would not name the landmark (data names are unchanged).
+  const MAP_NAME = {}; for (const P of Object.values(PLANS)) for (const [id, q] of Object.entries(P.projects)) if (q.label) MAP_NAME[id] = q.label;
+  // Region overview: the camera frames each plan north-up; region names are clickable on the national view.
+  const REGION_VIEWS = {}; for (const [k, P] of Object.entries(PLANS)) REGION_VIEWS[k] = {name:P.name, reference:P.reference, bounds:P.bounds, camera:P.camera, kingdomLabel:P.kingdomLabel, heading:P.heading || null};
   window.VisionLayout = {GAP, ROAD_CLEAR, FOOT, CORE, RIYADH_PLAN, NUDGE, ROAD_SERVED, ON_ROAD, SHORT, RIYADH_CORE, CITY_ROADS:cityRoads, METRO_ROUTE, WADI, RIDGES,
     CITY_GRID, cityAnchorFrame, legacy, projects, cores, roads, intercity, rails, geo, R, polyDist, footDist, footprintAt, decorAllowed, insideCore, roadDist, cityRoadDist,
-    clearOf, reservedRects, inReserved, resolvePick, MISSION_SITES, CHALLENGE_SITES, routeBetween, planWarp};
+    clearOf, reservedRects, inReserved, resolvePick, MISSION_SITES, CHALLENGE_SITES, routeBetween, planWarp,
+    PLANS, places, planRoads, cityDisplay, planAt, cityPlan, MAP_NAME, REGION_VIEWS};
 })();

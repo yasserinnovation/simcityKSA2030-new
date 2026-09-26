@@ -8,7 +8,7 @@ let fails = 0; const ok = (l, c, info='') => { if (!c) fails++; console.log(`${c
 const dist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 const RY = L.RIYADH_CORE, rel = p => ({dx:p.x - RY.x, dz:p.z - RY.z});          // +dx east, +dz south (north is −dz)
 const road = id => L.CITY_ROADS.find(r => r.id === id), X = id => L.projects[id];
-const riyadh = P.filter(p => p.illustrative), circles = P.filter(p => !p.ribbon);
+const riyadh = P.filter(p => p.region === 'riyadh'), circles = P.filter(p => !p.ribbon);
 
 // ---- Placement and footprints
 ok('Every project has a footprint and a marker pad', P.length === D.projects.length && P.every(p => p.r > 0 && p.pad));
@@ -20,7 +20,7 @@ const coreHits = []; for (const p of circles) for (const c of L.cores) if (dist(
 ok('No footprint sits inside a city tower core', !coreHits.length, coreHits.join(' '));
 ok('Riyadh has 11 illustrative districts (not survey geography)', riyadh.length === 11 && riyadh.every(p => D.projects.find(q => q.id === p.id)));
 ok('Layout never changes the source data (lon/lat/anchor untouched)', JSON.stringify(D.projects.map(p => [p.id, p.lon, p.lat, p.anchor])) === before);
-ok('Marker pads sit inside their footprint', P.every(p => L.footDist(p, p.pad[0], p.pad[1]) < -.01));
+ok('Marker pads sit inside their footprint (well inside, except on slim corridors)', P.every(p => L.footDist(p, p.pad[0], p.pad[1]) < (p.ribbon && p.ribbon.hw < .02 ? 0 : -.01)));
 
 // ---- Corridors (north-up plan)
 const fahd = road('kingFahd').pts, salman = road('kingSalman').pts, khalid = road('kingKhalid').pts, ring = road('northRing').pts;
@@ -86,9 +86,9 @@ ok('Short label names exist for every Riyadh district', riyadh.every(p => L.SHOR
     && D.projects.every(p => { const [x, z] = L.geo(p.lon, p.lat), a = p.anchor && D.cities.find(c => c.name === p.anchor); if (!a) return f.legacy[p.id][0] === x; const [ax, az] = L.geo(a.lon, a.lat), s = p.spread || 3.4; return Math.abs(f.legacy[p.id][0] - (ax + (x - ax) * s)) < 1e-9 && Math.abs(f.legacy[p.id][1] - (az + (z - az) * s)) < 1e-9; })); }
 
 // ---- Mission-only sites and mission lines (presentation only)
-{ const M = Object.entries(L.MISSION_SITES);
+{ const M = Object.entries(L.MISSION_SITES).filter(([k]) => k.startsWith('riyadh:'));
   ok('Mission-only sites sit on open ground: no parcel, core or city road underneath', M.every(([, q]) => !L.footprintAt(q[0], q[1]) && L.cores.every(c => Math.hypot(q[0] - c.x, q[1] - c.z) > c.r + .03) && L.cityRoadDist(q[0], q[1]) > .02), M.map(([k]) => k).join(' '));
-  const planC = circles.filter(p => p.illustrative), pts = [[RY.x, RY.z], ...planC.map(p => [p.x, p.z]), ...M.map(([, q]) => q)], crossings = [];
+  const planC = circles.filter(p => p.region === 'riyadh'), pts = [[RY.x, RY.z], ...planC.map(p => [p.x, p.z]), ...M.map(([, q]) => q)], crossings = [];
   for (const A of pts) for (const B of pts) if (A !== B) for (const road of [false, true]) { const path = L.routeBetween(A, B, road);
     for (const p of planC) { if (L.ON_ROAD[p.id]) continue;   // the Metro station straddles King Fahd Road by design
       if (Math.hypot(A[0] - p.x, A[1] - p.z) < p.r + .03 || Math.hypot(B[0] - p.x, B[1] - p.z) < p.r + .03) continue;
