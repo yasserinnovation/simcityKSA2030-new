@@ -162,7 +162,68 @@
     return null;
   }
 
+  // ---------------------------------------------------------------- mission and challenge sites (presentation only)
+  // Mission-only sites and timed-challenge assets are drawn at these plan positions. Their simulation keeps its own
+  // lon/lat and world coordinates, so distances, exposure and outcomes do not change.
+  const MISSION_SITES = {'riyadh:dryport':R(.72,-.13), 'riyadh:eastgate':R(.86,-.31), 'riyadh:westgate':R(-.62,.31)};
+  const CHALLENGE_SITES = {sandstorm:{ksia:R(.54,-.575), 'expo-site':R(.60,-.35), 'murabba-site':R(-.16,-.555), 'sub-east':R(.70,.02),
+    freight:R(.90,-.27), 'metro-ops':R(.03,.235), _base:R(.62,.12)}};
+
+  // Route a mission line between two plan points (spur → named roads → spur). Road corridors (viaRoads) always follow
+  // the plan's roads unless that is a long detour and the straight line is clear; other lines go straight when that
+  // crosses no district parcel or city core. Ribbons (boulevard, green corridor) may be crossed.
+  const ROAD_NET = (() => {
+    const nodes = [], edges = [], nodeRoad = [];
+    for (const r of cityRoads) { let prev = -1;
+      for (let i = 1; i < r.pts.length; i++) { const a = r.pts[i - 1], b = r.pts[i], L = Math.hypot(b[0] - a[0], b[1] - a[1]), n = Math.max(1, Math.ceil(L / .02));
+        for (let k = (i === 1 ? 0 : 1); k <= n; k++) { const id = nodes.push([a[0] + (b[0] - a[0]) * k / n, a[1] + (b[1] - a[1]) * k / n]) - 1; edges[id] = []; nodeRoad[id] = r.id; if (prev >= 0) { edges[id].push(prev); edges[prev].push(id); } prev = id; } } }
+    for (let i = 0; i < nodes.length; i++) for (let j = i + 1; j < nodes.length; j++)
+      if (!edges[i].includes(j) && Math.hypot(nodes[i][0] - nodes[j][0], nodes[i][1] - nodes[j][1]) < .022) { edges[i].push(j); edges[j].push(i); }   // junctions
+    return {nodes, edges, nodeRoad};
+  })();
+  const nodeRoad = ROAD_NET.nodeRoad;
+  const circles = () => Object.values(projects).filter(p => !p.ribbon);
+  function segBlocked(a, b, skip){
+    for (const p of circles()) { if (skip.includes(p.id)) continue; if (segDist(p.x, p.z, a, b) < p.r) return true; }
+    for (const c of cores) { if (skip.includes('core:' + c.name)) continue; if (segDist(c.x, c.z, a, b) < c.r) return true; }
+    return false;
+  }
+  const ownedBy = pt => [...circles().filter(p => Math.hypot(pt[0] - p.x, pt[1] - p.z) < p.r + .03).map(p => p.id), ...cores.filter(c => Math.hypot(pt[0] - c.x, pt[1] - c.z) < c.r + .03).map(c => 'core:' + c.name)];
+  const inPlan = pt => Math.abs(pt[0] - RY.x) < .95 && Math.abs(pt[1] - RY.z) < .98;
+  const routeCache = new Map();
+  const pathLen = pts => pts.slice(1).reduce((s, q, i) => s + Math.hypot(q[0] - pts[i][0], q[1] - pts[i][1]), 0);
+  function routeBetween(A, B, viaRoads = false){
+    const key = A.map(v => v.toFixed(4)) + '|' + B.map(v => v.toFixed(4)) + (viaRoads ? 'R' : ''); if (routeCache.has(key)) return routeCache.get(key);
+    const skip = [...ownedBy(A), ...ownedBy(B)], blocked = segBlocked(A, B, skip);
+    let out = [A, B];
+    if (inPlan(A) && inPlan(B) && (blocked || viaRoads)) {
+      const {nodes, edges} = ROAD_NET;
+      // Candidate on-ramps: the nearest node of each named road that can be reached without crossing another parcel.
+      const ramps = pt => { const own = ownedBy(pt), best = new Map();
+        nodes.forEach((q, i) => { const d = Math.hypot(q[0] - pt[0], q[1] - pt[1]), r = nodeRoad[i], cur = best.get(r);
+          if ((!cur || d < cur.d) && !segBlocked(pt, q, own)) best.set(r, {i, d}); });
+        const all = [...best.values()], near = Math.min(...all.map(r => r.d));
+        return all.filter(r => r.d <= near * 1.5 + .03); };                  // short on-ramps only: a spur is not a road
+      const dijkstra = s => { const dist = new Array(nodes.length).fill(Infinity), prev = new Array(nodes.length).fill(-1), done = new Uint8Array(nodes.length); dist[s] = 0;
+        for (;;) { let u = -1, ud = Infinity; for (let i = 0; i < nodes.length; i++) if (!done[i] && dist[i] < ud) { ud = dist[i]; u = i; }
+          if (u < 0) break; done[u] = 1;
+          for (const v of edges[u]) { const d = ud + Math.hypot(nodes[u][0] - nodes[v][0], nodes[u][1] - nodes[v][1]); if (d < dist[v]) { dist[v] = d; prev[v] = u; } } }
+        return {dist, prev}; };
+      let bestPath = null, bestCost = Infinity;
+      const rb = ramps(B);
+      for (const ra of ramps(A)) { const {dist, prev} = dijkstra(ra.i);
+        for (const r of rb) { const c = 3 * (ra.d + r.d) + dist[r.i]; if (c < bestCost) { bestCost = c; const path = []; for (let v = r.i; v >= 0; v = prev[v]) path.unshift(nodes[v]); bestPath = path; } } }
+      if (bestPath) { const path = bestPath;
+        const simple = [path[0]]; for (let i = 1; i < path.length - 1; i++) { const a = simple[simple.length - 1], b = path[i], c = path[i + 1];
+          if (Math.abs((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])) > 1e-6) simple.push(b); }
+        if (path.length > 1) simple.push(path[path.length - 1]);
+        const routed = [A, ...simple, B];
+        if (blocked || pathLen(routed) <= 2.2 * Math.hypot(B[0] - A[0], B[1] - A[1])) out = routed; }
+    }
+    routeCache.set(key, out); return out;
+  }
+
   window.VisionLayout = {GAP, ROAD_CLEAR, FOOT, CORE, RIYADH_PLAN, NUDGE, ROAD_SERVED, ON_ROAD, SHORT, RIYADH_CORE, CITY_ROADS:cityRoads, METRO_ROUTE, WADI, RIDGES,
     CITY_GRID, cityAnchorFrame, legacy, projects, cores, roads, intercity, rails, geo, R, polyDist, footDist, footprintAt, decorAllowed, insideCore, roadDist, cityRoadDist,
-    clearOf, reservedRects, inReserved, resolvePick};
+    clearOf, reservedRects, inReserved, resolvePick, MISSION_SITES, CHALLENGE_SITES, routeBetween};
 })();

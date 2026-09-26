@@ -79,7 +79,8 @@
   const NP = {};
   G.nodePos = (id, board = VM.board) => { const key = board + ':' + id; if (NP[key]) return NP[key]; const n = VM.BOARDS[board].nodes[id]; if (!n) return [0, 0];
     if (n.project) { const p = D.projects.find(p => p.id === n.project); NP[key] = [p.x, p.z]; }
-    else { const q = W.place(n.lon, n.lat, n.anchor); NP[key] = n.core || !window.VisionLayout ? q : window.VisionLayout.clearOf(q[0], q[1]); }   // keep mission-only sites off project footprints
+    else { const LY = window.VisionLayout, fixed = LY && LY.MISSION_SITES[key], q = W.place(n.lon, n.lat, n.anchor);   // mission-only sites: a set place on the plan, else nudged off footprints
+      NP[key] = fixed ? [...fixed] : n.core || !LY ? q : LY.clearOf(q[0], q[1]); }
     return NP[key]; };
   const SITE_OFF = {academy:[-.1,-.11], research:[.11,-.12], warehouse:[.12,.04], wind:[-.12,-.1], hotel:[.1,.07], housing:[-.11,.08], park:[.09,-.1], retrofit:[-.08,-.07], hub:[.13,-.02], shelter:[-.06,.11], medic:[.03,.13], generator:[.12,.11], microgrid:[.12,.11],
     solar:[0,0], storage:[.02,.1], peaker:[-.14,.06], opened:[0,0]};
@@ -141,8 +142,8 @@
     const ov = [];
     if (!S) { // legacy / menu: gentle flows on built lines of every chapter
       for (const [mid, lg] of Object.entries(G.profile.legacy)) { const bd = VM.boardOf(mid);
-        for (const [kind, a, b] of lg.links) if (kind !== 'wide') ov.push({a:G.nodePos(a, bd), b:G.nodePos(b, bd), color:kind === 'metro' ? [.8,.6,1] : [1,.7,.3], flow:true, n:6, speed:kind === 'metro' ? 2 : 1.2, both:true, noLine:true, size:4}); }
-      for (const [a, b] of VM.BOARDS.riyadh.roads) ov.push({a:G.nodePos(a, 'riyadh'), b:G.nodePos(b, 'riyadh'), color:[.93,.88,.78], flow:true, n:4, speed:.9, both:true, size:2.6, y:W.ground + .012});
+        for (const [kind, a, b] of lg.links) if (kind !== 'wide') ov.push({a:G.nodePos(a, bd), b:G.nodePos(b, bd), road:kind === 'brt', color:kind === 'metro' ? [.8,.6,1] : [1,.7,.3], flow:true, n:6, speed:kind === 'metro' ? 2 : 1.2, both:true, noLine:true, size:4}); }
+      for (const [a, b] of VM.BOARDS.riyadh.roads) ov.push({a:G.nodePos(a, 'riyadh'), b:G.nodePos(b, 'riyadh'), road:true, color:[.93,.88,.78], flow:true, n:4, speed:.9, both:true, size:2.6, y:W.ground + .012});
       return ov;
     }
     const lens = opts.lens;
@@ -158,9 +159,9 @@
       if (l.kind === 'road') {
         const vc = l.load / Math.max(.1, VM.linkCap(l));
         const col = l.closed ? [.95,.3,.25] : lens ? (vc < .6 ? [.35,.85,.45] : vc < .95 ? [1,.78,.25] : [.95,.35,.3]) : [.78,.72,.62];
-        ov.push({a, b, color:col, dash:!!l.closed, thick:lens && !l.closed && vc >= .95, flow:!l.closed, n:Math.min(16, Math.round(l.load * 1.6)), speed:Math.max(.25, 1.2 - vc * .6), both:true, size:2.6, y:W.ground + .012});
+        ov.push({a, b, road:true, color:col, dash:!!l.closed, thick:lens && !l.closed && vc >= .95, flow:!l.closed, n:Math.min(16, Math.round(l.load * 1.6)), speed:Math.max(.25, 1.2 - vc * .6), both:true, size:2.6, y:W.ground + .012});
       } else if (l.built && !l.closed && l.load > .05) {
-        ov.push({a, b, color:l.kind === 'metro' ? [.85,.65,1] : [1,.72,.3], flow:true, noLine:true, n:Math.min(12, 2 + Math.round(l.load * 1.5)), speed:l.kind === 'metro' ? 2.2 : 1.3, both:true, size:l.kind === 'metro' ? 5 : 4.2, y:l.kind === 'metro' ? W.ground + .045 : W.ground + .012});
+        ov.push({a, b, road:l.kind === 'brt', color:l.kind === 'metro' ? [.85,.65,1] : [1,.72,.3], flow:true, noLine:true, n:Math.min(12, 2 + Math.round(l.load * 1.5)), speed:l.kind === 'metro' ? 2.2 : 1.3, both:true, size:l.kind === 'metro' ? 5 : 4.2, y:l.kind === 'metro' ? W.ground + .045 : W.ground + .012});
       }
     }
     return ov;

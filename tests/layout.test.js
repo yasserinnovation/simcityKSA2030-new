@@ -85,6 +85,19 @@ ok('Short label names exist for every Riyadh district', riyadh.every(p => L.SHOR
   const f = L.cityAnchorFrame; ok('City Builder anchor frame is frozen to V5 (origin +1.02,+.12; lon/lat spread positions)', Math.abs(f.origin[0] - RY.x - 1.02) < 1e-9 && Math.abs(f.origin[1] - RY.z - .12) < 1e-9
     && D.projects.every(p => { const [x, z] = L.geo(p.lon, p.lat), a = p.anchor && D.cities.find(c => c.name === p.anchor); if (!a) return f.legacy[p.id][0] === x; const [ax, az] = L.geo(a.lon, a.lat), s = p.spread || 3.4; return Math.abs(f.legacy[p.id][0] - (ax + (x - ax) * s)) < 1e-9 && Math.abs(f.legacy[p.id][1] - (az + (z - az) * s)) < 1e-9; })); }
 
+// ---- Mission-only sites and mission lines (presentation only)
+{ const M = Object.entries(L.MISSION_SITES);
+  ok('Mission-only sites sit on open ground: no parcel, core or city road underneath', M.every(([, q]) => !L.footprintAt(q[0], q[1]) && L.cores.every(c => Math.hypot(q[0] - c.x, q[1] - c.z) > c.r + .03) && L.cityRoadDist(q[0], q[1]) > .02), M.map(([k]) => k).join(' '));
+  const planC = circles.filter(p => p.illustrative), pts = [[RY.x, RY.z], ...planC.map(p => [p.x, p.z]), ...M.map(([, q]) => q)], crossings = [];
+  for (const A of pts) for (const B of pts) if (A !== B) for (const road of [false, true]) { const path = L.routeBetween(A, B, road);
+    for (const p of planC) { if (L.ON_ROAD[p.id]) continue;   // the Metro station straddles King Fahd Road by design
+      if (Math.hypot(A[0] - p.x, A[1] - p.z) < p.r + .03 || Math.hypot(B[0] - p.x, B[1] - p.z) < p.r + .03) continue;
+      if (L.polyDist(p.x, p.z, path) < p.r) crossings.push(p.id); } }
+  ok('Mission lines never cross another district parcel (straight or routed; roads may pass under the Metro canopy)', !crossings.length, `${pts.length * (pts.length - 1) * 2} routes; ${[...new Set(crossings)].join(' ')}`);
+  const ks = L.projects.ksip, rt = L.routeBetween([RY.x, RY.z], [ks.x, ks.z], true);
+  ok('A road corridor follows King Fahd and King Salman Roads (not a diagonal)', rt.length > 3 && rt.slice(1, -1).every(q => L.cityRoadDist(q[0], q[1]) < .01), rt.length + ' points');
+  ok('Routes are cached (same array for the same request)', L.routeBetween([RY.x, RY.z], [ks.x, ks.z], true) === rt); }
+
 // ---- Selection priority (what a click selects from what is under the pointer)
 const Rv = L.resolvePick;
 ok('The front-most visible object wins over another project’s nearby marker', Rv({center:'expo', markers:[{id:'ksip', d:2}]}).select === 'expo');

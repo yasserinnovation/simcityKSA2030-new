@@ -151,10 +151,10 @@
       for (const id of validTargetsFor(ui.sel)) { const l = s.links.find(x => x.id === id); const sel = ui.target === id, imp = goal && ui.impacts ? ui.impacts[`${ui.sel}|${id}`] : null;
         if (imp && imp.ok) {   // 1-px dashed lines sink under roads and buildings, so goal previews float marker dots just above rooftops: moving = raises the goal, static = does not
           const helps = imp.code === 'helps';
-          ov.push({a:G.nodePos(l.a), b:G.nodePos(l.b), color:sel ? [1,.9,.35] : impColor(imp.code), noLine:true, flow:true, y:W.ground + .07, n:sel ? 16 : 12, speed:sel || helps ? 1.2 : .002, size:sel ? 7 : helps ? 6 : 4.5});
+          ov.push({a:G.nodePos(l.a), b:G.nodePos(l.b), road:l.kind === 'road' || l.kind === 'brt', color:sel ? [1,.9,.35] : impColor(imp.code), noLine:true, flow:true, y:W.ground + .07, n:sel ? 16 : 12, speed:sel || helps ? 1.2 : .002, size:sel ? 7 : helps ? 6 : 4.5});
           continue; }
         const base = a.cat === 'response' ? [1,.55,.35] : [1,.78,.3];
-        ov.push({a:G.nodePos(l.a), b:G.nodePos(l.b), color:sel ? [1,.9,.35] : base, thick:true, dash:!sel, flow:sel, n:8, speed:2, size:sel ? 6 : 5}); }
+        ov.push({a:G.nodePos(l.a), b:G.nodePos(l.b), road:l.kind === 'road' || l.kind === 'brt', color:sel ? [1,.9,.35] : base, thick:true, dash:!sel, flow:sel, n:8, speed:2, size:sel ? 6 : 5}); }
     }
     // A selected line that cannot carry goal trips: mark the missing link to the City Centre it depends on (static amber dots).
     const imp = ui.target != null && ui.impacts ? ui.impacts[`${ui.sel}|${ui.target}`] : null, g = M().goal;

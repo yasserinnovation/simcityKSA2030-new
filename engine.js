@@ -696,20 +696,29 @@
     missionMesh.p.length=missionMesh.c.length=missionMesh.n.length=missionLines.p.length=missionLines.c.length=0;
     target=missionMesh; lineTarget=missionLines;
     const sc=missionScene||{links:[],sites:[]};
-    for (const l of sc.links) {
-      const dx=l.b[0]-l.a[0], dz=l.b[1]-l.a[1], L=Math.hypot(dx,dz)||1, nx=-dz/L, nz=dx/L, off=KIND_OFF[l.kind]||0;
-      const a=[l.a[0]+nx*off+dx/L*.03, l.a[1]+nz*off+dz/L*.03], b=[l.b[0]+nx*off-dx/L*.03, l.b[1]+nz*off-dz/L*.03], p=l.progress??1;
+    // A link follows its routed path (layout.routeBetween): straight when clear, else along the plan's roads. Each path
+    // segment is drawn in turn; stations sit only at the two ends and the crane only where building has reached.
+    for (const l0 of sc.links) {
+      const pts=l0.pts||LY.routeBetween(l0.a,l0.b,l0.kind==='wide'||l0.kind==='brt'),   // roads and buses follow the road network
+        segL=pts.slice(1).map((q,i)=>Math.hypot(q[0]-pts[i][0],q[1]-pts[i][1])), tot=segL.reduce((s,x)=>s+x,0)||1, P0=l0.progress??1;
+      for (let si=0, acc=0; si<segL.length; acc+=segL[si], si++) {
+      const s0=acc/tot, s1=(acc+segL[si])/tot, first=si===0, last=si===segL.length-1;
+      const l={kind:l0.kind, a:pts[si], b:pts[si+1], progress:P0>=s1?1:P0<=s0?0:(P0-s0)/(s1-s0)}, tipHere=P0>=s0&&P0<s1;
+      const dx=l.b[0]-l.a[0], dz=l.b[1]-l.a[1], L=Math.hypot(dx,dz)||1, nx=-dz/L, nz=dx/L, off=KIND_OFF[l.kind]||0, ea=first?.03:0, eb=last?.03:0;
+      const a=[l.a[0]+nx*off+dx/L*ea, l.a[1]+nz*off+dz/L*ea], b=[l.b[0]+nx*off-dx/L*eb, l.b[1]+nz*off-dz/L*eb], p=l.progress, ends=[first&&a, last&&b].filter(Boolean);
       const tip=[a[0]+(b[0]-a[0])*p, a[1]+(b[1]-a[1])*p];
-      if (l.kind==='metro') { addRibbon(a,b,p,.014,G+.034,.007,[.60,.40,.86]); addRibbon(a,b,p,.018,G+.031,.003,[.9,.9,.93]);
+      if (p<=0) {}   // not reached yet: only the planned (dashed) line below
+      else if (l.kind==='metro') { addRibbon(a,b,p,.014,G+.034,.007,[.60,.40,.86]); addRibbon(a,b,p,.018,G+.031,.003,[.9,.9,.93]);
         const n=Math.floor(L*p/.07); for(let i=0;i<=n;i++){const q=i*.07/L; addCylinder(a[0]+(b[0]-a[0])*q,G,a[1]+(b[1]-a[1])*q,.0035,.032,[.88,.88,.9],6);}
-        if (p>=1) for (const e of [a,b]) { addCylinder(e[0],G,e[1],.022,.05,[.96,.95,.92],10); addCylinder(e[0],G+.05,e[1],.028,.006,[.60,.40,.86],10); } }
+        if (P0>=1) for (const e of ends) { addCylinder(e[0],G,e[1],.022,.05,[.96,.95,.92],10); addCylinder(e[0],G+.05,e[1],.028,.006,[.60,.40,.86],10); } }
       else if (l.kind==='brt') { addRibbon(a,b,p,.02,G+.006,.004,[.98,.55,.18]); addRibbon(a,b,p,.004,G+.0105,.001,[1,1,1]);
-        if (p>=1) for (const e of [a,b]) { addBox(e[0],G,e[1],.03,.022,.014,[.98,.97,.94]); addBox(e[0],G+.022,e[1],.036,.004,.02,[.98,.55,.18]); } }
+        if (P0>=1) for (const e of ends) { addBox(e[0],G,e[1],.03,.022,.014,[.98,.97,.94]); addBox(e[0],G+.022,e[1],.036,.004,.02,[.98,.55,.18]); } }
       else if (l.kind==='freight') { addRibbon(a,b,p,.022,G+.006,.004,[.36,.33,.30]); addRibbon(a,b,p,.004,G+.0105,.002,[.25,.85,.8]);
         if (p>=1) for (const q of [.3,.7]) { const x=a[0]+(b[0]-a[0])*q, z=a[1]+(b[1]-a[1])*q; addBox(x,G+.01,z,.03,.012,.012,[[.9,.35,.3],[.25,.55,.85]][q>.5?1:0],Math.atan2(b[1]-a[1],b[0]-a[0])); } }
       else if (l.kind==='wide') { addRibbon(a,b,p,.036,G+.005,.003,[.40,.41,.44]); addRibbon(a,b,p,.003,G+.0085,.001,[1,.85,.3]); }
       else if (l.kind==='power') { const n=Math.max(2,Math.floor(L*p/.12)); let prev=null; for(let i=0;i<=n;i++){const q=i/n*p; const x=a[0]+(b[0]-a[0])*q, z=a[1]+(b[1]-a[1])*q; addBox(x,G,z,.006,.07,.006,[.7,.72,.76]); addBox(x,G+.065,z,.03,.004,.004,[.7,.72,.76]); if(prev) addLine([prev[0],G+.067,prev[1]],[x,G+.067,z],[.35,.35,.4]); prev=[x,z];} }
-      if (p<1) { addCrane(tip[0]+.02,tip[1]+.02,.3,[.98,.74,.16]); const segs=10; for(let i=0;i<segs;i+=2){ const q0=p+(1-p)*i/segs, q1=p+(1-p)*(i+1)/segs; addLine([a[0]+(b[0]-a[0])*q0,G+.02,a[1]+(b[1]-a[1])*q0],[a[0]+(b[0]-a[0])*q1,G+.02,a[1]+(b[1]-a[1])*q1],[1,.8,.3]); } }
+      if (p<1) { if (tipHere) addCrane(tip[0]+.02,tip[1]+.02,.3,[.98,.74,.16]); const segs=10; for(let i=0;i<segs;i+=2){ const q0=p+(1-p)*i/segs, q1=p+(1-p)*(i+1)/segs; addLine([a[0]+(b[0]-a[0])*q0,G+.02,a[1]+(b[1]-a[1])*q0],[a[0]+(b[0]-a[0])*q1,G+.02,a[1]+(b[1]-a[1])*q1],[1,.8,.3]); } }
+    }
     }
     for (const s of sc.sites) {
       const p=s.progress??1, x=s.x, z=s.z, lv=s.level||1;
@@ -959,7 +968,7 @@
     // Simulation entities: support units, challenge assets, site beacons
     for (const e of entities) push(e.x,(e.y??G+.06)+(e.pulse?Math.sin(t*.006)*.01:0),e.z,e.color,e.size||10);
     // Flow dots along overlay layers (logistics, grid, dependencies)
-    for (const o of overlay) if (o.flow) { const L=Math.hypot(o.b[0]-o.a[0],o.b[1]-o.a[1]); const n=o.n!=null?o.n:Math.max(1,Math.round(L*5)); const sp=(o.speed||1)*.00012, y=o.y??G+.03; for(let i=0;i<n;i++){ let q=((t*sp)/Math.max(.2,L)+i/n+(o.phase||0))%1; if(o.both&&i%2) q=1-q; push(o.a[0]+(o.b[0]-o.a[0])*q,y,o.a[1]+(o.b[1]-o.a[1])*q,o.color,o.size||3.4); } }
+    for (const o of overlay) if (o.flow) { const P2=o._pts||[o.a,o.b], PL=o._L||pathLen(P2), L=PL[PL.length-1]; const n=o.n!=null?o.n:Math.max(1,Math.round(L*5)); const sp=(o.speed||1)*.00012, y=o.y??G+.03; for(let i=0;i<n;i++){ let q=((t*sp)/Math.max(.2,L)+i/n+(o.phase||0))%1; if(o.both&&i%2) q=1-q; const [x,z]=along(P2,PL,q); push(x,y,z,o.color,o.size||3.4); } }
     // City lights at night
     if (night>.28) { const k=Math.min(1,(night-.28)/.3); for (const c of cityLights) push(c[0],G+.012,c[1],[c[2],c[3],c[4]],c[5]*k); for (const c of missionLights) push(c[0],G+.02,c[1],[1,.86,.52],(c[2]||4)*k); }
     // Celebration bursts
@@ -991,6 +1000,7 @@
   const clusterLabels = clusters.map(cl => { const L=makeLabel(cl.anchor+' · '+cl.ids.length+' projects', 'cluster', cl.x, G+.34, cl.z, 9.5); L.cluster=true; return L; });
   // Project name labels hold a full and a short variant (each translated once by the Arabic layer); the placer picks the
   // variant that fits, anchors the label just above the model's real top, and lets the player click it.
+  const ESSENTIAL_LABELS = new Set(['sports', 'newmurabba', 'ksip', 'expo', 'metro']);   // kept visible first when space is tight
   const smallProjLabels = D.projects.map(p => { const L=makeLabel('', 'proj-small', p.x, G+.16, p.z, 1.5); L.small=true; L.pid=p.id; L.el.dataset.pid=p.id;
     L.el.innerHTML='<span class="lf"></span><span class="ls"></span>'; L.el.children[0].textContent=p.name; L.el.children[1].textContent=LY.SHORT[p.id]||p.name; return L; });
   const dynLabels = new Map();
@@ -1030,7 +1040,7 @@
       else if (!L.el.classList.contains('capital')) show = far < 24;
       const s = show && project([x,y,z]);
       if (!s || s[2]>1 || s[0]<-60 || s[1]<-30 || s[0]>innerWidth+60 || s[1]>innerHeight+30) { L.el.style.opacity=0; continue; }
-      if (L.small) pri = 2 + .9 * (1 - Math.min(1, Math.hypot(s[0]-cx, s[1]-cy) / diag));   // nearer the middle of the view = more relevant
+      if (L.small) pri = 2 + .9 * (1 - Math.min(1, Math.hypot(s[0]-cx, s[1]-cy) / diag)) + (ESSENTIAL_LABELS.has(L.pid) ? 1 : 0);   // nearer the middle = more relevant; key districts first
       cand.push({L, s, pri});
     }
     cand.sort((a,b) => b.pri - a.pri);
@@ -1043,6 +1053,8 @@
       let r = at(L.small ? L.wF : L.w), short = false;
       if (L.note || L.road) r.x = Math.max(6, Math.min(innerWidth - r.w - 6, r.x));   // map notes and road names stay fully on screen
       if (!free(r) && L.small) { r = at(L.wS); short = true; }        // shorten before giving up
+      if (!free(r) && L.small) { const b = r;                           // then nudge the short label just above, below or beside its marker
+        for (const [dx, dy] of [[0, -(L.h + 5)], [0, L.h + 5], [-(b.w / 2 + 12), 0], [b.w / 2 + 12, 0]]) { const c = {...b, x:b.x + dx, y:b.y + dy}; if (free(c)) { r = c; break; } } }
       if (!free(r)) { L.el.style.opacity=0; continue; }
       if (L.small) L.el.classList.toggle('use-short', short);
       L.el.classList.toggle('hot', !!L.pid && L.pid===hoverId || L===projLabel);
@@ -1138,9 +1150,10 @@
       if (sp) { if (sp.ribbon) { ribbonEdges(sp,.006,G+.014,[1,.86,.3]); ribbonEdges(sp,.012,G+.016,[1,.95,.6]); } else { addRing(sp.x,G+.014,sp.z,sp.foot+.006,[1,.86,.3],40); addRing(sp.x,G+.016,sp.z,sp.foot+.012,[1,.95,.6],40); } }
       if (hp) { if (hp.ribbon) ribbonEdges(hp,.006,G+.014,[1,1,1]); else addRing(hp.x,G+.014,hp.z,hp.foot+.006,[1,1,1],40); }
       if (hoverId===CORE_ID) { const c=LY.RIYADH_CORE; addRing(c.x,G+.014,c.z,c.r+.006,[1,1,1],40); } }
-    for (const o of overlay) { if (o.noLine) continue; const y=G+.022;
+    for (const o0 of overlay) { if (o0.noLine) continue; const y=G+.022, P2=o0._pts||[o0.a,o0.b];
+      for (let si=1; si<P2.length; si++) { const o={...o0, a:P2[si-1], b:P2[si]};
       if (o.dash) { const n=14; for(let i=0;i<n;i+=2){ const a=i/n,b=(i+1)/n; addLine([o.a[0]+(o.b[0]-o.a[0])*a,y,o.a[1]+(o.b[1]-o.a[1])*a],[o.a[0]+(o.b[0]-o.a[0])*b,y,o.a[1]+(o.b[1]-o.a[1])*b],o.color); } continue; }
-      addLine([o.a[0],y,o.a[1]],[o.b[0],y,o.b[1]],o.color); addLine([o.a[0],y+.002,o.a[1]+.004],[o.b[0],y+.002,o.b[1]+.004],o.color); if (o.thick) { addLine([o.a[0]+.004,y,o.a[1]],[o.b[0]+.004,y,o.b[1]],o.color); addLine([o.a[0]-.004,y+.001,o.a[1]-.002],[o.b[0]-.004,y+.001,o.b[1]-.002],o.color); } }
+      addLine([o.a[0],y,o.a[1]],[o.b[0],y,o.b[1]],o.color); addLine([o.a[0],y+.002,o.a[1]+.004],[o.b[0],y+.002,o.b[1]+.004],o.color); if (o.thick) { addLine([o.a[0]+.004,y,o.a[1]],[o.b[0]+.004,y,o.b[1]],o.color); addLine([o.a[0]-.004,y+.001,o.a[1]-.002],[o.b[0]-.004,y+.001,o.b[1]-.002],o.color); } } }
     for (const e of entities) { if (e.ring) addRing(e.x,G+.012,e.z,e.ring,e.ringColor||e.color,28);
       if (e.path) { const n=10; for(let i=0;i<n;i+=2){ const a=i/n,b=(i+1)/n; addLine([e.x+(e.path[0]-e.x)*a,G+.03,e.z+(e.path[1]-e.z)*a],[e.x+(e.path[0]-e.x)*b,G+.03,e.z+(e.path[1]-e.z)*b],e.color); } } }
     if (hazard && hazard.intensity>.02) { addRing(hazard.x,G+.015,hazard.z,hazard.r,[1,.55,.3],48); addRing(hazard.x,G+.015,hazard.z,hazard.r*(.55+.05*Math.sin(t*.004)),[1,.72,.4],40); }
@@ -1291,7 +1304,8 @@
     focusPoint(x, z, dist=3.4, el=.72){ directMode=false; follow=null; setDesired(.35,el,dist,x,z,.03); },
     setHazard(h){ hazard=h; },
     setEntities(list){ entities=list||[]; },
-    setOverlay(list){ overlay=list||[]; },
+    setOverlay(list){ overlay=list||[];   // lines follow routed paths (straight when clear, else along the Riyadh plan's roads)
+      for (const o of overlay) if (o.a && o.b) { o._pts=o.pts||LY.routeBetween(o.a,o.b,!!o.road); o._L=pathLen(o._pts); } },
     setConvoys(list){ convoyList=list||[]; },
     setDynamicLabels(list){ setDynLabels(list||[]); },
     onGroundClick(fn){ groundHandler=fn; canvas.style.cursor=fn?'crosshair':''; },

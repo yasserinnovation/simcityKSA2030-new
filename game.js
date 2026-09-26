@@ -311,7 +311,22 @@
 
   /* ========================= LIVE CHALLENGES ========================== */
   function currentChallengeDef(){ const st = S(); const id = st.challenge ? st.challenge.id : st.advisory ? st.advisory.id : null; return id ? {id, c:SIM.CHALLENGES[id]} : null; }
-  const centroid = as => [as.reduce((a, x) => a + x.pos[0], 0) / as.length, as.reduce((a, x) => a + x.pos[1], 0) / as.length];
+  // Timed-challenge assets are drawn at their place on the district plan (layout CHALLENGE_SITES). The simulation keeps
+  // its own world positions for storm exposure and unit reach, so the challenge plays and scores exactly as before.
+  const chSites = () => { const cd = currentChallengeDef(); return (cd && window.VisionLayout && VisionLayout.CHALLENGE_SITES[cd.id]) || {}; };
+  const visAsset = a => chSites()[a.id] || a.pos;
+  const visTarget = (u, assets) => { const a = u.assetId && assets.find(x => x.id === u.assetId); if (!a) return u.target; const v = visAsset(a); return [v[0] + u.target[0] - a.pos[0], v[1] + u.target[1] - a.pos[1]]; };
+  // A unit is drawn travelling from where it was last shown to its target's plan position, in step with its simulated travel.
+  const unitVis = new Map();
+  function visUnit(u, key, assets){
+    if (!u.target) return u.pos;
+    const T = visTarget(u, assets), k = u.target.join(), d = Math.hypot(u.pos[0] - u.target[0], u.pos[1] - u.target[1]);
+    let r = unitVis.get(key);
+    if (!r || r.k !== k) { const from = r ? r.last : d < .005 ? T : (chSites()._base || u.pos); r = {k, fromVis:from, fromSim:[...u.pos], last:from}; unitVis.set(key, r); }
+    const d0 = Math.hypot(r.fromSim[0] - u.target[0], r.fromSim[1] - u.target[1]), f = d0 < 1e-6 ? 1 : Math.max(0, Math.min(1, 1 - d / d0));
+    r.last = [r.fromVis[0] + (T[0] - r.fromVis[0]) * f, r.fromVis[1] + (T[1] - r.fromVis[1]) * f]; return r.last;
+  }
+  const centroid = as => { const ps = as.map(visAsset); return [ps.reduce((a, p) => a + p[0], 0) / ps.length, ps.reduce((a, p) => a + p[1], 0) / ps.length]; };
   function openReadiness(){
     const cd = currentChallengeDef(); if (!cd) return;
     ui.readiness = true; const [cx, cz] = centroid(SIM.challengeAssets(cd.id));
@@ -376,9 +391,11 @@
       const assets = st.challenge ? st.challenge.assets : SIM.challengeAssets(cd.id);
       const def = cd.c.units.find(u => u.type === ui.tool);
       let best = null, near = null, bd = .3;
-      for (const a of assets) { const d = Math.hypot(a.pos[0] - x, a.pos[1] - z); if (d < bd) { bd = d; near = a; if (def.supports.includes(a.kind)) best = a; } }
+      for (const a of assets) { const v = visAsset(a), d = Math.hypot(v[0] - x, v[1] - z); if (d < bd) { bd = d; near = a; if (def.supports.includes(a.kind)) best = a; } }
       if (near && !best) { setMessage(`${def.name} cannot support ${near.name} — try a ${near.kind === 'grid' ? 'grid crew' : 'matching unit'}.`, 'DISPATCH'); return true; }
-      const pos = best ? [best.pos[0] + (Math.random() - .5) * .05, best.pos[1] + (Math.random() - .5) * .05] : [x, z];
+      let pos = best ? [best.pos[0] + (Math.random() - .5) * .05, best.pos[1] + (Math.random() - .5) * .05] : [x, z];
+      // Open ground must not silently cover an asset whose simulated position lies under the click but is drawn elsewhere.
+      if (!best) for (const a of assets) { const d = Math.hypot(pos[0] - a.pos[0], pos[1] - a.pos[1]); if (d < .18) { const k = .18 / Math.max(d, 1e-6); pos = d > 1e-6 ? [a.pos[0] + (pos[0] - a.pos[0]) * k, a.pos[1] + (pos[1] - a.pos[1]) * k] : [a.pos[0] + .18, a.pos[1]]; } }
       if (SIM.dispatch(ui.tool, pos, best ? best.id : null)) setMessage(best ? `${def.name} heading to ${best.name}.` : `${def.name} heading to the selected point.`, st.challenge ? 'DISPATCH' : 'READINESS');
       renderUnitBar(); renderChallengePanel(); return true;
     } : null);
@@ -388,7 +405,7 @@
     const st = S(); if (!st.challenge) return;
     const d = st.challenge.units.find(u => u.drone); if (!d) return;
     if (!d.pos) { setMessage('Dispatch the survey drone first: it is selected — click a place on the map.', 'FIELD VIEW'); if (ui.tool !== d.type) selectTool(d.type); return; }
-    ui.droneFollow = !ui.droneFollow; W.setDirectMode(ui.droneFollow, d.pos[0], d.pos[1]); renderUnitBar();
+    const dv = visUnit(d, 'u' + st.challenge.units.indexOf(d), st.challenge.assets); ui.droneFollow = !ui.droneFollow; W.setDirectMode(ui.droneFollow, dv[0], dv[1]); renderUnitBar();
   }
   function renderChallengePanel(){
     const st = S(), cd = currentChallengeDef(); if (!cd) return;
@@ -417,12 +434,13 @@
     if (!cd || (!st.challenge && !ui.readiness)) return;
     const ents = [], labs = [], assets = st.challenge ? st.challenge.assets : SIM.challengeAssets(cd.id);
     for (const a of assets) { const cont = st.challenge ? a.continuity : 100, col = cont > 75 ? [.3,.85,.45] : cont > 45 ? [1,.75,.2] : [.95,.35,.3];
-      ents.push({x:a.pos[0], z:a.pos[1], y:G_UP, color:col, size:13, ring:.16, ringColor:col, pulse:!!(st.challenge && a.exposure > .1)});
-      labs.push({id:'a-' + a.id, text:`${a.name} · ${Math.round(cont)}%`, x:a.pos[0], z:a.pos[1], cls:'asset ' + (cont > 75 ? 'ok' : cont > 45 ? 'mid' : 'low')}); }
-    const units = st.challenge ? st.challenge.units.filter(u => u.pos) : (st.advisory.prepared || []).map(p => ({pos:p.pos, target:p.pos, color:cd.c.units.find(u => u.type === p.type).color}));
-    for (const u of units) ents.push({x:u.pos[0], z:u.pos[1], y:G_UP + .05, color:u.color, size:u.drone ? 10 : 12, path: u.target && Math.hypot(u.target[0]-u.pos[0], u.target[1]-u.pos[1]) > .01 ? u.target : null});
+      const v = visAsset(a); ents.push({x:v[0], z:v[1], y:G_UP, color:col, size:13, ring:.16, ringColor:col, pulse:!!(st.challenge && a.exposure > .1)});
+      labs.push({id:'a-' + a.id, text:`${a.name} · ${Math.round(cont)}%`, x:v[0], z:v[1], cls:'asset ' + (cont > 75 ? 'ok' : cont > 45 ? 'mid' : 'low')}); }
+    const units = st.challenge ? st.challenge.units.map((u, i) => ({u, key:'u' + i})).filter(x => x.u.pos) : (st.advisory.prepared || []).map((p, i) => ({key:'p' + i, u:{pos:p.pos, target:p.pos, assetId:p.assetId, color:cd.c.units.find(u => u.type === p.type).color}}));
+    for (const {u, key} of units) { const v = visUnit(u, key, assets), T = u.target ? visTarget(u, assets) : null;
+      ents.push({x:v[0], z:v[1], y:G_UP + .05, color:u.color, size:u.drone ? 10 : 12, path: T && Math.hypot(T[0]-v[0], T[1]-v[1]) > .01 ? T : null}); }
     W.setEntities(ents); W.setDynamicLabels(labs); W.setHazard(st.challenge ? st.challenge.hazard : null);
-    if (ui.droneFollow && st.challenge) { const d = st.challenge.units.find(u => u.drone && u.pos); if (d) W.followPoint(d.pos[0], d.pos[1]); }
+    if (ui.droneFollow && st.challenge) { const d = st.challenge.units.find(u => u.drone && u.pos); if (d) { const v = visUnit(d, 'u' + st.challenge.units.indexOf(d), assets); W.followPoint(v[0], v[1]); } }
   }
 
   /* ============================ OUTCOMES ============================== */
