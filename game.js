@@ -154,6 +154,9 @@
     const it = $(`#projectList [data-project="${id}"]`); if (it) it.scrollIntoView({block:'nearest'});
   }
   W.onSelect(p => { if (ui.started && !ui.tool) selectProject(p.id); });
+  // Clicking downtown Riyadh (the skyline or its label) opens the Riyadh planning view; it is a place, not a project.
+  W.onPlace(id => { if (!ui.started || ui.tool) return; const b = $(`[data-region="${id}"]`); if (b) b.onclick(); else W.focusRegion(id);
+    setMessage('Riyadh planning view — pick a district on the map or in the project list.', 'RIYADH'); });
 
   /* ========================= OPERATIONS DOCK ========================== */
   function renderDock(){

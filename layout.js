@@ -1,8 +1,12 @@
 // Vision Nexus 2030 — map layout and selection rules (pure: no WebGL, testable headlessly).
-//  • Every project has a FOOTPRINT: a clear disc that belongs to it. Generic city blocks, palms, trees and other decoration
-//    are never placed inside a footprint, a city core, or on a road.
-//  • Riyadh uses an ILLUSTRATIVE DISTRICT PLAN (not survey geography): the ten Riyadh projects sit in named districts
-//    around a compact tower core, with clear space between them. Other projects keep their mapped positions.
+//  • Every project owns a FOOTPRINT (a circle, or a ribbon for linear places such as Sports Boulevard and Green Riyadh).
+//    Generic blocks, palms, trees and other decoration are never placed inside a footprint, a city core, a road, the
+//    metro track or the wadi.
+//  • Riyadh follows a STYLIZED NORTH-UP PLANNING MAP (not surveyed geography): King Fahd Road is the north–south spine,
+//    King Salman Road the northern axis, King Khalid Road the western flank, the Northern Ring Road and Sports Boulevard
+//    mid-map corridors. Other projects keep their mapped positions.
+//  • Only the drawing moves. The simulation and missions keep using lon/lat, and the City Builder picks the landmarks of
+//    a new city in a frozen logical frame (cityAnchorFrame), so balance and saves are untouched.
 //  • resolvePick() decides what a click/tap selects from what is actually visible under the pointer.
 (() => {
   'use strict';
@@ -10,90 +14,142 @@
   const PJ = D.projection, KX = PJ.scale * Math.cos(PJ.lat0 * Math.PI / 180), KZ = PJ.scale;
   const geo = (lon, lat) => [(lon - PJ.lon0) * KX, -(lat - PJ.lat0) * KZ];
   const ANCHOR_SPREAD = 3.4;
+  const GAP = .04, ROAD_CLEAR = .015, DEFAULT_R = .09;
 
-  // Footprint radius (world units) — the space a project's landmark, progress pad and marker may use.
-  const FOOT = {ksip:.16, expo:.11, newmurabba:.10, park:.11, metro:.08, greenriyadh:.10, sports:.08, diriyah:.10, qiddiya:.12, roshn:.10,
-    renewables:.13, neom:.10, oxagon:.10, trojena:.09, hydrogen:.12, alula:.12, hajj:.10, masar:.08, jeddahcentral:.08, ceer:.06, lucid:.055,
-    eastern:.12, jazan:.08, soudah:.09, redsea:.10, amaala:.08, sindalah:.06, madinah:.08, haramain:.08, green:.09};
-  const DEFAULT_R = .09, GAP = .04;
-  // Compact downtown towers (Kingdom Centre, Al Faisaliah, CBD) — nothing else is built inside a city core.
-  const CORE = {Riyadh:.13, Jeddah:.06, Makkah:.11, Madinah:.10, Dammam:.08};
-  // Illustrative Riyadh district plan: offsets from the city centre (east +x, south +z).
-  // Solved so that districts sit between the four intercity roads leaving Riyadh (bearings ≈ −147°, −14°, 108°, 132°).
+  const cities = {}; for (const c of D.cities) { const [x, z] = geo(c.lon, c.lat); cities[c.name] = {name:c.name, x, z, size:c.size}; }
+  const RY = cities.Riyadh;
+  const R = (dx, dz) => [RY.x + dx, RY.z + dz];                       // Riyadh plan offset → world
+  const Rs = pts => pts.map(([a, b]) => R(a, b));
+
+  // ---------------------------------------------------------------- the Riyadh plan (offsets: +x east, −z north)
+  // Five main corridors (plus the road that curves back from Qiddiya).
+  const CITY_ROADS = [
+    {id:'kingFahd',   name:{en:'King Fahd Road', ar:'طريق الملك فهد'},        kind:'road', w:.022, pts:Rs([[0,-.95],[0,.85]])},
+    {id:'kingSalman', name:{en:'King Salman Road', ar:'طريق الملك سلمان'},    kind:'road', w:.02,  pts:Rs([[-.85,-.48],[.85,-.48]])},
+    {id:'kingKhalid', name:{en:'King Khalid Road', ar:'طريق الملك خالد'},     kind:'road', w:.02,  pts:Rs([[-.70,-.95],[-.71,-.40],[-.70,0],[-.68,.25]])},
+    {id:'northRing',  name:{en:'Northern Ring Road', ar:'الطريق الدائري الشمالي'}, kind:'road', w:.02, pts:Rs([[-.85,-.26],[.85,-.26]])},
+    {id:'qiddiyaRd',  name:{en:'Qiddiya Road', ar:'طريق القدية'},             kind:'road', w:.016, pts:Rs([[-.47,.40],[-.34,.33],[-.16,.33],[0,.34]]), minor:true}
+  ];
+  // Metro: station at the southern foot of the skyline, rail around King Salman Park and north to the airport terminal.
+  const METRO_ROUTE = Rs([[0,.22],[.20,.22],[.40,.19],[.46,.10],[.46,-.22],[.46,-.44],[.49,-.56]]);
+  const WADI = Rs([[-.42,-.70],[-.40,-.40],[-.38,-.14],[-.38,.08],[-.43,.20],[-.52,.26]]);   // Wadi Hanifa beside Diriyah
+  const RIDGES = Rs([[-.78,.14],[-.60,.20],[-.44,.26],[-.34,.40],[-.30,.56]]);                  // stepped Tuwaiq cliffs between the city and Qiddiya
+  const RIYADH_CORE = {x:RY.x, z:RY.z, r:.12, id:'riyadh-core'};                              // the skyline: a clickable place, not a project
+  // Landmarks. `r` = circle footprint; `ribbon` = linear footprint (points + half-width). `pad` = marker / progress pad.
   const RIYADH_PLAN = {
-    newmurabba:[-.05,-.28],   // New downtown, just north of the core
-    ksip:[.06,-.58],          // Airport district, far north
-    expo:[.34,-.40],          // Expo grounds, north-east
-    park:[.28,.07],           // King Salman Park, east of the core
-    greenriyadh:[.32,.34],    // Green Riyadh belt, south-east
-    metro:[.03,.27],          // Metro depot and interchange, south
-    qiddiya:[-.44,.28],       // Qiddiya on the Tuwaiq escarpment, south-west
-    diriyah:[-.38,.01],       // Diriyah heritage district, west
-    sports:[-.51,-.17],       // Sports Boulevard, west
-    roshn:[-.24,-.49]         // ROSHN communities, north-west
+    newmurabba:{at:[-.16,-.61], r:.10},
+    roshn:     {at:[.17,-.61],  r:.09},
+    ksip:      {at:[.55,-.64],  r:.13, pad:[.52,-.56]},
+    expo:      {at:[.60,-.37],  r:.075},
+    metro:     {at:[0,.22],     r:.06, pad:[.035,.245]},
+    park:      {at:[.30,.02],   r:.10},
+    diriyah:   {at:[-.52,-.09], r:.09},
+    sports:    {at:[-.18,-.20], ribbon:{pts:[[-.40,-.20],[-.20,-.20],[0,-.20],[.20,-.20],[.40,-.20]], hw:.03}, pad:[-.26,-.20]},
+    renewables:{at:[-.47,-.62], r:.10},
+    qiddiya:   {at:[-.56,.44],  r:.10},
+    greenriyadh:{at:[.34,.44],  ribbon:{pts:[[.12,.40],[.26,.43],[.40,.47],[.56,.44],[.70,.48],[.86,.46]], hw:.07}, pad:[.30,.44]}
   };
-  // The City Builder's own district east of the core (city_ui.js setupGrid: centre core + (1.02, .12), 40 tiles × .027).
-  // No Riyadh district footprint may enter it. (It already spans Hofuf and the Al-Ahsa oasis far to the east; that
-  // pre-existing overlap is left as is so the national view keeps Hofuf's look.)
-  const RESERVED = [{name:'City Builder district', anchor:'Riyadh', x0:.48, x1:1.56, z0:-.42, z1:.66}];
-  // Small illustrative offsets that keep a project clear of the landmark core of the city it belongs to.
+  // Roads that legitimately enter a footprint because they serve it (downtown and the metro station sit on King Fahd
+  // Road; Sports Boulevard bridges it).
+  const ON_ROAD = {'riyadh-core':['kingFahd'], metro:['kingFahd'], sports:['kingFahd'], qiddiya:['qiddiyaRd']};
+
+  // Footprint radii elsewhere in the Kingdom (unchanged mapped positions).
+  const FOOT = {neom:.10, oxagon:.10, trojena:.09, hydrogen:.12, alula:.12, hajj:.10, masar:.08, jeddahcentral:.08, ceer:.06, lucid:.055,
+    eastern:.12, jazan:.08, soudah:.09, redsea:.10, amaala:.08, sindalah:.06, madinah:.08, haramain:.08, green:.09};
+  const CORE = {Jeddah:.06, Makkah:.11, Madinah:.10, Dammam:.08};
   const NUDGE = {madinah:[.24,.02], jeddahcentral:[.12,-.16], hajj:[.10,.12], masar:[-.08,.30]};
-  // Projects that sit on their own intercity corridor: that road may pass through their footprint (it serves them).
-  // Riyadh's district plan has no such exception — no road crosses a Riyadh project.
-  const ROAD_SERVED = new Set(['alula','madinah','jeddahcentral','haramain','ceer','lucid','jazan','soudah','green','neom','oxagon','hajj','masar','renewables']);
-  // Shorter names used when a full label does not fit.
+  const ROAD_SERVED = new Set(['alula','madinah','jeddahcentral','haramain','ceer','lucid','jazan','soudah','green','neom','oxagon','hajj','masar']);
   const SHORT = {ksip:'KSIA Airport', hajj:'Hajj', haramain:'Haramain Rail', jazan:'Jazan Industry', lucid:'EV Factory', renewables:'Renewables',
     green:'Green Initiative', eastern:'East Energy', ceer:'Ceer', hydrogen:'NEOM H2', roshn:'ROSHN', alula:'AlUla', expo:'Expo 2030', park:'KS Park',
     greenriyadh:'Green Riyadh', newmurabba:'New Murabba', metro:'Metro', sports:'Sports Blvd', qiddiya:'Qiddiya', jeddahcentral:'Jeddah Central',
     madinah:'Rua Al Madinah', masar:'Masar', soudah:'Soudah', redsea:'Red Sea', amaala:'AMAALA', trojena:'Trojena', oxagon:'Oxagon', neom:'THE LINE', sindalah:'Sindalah', diriyah:'Diriyah'};
 
-  const cities = {}; for (const c of D.cities) { const [x, z] = geo(c.lon, c.lat); cities[c.name] = {name:c.name, x, z, size:c.size}; }
-  // Resolve positions: Riyadh plan → anchored spread → mapped lon/lat.
+  // ---------------------------------------------------------------- geometry helpers
+  const segDist = (x, z, a, b) => { const dx = b[0] - a[0], dz = b[1] - a[1], t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (z - a[1]) * dz) / (dx * dx + dz * dz || 1))); return Math.hypot(x - a[0] - dx * t, z - a[1] - dz * t); };
+  const polyDist = (x, z, pts) => { let d = Infinity; for (let i = 1; i < pts.length; i++) d = Math.min(d, segDist(x, z, pts[i - 1], pts[i])); return d; };
+
+  // ---------------------------------------------------------------- resolve positions
+  // Legacy (V5) positions: lon/lat spread around the anchor city. Used only for the City Builder's frozen anchor frame.
+  const legacy = {};
+  for (const p of D.projects) { let [x, z] = geo(p.lon, p.lat); const a = p.anchor && cities[p.anchor]; if (a) { const s = p.spread || ANCHOR_SPREAD; x = a.x + (x - a.x) * s; z = a.z + (z - a.z) * s; } legacy[p.id] = [x, z]; }
   const projects = {};
   for (const p of D.projects) {
-    let [x, z] = geo(p.lon, p.lat);
-    const a = p.anchor && cities[p.anchor];
-    if (p.anchor === 'Riyadh' && RIYADH_PLAN[p.id]) { x = a.x + RIYADH_PLAN[p.id][0]; z = a.z + RIYADH_PLAN[p.id][1]; }
-    else if (a) { const s = p.spread || ANCHOR_SPREAD; x = a.x + (x - a.x) * s; z = a.z + (z - a.z) * s; }
+    const plan = RIYADH_PLAN[p.id];
+    if (plan) {
+      const [x, z] = R(...plan.at), ribbon = plan.ribbon ? {pts:Rs(plan.ribbon.pts), hw:plan.ribbon.hw} : null;
+      const r = plan.r || .06;                                             // ribbons: small radius around the label anchor for rings/cues
+      const pad = plan.pad ? R(...plan.pad) : [x, z + r * .72];
+      projects[p.id] = {id:p.id, x, z, r, ribbon, pad, illustrative:true};
+      continue;
+    }
+    let [x, z] = legacy[p.id];
     if (NUDGE[p.id]) { x += NUDGE[p.id][0]; z += NUDGE[p.id][1]; }
     const r = FOOT[p.id] || DEFAULT_R;
-    // Progress pad and marker sit on the camera-facing (south, +z) edge of the footprint, so the landmark never hides them
-    // from the default views; the landmark itself stays at the centre.
-    projects[p.id] = {id:p.id, x, z, r, pad:[x, z + r * .72], illustrative:p.anchor === 'Riyadh' && !!RIYADH_PLAN[p.id]};
+    projects[p.id] = {id:p.id, x, z, r, ribbon:null, pad:[x, z + r * .72], illustrative:false};
   }
-  const reservedRects = RESERVED.map(r => { const a = cities[r.anchor]; return {name:r.name, x0:a.x + r.x0, x1:a.x + r.x1, z0:a.z + r.z0, z1:a.z + r.z1}; });
-  const cores = Object.entries(CORE).map(([name, r]) => ({name, x:cities[name].x, z:cities[name].z, r}));
-  const roads = D.roads.map(r => r.map(w => typeof w === 'string' ? [cities[w].x, cities[w].z] : geo(w[0], w[1])));
-  const segDist = (x, z, a, b) => { const dx = b[0] - a[0], dz = b[1] - a[1], t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (z - a[1]) * dz) / (dx * dx + dz * dz || 1))); return Math.hypot(x - a[0] - dx * t, z - a[1] - dz * t); };
-  const roadDist = (x, z) => { let d = Infinity; for (const r of roads) for (let i = 1; i < r.length; i++) d = Math.min(d, segDist(x, z, r[i - 1], r[i])); return d; };
+  const cores = [{name:'Riyadh', x:RIYADH_CORE.x, z:RIYADH_CORE.z, r:RIYADH_CORE.r}, ...Object.entries(CORE).map(([name, r]) => ({name, x:cities[name].x, z:cities[name].z, r}))];
+
+  // Intercity roads and rails that reach Riyadh join the plan at a gate on a named road instead of cutting across it.
+  const GATES = [R(.85,-.26), R(-.70,-.95), R(-.68,.25), R(0,.85), R(0,-.95), R(.85,-.48), R(-.85,-.48)];
+  function gateToward(other){ let best = null, bd = Infinity; for (const g of GATES) { const d = Math.hypot(g[0] - other[0], g[1] - other[1]); if (d < bd) { bd = d; best = g; } } return best; }
+  const toPts = r => r.map(w => typeof w === 'string' ? [cities[w].x, cities[w].z] : geo(w[0], w[1]));
+  // A gate segment that would cross a Riyadh footprint gets one waypoint around it (on the side away from the plan centre).
+  function detour(a, b){
+    for (const p of Object.values(projects)) { if (!p.illustrative || p.ribbon) continue;
+      if (segDist(p.x, p.z, a, b) >= p.r + .03) continue;
+      let ox = p.x - RY.x, oz = p.z - RY.z; const l = Math.hypot(ox, oz) || 1; ox /= l; oz /= l;
+      return [[p.x + ox * (p.r + .09), p.z + oz * (p.r + .09)]]; }
+    return [];
+  }
+  function remap(list){ return list.map(r => { let pts = toPts(r);
+    for (let i = 0; i < pts.length; i++) if (r[i] === 'Riyadh') { const nb = pts[i + 1] || pts[i - 1]; pts[i] = gateToward(nb);
+      const extra = detour(pts[i], nb); if (extra.length) { pts = i === 0 ? [pts[0], ...extra, ...pts.slice(1)] : [...pts.slice(0, i), ...extra, ...pts.slice(i)]; } }
+    return pts; }); }
+  const intercity = remap(D.roads), rails = remap(D.rails);
+  const cityRoads = CITY_ROADS.map(r => ({...r}));
+  const roads = [...intercity, ...cityRoads.map(r => r.pts)];            // everything decoration must keep off
+  const roadDist = (x, z) => { let d = Infinity; for (const r of roads) d = Math.min(d, polyDist(x, z, r)); return d; };
+  const cityRoadDist = (x, z, except = []) => { let d = Infinity; for (const r of cityRoads) if (!except.includes(r.id)) d = Math.min(d, polyDist(x, z, r.pts) - r.w / 2); return d; };
+
+  // Distance from a point to the outside of a footprint (negative inside).
+  const footDist = (p, x, z) => p.ribbon ? polyDist(x, z, p.ribbon.pts) - p.ribbon.hw : Math.hypot(x - p.x, z - p.z) - p.r;
   // Which project's footprint contains a point (used to tag geometry for picking); null when none.
-  function footprintAt(x, z){ let best = null, bd = Infinity; for (const p of Object.values(projects)) { const d = Math.hypot(x - p.x, z - p.z); if (d < p.r && d < bd) { bd = d; best = p.id; } } return best; }
+  function footprintAt(x, z){
+    let best = null, bd = Infinity;
+    for (const p of Object.values(projects)) { const d = footDist(p, x, z); if (d < 0 && d < bd) { bd = d; best = p.id; } }
+    if (best) return best;
+    if (polyDist(x, z, METRO_ROUTE) < .014) return 'metro';                                        // the rail is part of the Metro
+    if (Math.hypot(x - RIYADH_CORE.x, z - RIYADH_CORE.z) < RIYADH_CORE.r) return RIYADH_CORE.id;   // the skyline
+    return null;
+  }
   // Decoration (generic blocks, palms, trees) may only go where it cannot be mistaken for — or cover — a project.
-  const inReserved = (x, z, pad = 0) => reservedRects.some(r => x > r.x0 - pad && x < r.x1 + pad && z > r.z0 - pad && z < r.z1 + pad);
-  // `tall` decoration (palms, trees) also keeps a view corridor clear on the camera-facing (south) side of each footprint,
-  // so it cannot stand between the planning cameras and a project.
+  // `tall` decoration also keeps a view corridor clear on the camera-facing (south) side of circular footprints.
   function decorAllowed(x, z, margin = .02, roadClear = .028, tall = false){
-    for (const p of Object.values(projects)) { if (Math.hypot(x - p.x, z - p.z) < p.r + margin) return false;
-      if (tall && z > p.z && z - p.z < p.r + .16 && Math.abs(x - p.x) < p.r + .03) return false; }
+    for (const p of Object.values(projects)) { if (footDist(p, x, z) < margin) return false;
+      if (tall && !p.ribbon && z > p.z && z - p.z < p.r + .16 && Math.abs(x - p.x) < p.r + .03) return false; }
     for (const c of cores) if (Math.hypot(x - c.x, z - c.z) < c.r + margin * .5) return false;
+    if (polyDist(x, z, METRO_ROUTE) < .02 + margin * .5 || polyDist(x, z, WADI) < .03) return false;
     return roadDist(x, z) >= roadClear;
   }
-  // Mission-only sites (dry port, rail gateways…) are drawn where they belong but nudged out of any project footprint,
-  // so their marker and label never sit on a project. Mission rules keep using lon/lat; only the drawing moves.
+  const insideCore = (name, x, z) => { const c = cores.find(c => c.name === name); return !!c && Math.hypot(x - c.x, z - c.z) < c.r; };
+  // Mission-only sites (dry port, rail gateways…) are drawn where they belong but nudged out of any project footprint.
   function clearOf(x, z, r = .05){
-    for (let pass = 0; pass < 4; pass++) { let moved = false;
-      for (const p of Object.values(projects)) { const d = Math.hypot(x - p.x, z - p.z), need = p.r + r + .01; if (d < need) { const k = d > 1e-6 ? need / d : 1; x = p.x + (x - p.x) * k; z = p.z + (z - p.z) * k + (d > 1e-6 ? 0 : need); moved = true; } }
+    for (let pass = 0; pass < 6; pass++) { let moved = false;
+      for (const p of Object.values(projects)) { if (p.ribbon) continue; const d = Math.hypot(x - p.x, z - p.z), need = p.r + r + .01; if (d < need) { const k = d > 1e-6 ? need / d : 1; x = p.x + (x - p.x) * k; z = p.z + (z - p.z) * k + (d > 1e-6 ? 0 : need); moved = true; } }
       if (!moved) break; }
     return [x, z];
   }
-  const insideCore = (name, x, z) => { const c = cores.find(c => c.name === name); return !!c && Math.hypot(x - c.x, z - c.z) < c.r; };
 
-  // Pick resolution. Inputs are what the renderer measured under the pointer:
-  //   center: project id of the front-most pixel at the pointer (depth-tested ID buffer), or null
-  //   around: [{id, d}] project pixels within the tolerance radius (d = pixel distance from the pointer)
-  //   markers: [{id, d}] project markers (beacons) within the tolerance radius
-  //   cluster: optional list of project ids when the view is clustered (Kingdom overview)
-  // Returns {select:id} | {choose:[ids]} | null. The front-most visible object always wins over a nearby marker.
+  // City Builder district: drawn south-east of the Riyadh plan — the nearest spot that is fully on land (clear of the
+  // Gulf coast), crosses no intercity road or rail and holds no project. New-city landmarks are still chosen in the
+  // ORIGINAL frame (grid centre core + (1.02, .12), V5 node positions), so city gameplay and saves are unchanged.
+  const CITY_GRID = {ts:.027, n:40, visual:{dx:1.55, dz:.85}, logical:{dx:1.02, dz:.12}};
+  const cityAnchorFrame = {origin:[RY.x + CITY_GRID.logical.dx, RY.z + CITY_GRID.logical.dz], legacy};
+  const half = CITY_GRID.ts * CITY_GRID.n / 2;
+  const reservedRects = [{name:'City Builder district', x0:RY.x + CITY_GRID.visual.dx - half, x1:RY.x + CITY_GRID.visual.dx + half, z0:RY.z + CITY_GRID.visual.dz - half, z1:RY.z + CITY_GRID.visual.dz + half}];
+  const inReserved = (x, z, pad = 0) => reservedRects.some(r => x > r.x0 - pad && x < r.x1 + pad && z > r.z0 - pad && z < r.z1 + pad);
+
+  // Pick resolution (see engine.js): front-most visible object wins; ambiguous or clustered → a choice list.
   function resolvePick({center = null, around = [], markers = [], cluster = null} = {}){
     const withCluster = id => cluster && cluster.length > 1 && cluster.includes(id) ? {choose:cluster.slice()} : {select:id};
     if (center) return withCluster(center);
@@ -106,5 +162,7 @@
     return null;
   }
 
-  window.VisionLayout = {clearOf, reservedRects, inReserved, FOOT, CORE, GAP, RIYADH_PLAN, NUDGE, ROAD_SERVED, SHORT, projects, cores, roads, geo, footprintAt, decorAllowed, insideCore, roadDist, resolvePick};
+  window.VisionLayout = {GAP, ROAD_CLEAR, FOOT, CORE, RIYADH_PLAN, NUDGE, ROAD_SERVED, ON_ROAD, SHORT, RIYADH_CORE, CITY_ROADS:cityRoads, METRO_ROUTE, WADI, RIDGES,
+    CITY_GRID, cityAnchorFrame, legacy, projects, cores, roads, intercity, rails, geo, R, polyDist, footDist, footprintAt, decorAllowed, insideCore, roadDist, cityRoadDist,
+    clearOf, reservedRects, inReserved, resolvePick};
 })();

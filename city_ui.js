@@ -9,15 +9,20 @@
   /* ============================ GRID PLACEMENT ========================== */
   function setupGrid(){
     const core = W.place(46.68, 24.71, 'Riyadh'), ts = .027, n = N;
-    const cx = core[0] + 1.02, cz = core[1] + .12;                       // new district east of the centre, clear of the landmark cluster
+    const V = window.VisionLayout.CITY_GRID.visual;                       // drawn south-east of the Riyadh plan, on land, clear of every parcel and corridor
+    const cx = core[0] + V.dx, cz = core[1] + V.dz;
     grid = {x0:cx - n * ts / 2, z0:cz - n * ts / 2, ts, n}; G.cityGrid = grid;
     return grid;
   }
   const tileAt = (x, z) => { const i = Math.floor((x - grid.x0) / grid.ts), j = Math.floor((z - grid.z0) / grid.ts); return i >= 0 && j >= 0 && i < N && j < N ? [i, j] : null; };
   const center = u => [grid.x0 + ((u % N) + .5) * grid.ts, grid.z0 + (((u / N) | 0) + .5) * grid.ts];
   function anchorsInGrid(){
-    const out = [], nodes = VM.BOARDS.riyadh.nodes;
-    for (const [id, n] of Object.entries(nodes)) { const p = G.nodePos(id, 'riyadh'), tt = tileAt(p[0], p[1]); if (!tt) continue; out.push({id, name:n.name.en, nameL:n.name, i:Math.max(1, Math.min(N - 2, tt[0])), j:Math.max(1, Math.min(N - 2, tt[1])), r:1, jobs:n.core ? 420 : 160}); }
+    // Which Riyadh sites seed a new city is decided in the original V5 frame (legacy positions, original grid origin), so
+    // moving the drawn district or the map landmarks never changes a new city's anchors, jobs or balance.
+    const out = [], nodes = VM.BOARDS.riyadh.nodes, LY = window.VisionLayout, core = W.place(46.68, 24.71, 'Riyadh'), Lg = LY.CITY_GRID.logical;
+    const lx0 = core[0] + Lg.dx - N * grid.ts / 2, lz0 = core[1] + Lg.dz - N * grid.ts / 2;
+    const tileL = (x, z) => { const i = Math.floor((x - lx0) / grid.ts), j = Math.floor((z - lz0) / grid.ts); return i >= 0 && j >= 0 && i < N && j < N ? [i, j] : null; };
+    for (const [id, n] of Object.entries(nodes)) { const p = n.project ? LY.legacy[n.project] : W.place(n.lon, n.lat, n.anchor), tt = tileL(p[0], p[1]); if (!tt) continue; out.push({id, name:n.name.en, nameL:n.name, i:Math.max(1, Math.min(N - 2, tt[0])), j:Math.max(1, Math.min(N - 2, tt[1])), r:1, jobs:n.core ? 420 : 160}); }
     return out;
   }
 
