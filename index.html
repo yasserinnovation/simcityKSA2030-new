@@ -6,16 +6,15 @@
   <meta name="theme-color" content="#7acfd6" />
   <meta name="description" content="An unofficial Saudi Vision 2030 strategy and resilience-simulation prototype." />
   <title>Vision Nexus 2030 — The Kingdom in Motion</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Tajawal:wght@400;500;700;800&display=swap" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%23153F36%27/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="vendor/fonts/fonts.css" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <canvas id="world" aria-label="Interactive 3D map of Saudi Arabia" title="Drag to orbit · right-drag or WASD to pan · scroll to zoom · click to inspect · Space to pause"></canvas>
   <div class="tiltshift" aria-hidden="true"></div>
   <div class="sun-glow"></div>
-  <div class="build-badge">Vision Nexus 2030 · build V7 (city missions)</div>
+  <div class="build-badge">Vision Nexus 2030 · build V8 (renderer upgrade · phase 1)</div>
   <nav id="modeNav" class="mode-nav glass" aria-label="Game modes"></nav>
 
   <!-- ====================== MISSION MODE (V4) ====================== -->
@@ -184,22 +183,8 @@
     </div>
   </section>
 
-  <script src="data.js"></script>
-  <script src="regions.js"></script>
-  <script src="layout.js"></script>
-  <script src="models.js"></script>
-  <script src="engine.js"></script>
-  <script src="sim.js"></script>
-  <script src="saves.js"></script>
-  <script src="game.js"></script>
-  <script src="competitiveness.js"></script>
-  <script src="mission.js"></script>
-  <script src="i18n.js"></script>
-  <script src="play_core.js"></script>
-  <script src="play_mission.js"></script>
-  <script src="city.js"></script>
-  <script src="lens.js"></script>
-  <script src="city_ui.js"></script>
-  <script src="national_ar.js"></script>
+  <script type="importmap">{"imports":{"three":"./vendor/three/three.module.js","three/addons/":"./vendor/three/addons/"}}</script>
+  <!-- boot.js loads the game scripts in order, with the three.js renderer (http) or the classic one (?renderer=classic, file://). -->
+  <script src="boot.js"></script>
 </body>
 </html>

@@ -3,7 +3,28 @@
 The build label is shown in the bottom corner of the screen. If you see a "Strategic Actions" panel, "Path to 2030" or a calendar past 2030, you are running an older copy of the files.
 
 An unofficial Saudi strategy game in the browser (WebGL, no install, no build step).
-Double-click `Launch_Prototype.bat` on Windows, or open `index.html` in Chrome or Edge.
+## How to launch (works offline)
+The game runs from a tiny local web server, because browsers block the ES modules, models and textures of the three.js renderer on  pages. Nothing is downloaded from the internet: three.js and the fonts are in .
+- **Windows:** double-click Vision Nexus 2030 is running at http://localhost:8000/index.html
+Close the "Vision Nexus 2030 server" window to stop it.. It starts  (or  if Python is missing) and opens http://localhost:8000.
+- **macOS / Linux:** run  (same fallbacks).
+- **Any system with Node:** Unknown command: "start"
+
+
+Did you mean this?
+  npm start # Start a package
+To see a list of supported npm commands, run:
+  npm help, then open http://localhost:8000.
+- **Renderers:** http://localhost:8000/index.html uses the three.js renderer; add  for the original hand-written WebGL renderer (kept for comparison). Opening  directly from disk still works and uses the classic renderer. Add  for the frame-time counter.
+- **Tests:** Unknown command: "test"
+
+
+Did you mean this?
+  npm test # Test a package
+To see a list of supported npm commands, run:
+  npm help (game logic, headless) and up to date, audited 2 packages in 1s
+
+found 0 vulnerabilities (Playwright smoke test against your installed Chrome or Edge).
 
 ## Play first
 **Mission 1 — Connect for the Opening.** Choose **Bus rapid transit**, tap *City Centre ↔ Expo 2030 site*, then **Add to plan**. Add *City Centre ↔ King Salman Airport* the same way, then press **End turn**. You will see the transformation moment. Finish the mission to see the victory moment.

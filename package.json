@@ -1,0 +1,13 @@
+{
+  "name": "vision-nexus-2030",
+  "private": true,
+  "description": "Vision Nexus 2030 — browser strategy game (no build step). npm is only used for the development tests.",
+  "scripts": {
+    "start": "node tools/serve.js 8000",
+    "test": "node tests/missions.test.js && node tests/city.test.js && node tests/competitiveness.test.js && node tests/layout.test.js && node tests/regions.test.js && node tests/saves.test.js && node tests/challenge.test.js",
+    "test:render": "node tests/render.smoke.js"
+  },
+  "devDependencies": {
+    "playwright-core": "1.64.0"
+  }
+}
