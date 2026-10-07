@@ -6,10 +6,13 @@
   <meta name="theme-color" content="#7acfd6" />
   <meta name="description" content="An unofficial Saudi Vision 2030 strategy and resilience-simulation prototype." />
   <title>Vision Nexus 2030 — The Kingdom in Motion</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Tajawal:wght@400;500;700;800&display=swap" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <canvas id="world" aria-label="Interactive 3D map of Saudi Arabia"></canvas>
+  <canvas id="world" aria-label="Interactive 3D map of Saudi Arabia" title="Drag to orbit · right-drag or WASD to pan · scroll to zoom · click to inspect · Space to pause"></canvas>
   <div class="tiltshift" aria-hidden="true"></div>
   <div class="sun-glow"></div>
   <div class="build-badge">Vision Nexus 2030 · build V7 (city missions)</div>
@@ -91,6 +94,7 @@
   <main id="hud" class="hud hidden">
     <header class="topbar glass">
       <div class="brand"><span class="brand-mark">✦</span><div><b>VISION NEXUS 2030</b><small id="modeTag">EXECUTIVE · CAMPAIGN</small></div></div>
+      <div class="nav-slot" id="hudNavSlot"></div>
       <div id="kpis" class="kpis" role="list"></div>
       <div class="clock">
         <div class="clock-date"><small>STRATEGIC CALENDAR</small><strong id="dateValue">JAN 2024</strong></div>
@@ -146,7 +150,7 @@
         <button data-region="south" title="Aseer & Jazan"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M1 27 11 10l7 10 4-6 9 13z" fill="#3fb86a"/><circle cx="24" cy="8" r="3" fill="#fff" opacity=".85"/></svg><span>South</span></button>
       </nav>
       <div class="timeline-wrap">
-        <div class="timeline-head"><small>STRATEGIC TIMELINE</small><small id="queueInfo">Drag a work package here to schedule it</small></div>
+        <div class="timeline-head"><button class="tl-toggle" id="tlToggle" aria-expanded="true" aria-controls="timeline" title="Show or hide the timeline"><small>STRATEGIC TIMELINE</small><span class="chev" aria-hidden="true">▾</span></button><small id="queueInfo">Drag a work package here to schedule it</small></div>
         <div id="timeline" class="timeline" aria-label="Strategic timeline, 2024 to 2030"></div>
       </div>
       <div class="layers" role="group" aria-label="Map layers">
@@ -183,6 +187,7 @@
   <script src="data.js"></script>
   <script src="regions.js"></script>
   <script src="layout.js"></script>
+  <script src="models.js"></script>
   <script src="engine.js"></script>
   <script src="sim.js"></script>
   <script src="saves.js"></script>

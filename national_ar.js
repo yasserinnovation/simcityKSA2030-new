@@ -20,7 +20,8 @@
     'operations dock':'منصة العمليات', 'national capacity':'السعة الوطنية', 'shared capacity':'السعة المشتركة', 'build capacity':'بناء السعة', 'preventive maintenance':'الصيانة الوقائية',
     'material gateways':'بوابات المواد', 'national grid headroom':'هامش الشبكة الوطنية', 'takes time — never buys progress':'يستغرق وقتًا — لا يشتري التقدم',
     'start':'ابدأ', 'start now':'ابدأ الآن', 'pause & release crews':'أوقف وحرّر الأطقم', 'national view':'العرض الوطني', 'suggested':'مقترح', 'waiting on prerequisites':'بانتظار المتطلبات',
-    'strategic timeline':'الخط الزمني الاستراتيجي', 'layers':'الطبقات', 'logistics':'اللوجستيات', 'grid':'الشبكة', 'dependencies':'الاعتمادات',
+    'strategic timeline':'الخط الزمني الاستراتيجي', 'waiting':'بانتظار', 'blocked':'متعثر', 'idle':'خامل', 'maintenance, gateways and grid':'الصيانة والبوابات والشبكة', 'show or hide the timeline':'إظهار الخط الزمني أو إخفاؤه',
+    'drag to orbit · right-drag or wasd to pan · scroll to zoom · click to inspect · space to pause':'اسحب للتدوير · اسحب بالزر الأيمن أو WASD للتحريك · مرّر للتكبير · انقر للفحص · المسافة للإيقاف', 'layers':'الطبقات', 'logistics':'اللوجستيات', 'grid':'الشبكة', 'dependencies':'الاعتمادات',
     'kingdom':'المملكة', 'riyadh':'الرياض', 'west':'الغرب', 'neom':'نيوم', 'east':'الشرقية', 'south':'الجنوب',
     'kingdom motion':'حراك المملكة', 'first step':'الخطوة الأولى', 'planning pause':'توقف للتخطيط', 'in motion':'قيد التنفيذ', 'complete':'مكتمل', 'cause chain':'سلسلة الأسباب',
     'early signal':'إشارة مبكرة', 'advisory':'تنبيه', 'national challenge':'تحدٍّ وطني', 'capacity':'السعة', 'mandate':'الولاية', 'opportunity':'فرصة', 'performance':'الأداء', 'dispatch':'إرسال', 'readiness':'الجاهزية', 'field view':'العرض الميداني',
@@ -93,6 +94,9 @@
     [/^(.+) · (\d+)% · (dust|rain|heat) (\d+)%$/, m => `${tr(m[1])} · ${m[2]}٪ · ${({dust:'غبار', rain:'أمطار', heat:'حرارة'})[m[3]]} ${m[4]}٪`],
     [/^(.+) · (\d+)%$/, m => P[m[1].trim().toLowerCase()] ? `${tr(m[1])} · ${m[2]}٪` : null]
   ];
+  // Map names from the layout (districts, regions, headings, project map names) — their Arabic lives with the layout data.
+  { const LY = window.VisionLayout, add = n => { if (n && n.en && n.ar && !P[n.en.toLowerCase()]) P[n.en.toLowerCase()] = n.ar; };
+    if (LY) { Object.values(LY.places || {}).forEach(q => add(q.name)); Object.values(LY.REGION_VIEWS || {}).forEach(v => { add(v.name); add(v.heading && v.heading.text); }); Object.values(LY.MAP_NAME || {}).forEach(add); (LY.planRoads || []).forEach(r => add(r.name)); } }
   function worldAr(w){ const t = String(w).trim(); if (/^campaign$/i.test(t)) return 'الحملة'; if (/^sandbox$/i.test(t)) return 'المحاكاة الحرة'; const m = t.match(/^Timed challenge: (.+)$/i); return m ? `التحدي الزمني: ${tr(m[1])}` : t; }
   function translateText(s){
     const t = s.trim(); if (!t || /^[\d\s.,%+−▲▼▬×—·B/:-]+$/.test(t)) return null;

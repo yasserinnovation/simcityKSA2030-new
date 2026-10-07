@@ -276,8 +276,11 @@
     if (mode) G.mode = mode;
     const nav = $('#modeNav'); if (!nav) return;
     nav.className = 'mode-nav glass mode-' + G.mode + (G.mode === 'national' && !$('#hud').classList.contains('hidden') ? ' in-hud' : '') + (G.mode === 'city' ? ' in-city' : '');
+    const slot = G.mode === 'national' && !$('#hud').classList.contains('hidden') ? $('#hudNavSlot') : G.mode === 'city' && G.cityActive && G.cityActive() ? $('#cNavSlot') : null;
+    if (slot && nav.parentNode !== slot) slot.appendChild(nav); else if (!slot && nav.parentNode !== document.body) document.body.appendChild(nav);
+    nav.classList.toggle('docked', !!slot);
     nav.innerHTML = `<div class="mn-row" role="tablist">${MODES.map(([id, ic, k]) => `<button role="tab" data-go="${id}" class="${G.mode === id ? 'on' : ''}" aria-selected="${G.mode === id}" aria-label="${esc(G.t(k))}" title="${esc(G.t(k))}">${ic} <span class="mn-t">${esc(G.t(k))}</span></button>`).join('')}</div>
-      <small class="mn-save" title="${esc(G.t('savePolicy'))}">💾 ${esc(saveStatus(G.mode))}</small>`;
+      <small class="mn-save" title="${esc(G.t('savePolicy'))}" aria-label="${esc(saveStatus(G.mode))}"><span class="mn-save-ic" aria-hidden="true">💾</span><span class="mn-save-t">${esc(saveStatus(G.mode))}</span></small>`;
     $$('#modeNav [data-go]').forEach(b => b.onclick = () => G.go(b.dataset.go));
   };
   // Leave whatever is on screen, saving it first. `next` runs once the current mode has been put away.

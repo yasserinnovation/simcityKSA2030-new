@@ -144,14 +144,14 @@
     void main(){
       vec3 N=normalize(vNormal); vec3 V=normalize(uEye-vWorld); if(dot(N,V)<0.0) N=-N;
       float ndl=max(dot(N,uSun),0.0); float sh=mix(1.0, shadowAt(ndl), 1.0-uStorm*.6);
-      vec3 hemi=mix(vec3(.66,.52,.40), vec3(.68,.80,.98), N.y*0.5+0.5);
+      vec3 hemi=mix(vec3(.62,.55,.48), vec3(.74,.80,.88), N.y*0.5+0.5);
       float ao = N.y>0.8 ? 1.0 : mix(0.70,1.0,clamp((vWorld.y-uGround)/0.06,0.0,1.0));
-      vec3 sunCol=vec3(1.0,.94,.80);
+      vec3 sunCol=vec3(1.0,.96,.88);
       float cl=uGlow>0.3?1.0:cloudShade(vWorld.xz,uTime);
-      vec3 c=vColor*(hemi*(0.58+uGlow)*ao + sunCol*ndl*sh*0.72*cl);
+      vec3 c=vColor*(hemi*(0.62+uGlow)*ao + sunCol*ndl*mix(0.55,1.0,sh)*0.64*cl);   // shadows lifted: soft ambient shade, not black
       vec3 H=normalize(uSun+V); c+=sunCol*pow(max(dot(N,H),0.0),40.0)*0.10*sh;
       c+=vec3(1.0,.85,.6)*pow(1.0-max(dot(N,V),0.0),3.0)*0.08;           // warm rim light
-      float l=dot(c,vec3(.299,.587,.114)); c=mix(vec3(l),c,1.18);           // toy-like saturation
+      float l=dot(c,vec3(.299,.587,.114)); c=mix(vec3(l),c,1.02);           // natural saturation
       c=mix(c, c*vec3(.26,.32,.58)+vec3(.012,.018,.05)+vColor*uGlow*.6, uNight);   // dusk to night
       gl_FragColor=vec4(applyAtmos(c,vW),1.0);
     }
@@ -178,12 +178,12 @@
       float w1=sin(vWorld.x*11.0+t*1.2)*sin(vWorld.z*9.0-t*0.9);
       float w2=(sin((vWorld.x-vWorld.z)*29.0+t*2.1)*0.5+sin((vWorld.x+vWorld.z*1.3)*41.0-t*2.6)*0.35)*fade;
       vec3 N=normalize(vec3((w1+w2)*0.07,1.0,(w1-w2)*0.06));
-      vec3 reef=vec3(.58,.96,.86), shallow=vec3(.22,.86,.88), mid=vec3(.08,.64,.88), deep=vec3(.05,.44,.76);
+      vec3 reef=vec3(.62,.86,.80), shallow=vec3(.38,.74,.76), mid=vec3(.24,.55,.68), deep=vec3(.17,.40,.56);
       vec3 c=mix(reef,shallow,smoothstep(0.0,0.05,s)); c=mix(c,mid,smoothstep(0.05,0.22,s)); c=mix(c,deep,smoothstep(0.22,0.75,s));
       c*=0.96+0.06*w1*fade;
       float band=0.012+0.008*sin(t*1.6+vWorld.x*14.0+vWorld.z*9.0);
       float foam=smoothstep(0.012,0.0,abs(s-band))+smoothstep(0.008,0.0,s)*0.6;
-      c=mix(c,vec3(1.0),clamp(foam,0.0,1.0)*0.75);
+      c=mix(c,vec3(.96,.97,.95),clamp(foam,0.0,1.0)*0.55);
       vec3 V=normalize(uEye-vWorld); vec3 H=normalize(uSun+V);
       float spec=pow(max(dot(N,H),0.0),90.0)*fade; c+=vec3(1.0,.97,.88)*spec*0.8*(1.0-uStorm);
       c*=mix(0.88,1.0,(cloudShade(vWorld.xz,t)-0.70)/0.30);
@@ -349,6 +349,27 @@
     addLine([x+.09*k,G+H,z],[x+.09*k,G+H*.45,z],[.3,.3,.3]);
   }
   function addSolar(x,z,cols,rows,sp=.05){for(let i=0;i<cols;i++)for(let j=0;j<rows;j++){const px=x+(i-cols/2)*sp,pz=z+(j-rows/2)*sp*.8;addBox(px,G+.002,pz,sp*.84,.006,sp*.56,[.20,.42,.78]);addBox(px,G+.008,pz,sp*.78,.0015,sp*.5,[.42,.66,.95]);}}
+  // Authored low-poly models (models.js, exported from VN2030_Assets.blend): metres, origin at the base centre,
+  // x east / y up / z south. Decoded once, then stamped into the current target like any other primitive.
+  const MODELS = window.VN_MODELS || {}, modelCache = {};
+  const b64buf = s => { const bin=atob(s), u=new Uint8Array(bin.length); for (let i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i); return u.buffer; };
+  function modelData(name){
+    if (modelCache[name]) return modelCache[name]; const m=MODELS[name]; if (!m) return null;
+    return modelCache[name] = {m, v:new Int16Array(b64buf(m.v)), i:m.i32?new Uint32Array(b64buf(m.i)):new Uint16Array(b64buf(m.i)), f:new Uint8Array(b64buf(m.f))};
+  }
+  // `size` = world width of the model's larger horizontal side (or pass `k`, world units per metre, to share one scale
+  // between models); `hk` = extra vertical scale (the map exaggerates height, as the hand-built landmarks do); `sx` =
+  // stretch along the model's own x (linear pieces); `rot` = yaw as in addBox; `y` = base height. Returns false if missing.
+  function addModel(name, x, z, size, {rot=0, hk=1, y=G, k=null, sx=1}={}){
+    const d=modelData(name); if (!d) return false; const {m,v,i,f}=d;
+    const s=(k ?? size/Math.max(m.w,m.d))*m.q, cs=Math.cos(rot), sn=Math.sin(rot);
+    const V=j=>{ const a=v[j*3]*s*sx, b=v[j*3+1]*s*hk, c=v[j*3+2]*s; return [x+a*cs-c*sn, y+b, z+a*sn+c*cs]; };
+    for (let t=0;t<f.length;t++) addTri(V(i[t*3]),V(i[t*3+1]),V(i[t*3+2]),m.pal[f[t]]);
+    return true;
+  }
+  const modelK = (name, size) => { const m=MODELS[name]; return m ? size/Math.max(m.w,m.d) : 0; };
+  // Largest model width that sits inside a project's footprint and keeps its marker pad clear.
+  const fitFoot = (p, k=1) => Math.min(2*p.foot-.016, 2*(Math.hypot(p.pad[0]-p.x,p.pad[1]-p.z)-.014))*k;
   const turbines=[];
   function addTurbine(x,z,k=1){const h=.2*k;addCylinder(x,G,z,.006*k,h,[.96,.96,.94],6,.003*k);addBox(x,G+h-.004*k,z,.02*k,.01*k,.01*k,[.94,.94,.92]);turbines.push([x,G+h,z+.007*k,k]);}
   function addCloud(x,y,z,k){
@@ -366,10 +387,10 @@
 
   /* ----------------------------- terrain ---------------------------- */
   const blobs = [ // [lon, lat, rLon, rLat, color, weight]
-    [44.2,25.2,3.2,3.0,[.98,.85,.60],.55],             // Najd plateau
-    [51.0,20.3,4.6,2.3,[1.0,.66,.34],.9],              // Rub' al Khali
-    [41.3,28.4,2.3,1.0,[.94,.60,.36],.85],             // An Nafud
-    [45.8,26.0,.55,1.4,[.95,.63,.37],.7],[47.0,23.8,.55,1.3,[.95,.63,.37],.7],[47.9,21.9,.55,.9,[.95,.63,.37],.6], // Ad Dahna
+    [44.2,25.2,3.2,3.0,[.91,.83,.68],.55],             // Najd plateau
+    [51.0,20.3,4.6,2.3,[.93,.73,.52],.85],              // Rub' al Khali
+    [41.3,28.4,2.3,1.0,[.88,.68,.50],.8],             // An Nafud
+    [45.8,26.0,.55,1.4,[.89,.71,.53],.7],[47.0,23.8,.55,1.3,[.89,.71,.53],.7],[47.9,21.9,.55,.9,[.89,.71,.53],.6], // Ad Dahna
     [38.1,26.3,1.1,1.5,[.72,.56,.43],.75],[39.6,23.4,1.0,1.6,[.73,.57,.44],.7],[40.6,21.0,.9,1.1,[.71,.56,.44],.7], // Hejaz
     [36.2,28.2,1.0,.9,[.74,.58,.46],.7],
     [42.6,18.7,1.0,1.3,[.46,.70,.30],.9],[42.9,17.3,.5,.6,[.66,.70,.42],.7],       // Aseer, Jazan plain
@@ -378,7 +399,7 @@
   ];
   function landColor(x, z) {
     const [lon, lat] = ungeo(x, z);
-    let c = [.99,.81,.50];
+    let c = [.90,.80,.64];
     for (const [bl, bt, rl, rt, col, w] of blobs) {
       const d = ((lon-bl)/rl)**2 + ((lat-bt)/rt)**2;
       if (d < 6) c = mix(c, col, w*Math.exp(-d));
@@ -477,15 +498,11 @@
   const KC = {dx:.045, dz:-.01, h:.42};                                   // split-top tower: position and height (label sits above it)
   function riyadhDowntown(ry, rn){
     keepOut.push([ry.x,ry.z,LY.RIYADH_CORE.r]);
-    const kx=ry.x+KC.dx, kz=ry.z+KC.dz, H=KC.h, y0=H*.56, n=28, glass=[.50,.72,.82], edge=[.78,.90,.95];
-    addBox(kx,G,kz,.074,.012,.052,[.80,.80,.78]);                                                         // podium
-    for (let i=0;i<n;i++){ const ya=H*i/n, yb=H*(i+1)/n, ym=(ya+yb)/2, t=ym/H;
-      const W=.027*(1-.32*t*t), D=.019*(1-.3*t);                                                            // outer half-width tapers towards the top
-      if (ym<y0) { addBox(kx,G+.012+ya,kz,2*W,yb-ya,2*D,i%4===3?edge:glass); continue; }
-      const g=.021*Math.sqrt((ym-y0)/(H-y0));                                                               // the parabolic opening widens upwards
-      if (W-g < .0025) continue;
-      for (const sg of [-1,1]) addBox(kx+sg*(W+g)/2,G+.012+ya,kz,W-g,yb-ya,2*D,i%4===3?edge:glass); }
-    { const yb=y0+(H-y0)*.66, W=.027*(1-.32*((yb)/H)**2); addBox(kx,G+.012+yb,kz,2*W-.003,.008,.014,[.92,.95,.97]); }   // skybridge across the opening
+    const kx=ry.x+KC.dx, kz=ry.z+KC.dz, H=KC.h;
+    addModel('RUH_KingdomCentre',kx,kz,.074,{hk:H/(.074/130*300)});                                     // split-top tower, as tall as the label expects
+    // King Abdullah Financial District: three coordinated towers north-west of the core, clear of King Fahd Road.
+    const FIN=[['RUH_FinTower_Faceted',-.062,-.07,.024,1.25],['RUH_FinTower_Stepped',-.036,-.088,.022,1.3],['RUH_FinTower_Slim',-.086,-.05,.016,1.5]];
+    for (const [nm,dx,dz,s,hk] of FIN) addModel(nm,ry.x+dx,ry.z+dz,s,{hk});
     const fx=ry.x-.052, fz=ry.z+.03;                                                                        // Al Faisaliah: slim square pyramid, gold globe, spire
     addBox(fx,G,fz,.05,.01,.05,[.80,.80,.78]); addCone(fx,G+.01,fz,.03,.29,[.58,.72,.78],4); addOcta(fx,G+.215,fz,.017,[.96,.76,.26]); addCylinder(fx,G+.29,fz,.002,.035,[.85,.85,.85],4);
     // downtown streets (they explain the blocks) and towers stepping down from the centre
@@ -495,6 +512,7 @@
       if (d > .11 || Math.abs(x-ry.x) < .024) continue;                                   // King Fahd Road runs clear through downtown
       if (Math.abs(x-kx) < .045 && Math.abs(z-kz) < .04) continue;                          // clear air around the split-top
       if (Math.abs(x-fx) < .032 && Math.abs(z-fz) < .032) continue;                         // and around Al Faisaliah
+      if (FIN.some(([,dx,dz]) => Math.hypot(x-ry.x-dx, z-ry.z-dz) < .022)) continue;            // and around the financial towers
       if ([-.078,-.052,.052,.078].some(o => Math.abs(x-ry.x-o) < .006 || Math.abs(z-ry.z-o) < .006)) continue;   // not on a street
       const k=Math.pow(1-d/.12,1.1), h=.04+.27*k*(.5+rn()*.5), w=.012+rn()*.007, col=pal[Math.floor(rn()*pal.length)];
       if (h > .12 && rn() > .5) { addBox(x,G,z,w+.004,h*.55,w+.004,col); addTower(x,z,w*.8,h,shade(col,1.08),rn()>.5?[.88,.92,.96]:null); }   // setback tower
@@ -506,18 +524,9 @@
     const ex=P('expo'), R0=ex.foot; keepOut.push([ex.x,ex.z,R0]);
     addDisc(ex.x,G+.003,ex.z,R0-.002,[.86,.82,.72],32); addRing(ex.x,G+.006,ex.z,R0-.004,[.34,.58,.30],40);                      // parcel paving + hedge line
     addDisc(ex.x,G+.004,ex.z,.046,[.93,.90,.82],28);                                                                           // central plaza
-    const gold=[.95,.73,.24], deep=[.82,.56,.16];
-    addCylinder(ex.x,G,ex.z,.036,.008,[.96,.93,.86],28);                                                                        // plinth
-    for (let i=0;i<28;i++){ const a=i/28*6.283, r=.034; addBox(ex.x+Math.cos(a)*r,G+.008,ex.z+Math.sin(a)*r,.0035,.03,.0035,i%2?gold:deep,-a); }   // lattice ribs
-    for (let i=0;i<36;i++){ const a=(i+.5)/36*6.283; addBox(ex.x+Math.cos(a)*.0355,G+.038,ex.z+Math.sin(a)*.0355,.0075,.006,.0065,gold,-a); }   // open crown ring
-    addDome(ex.x,G+.008,ex.z,.024,[.72,.84,.86]); addCylinder(ex.x,G+.008,ex.z,.03,.002,[.93,.90,.82],24);                    // glass dome in an open court
-    for (let i=0;i<6;i++){ const a=i/6*6.283+.52, x=ex.x+Math.cos(a)*.058, z=ex.z+Math.sin(a)*.058;                               // exhibition pavilions
-      if (Math.hypot(x-ex.pad[0],z-ex.pad[1])<.03) continue;
-      if (i%3===0) { addBox(x,G,z,.018,.012,.018,[.95,.95,.96],a); addBox(x,G+.012,z,.02,.003,.02,[.30,.62,.78],a); }
-      else if (i%3===1) { addCylinder(x,G,z,.01,.01,[.94,.94,.95],12); addDome(x,G+.01,z,.01,[.55,.78,.72]); }
-      else { addBox(x,G,z,.022,.009,.012,[.93,.90,.84],a+1.57); addBox(x,G+.009,z,.024,.003,.014,[.86,.52,.34],a+1.57); } }
-    for (let i=0;i<6;i++){ const a=i/6*6.283; const x=ex.x+Math.cos(a)*.047, z=ex.z+Math.sin(a)*.047;                              // gardens between pavilions
-      addDisc(x,G+.005,z,.008,[.46,.72,.38],10); addTree(x,z,.22,[.24,.58,.30]); }
+    // Six distinct pavilions round the plaza, ring canopy, spire, shaded walks and planting. Pavilions sit at 30° + 60°k,
+    // so the marker pad (south-east, 45°) falls in the gap between two of them.
+    addModel('RUH_Expo2030',ex.x,ex.z,2*(R0-.012),{hk:1.6});
     addStrip([ex.x-.012,ex.z-R0],[ks.x-.012,ks.z+ks.foot],.004,G+.006,[.90,.84,.66]);                                           // footpath to the airport
   }
   // King Salman International Airport: broad and low — two long runways with centre lines and thresholds, a parallel
@@ -532,13 +541,14 @@
       for (const e of [-1,1]) for (let k=-2;k<=2;k++) addBox(ks.x+e*(L-.008),G+.0062,ks.z+dz+k*.004,.01,.0008,.002,white); }   // threshold bars
     addStrip([ks.x-.1,ks.z+.012],[ks.x+.1,ks.z+.012],.0045,G+.0055,taxi);                                    // parallel taxiway
     for (const t of [-.085,-.03,.03,.085]) { addStrip([ks.x+t,ks.z-.075],[ks.x+t,ks.z+.012],.003,G+.0056,taxi); addStrip([ks.x+t,ks.z+.012],[ks.x+t,ks.z+.03],.003,G+.0056,taxi); }
-    addBox(ks.x,G+.002,ks.z+.042,.17,.004,.03,apron);                                                          // apron
-    addBox(ks.x,G,ks.z+.068,.13,.014,.02,[.90,.92,.94]); addBox(ks.x,G+.014,ks.z+.068,.134,.004,.024,[.55,.72,.86]);   // terminal, blue roof
-    for (const t of [-.045,-.015,.015,.045]) addBox(ks.x+t,G,ks.z+.047,.008,.008,.022,[.92,.93,.95]);         // piers to the apron
-    addCylinder(ks.x+.075,G,ks.z+.06,.004,.05,[.90,.90,.92],8); addCylinder(ks.x+.075,G+.05,ks.z+.06,.009,.008,[.45,.62,.74],10);   // control tower
-    const plane=(x,z,rot,k=1)=>{ addBox(x,G+.006,z,.024*k,.004,.005*k,white,rot); addBox(x,G+.007,z,.006*k,.002,.03*k,white,rot); addBox(x+Math.cos(rot)*.011*k,G+.008,z+Math.sin(rot)*.011*k,.003*k,.006,.011*k,white,rot); };
-    for (const t of [-.045,-.015,.015,.045]) plane(ks.x+t,ks.z+.03,Math.PI/2,.85);                              // parked at the piers
-    plane(ks.x-.05,ks.z-.075,0,1.1);                                                                            // one on the runway
+    // Terminal with its vaulted roof bays, concourse and apron (the model's airside faces north, toward the runways),
+    // a separate control tower and parked jets sharing one scale. The terminal stays south of the parallel taxiway.
+    const kT=modelK('RUH_Airport_Terminal',.11);
+    addModel('RUH_Airport_Terminal',ks.x-.01,ks.z+.046,0,{k:kT,hk:1.8});
+    addModel('RUH_Airport_ControlTower',ks.x+.078,ks.z+.05,0,{k:kT,hk:1.8});
+    const jet=(x,z,rot)=>addModel('RUH_Aircraft_Parked',x,z,0,{k:kT*1.8,rot,hk:1.4,y:G+.0045});
+    for (const t of [-.045,-.015,.015,.045]) jet(ks.x+t,ks.z+.004,-Math.PI/2);                                   // parked on the apron, nose to the concourse
+    jet(ks.x-.05,ks.z-.075,0);                                                                                  // one on the runway
     const me=LY.METRO_ROUTE[LY.METRO_ROUTE.length-1]; addBox(me[0],G,me[1],.02,.012,.012,[.95,.96,.98]); addBox(me[0],G+.012,me[1],.022,.003,.014,[.20,.42,.82]);   // Metro terminal stop
   }
   // King Salman Park: a bounded, designed landscape beside downtown — hedge edge, lawns in two greens, an irregular lake
@@ -552,7 +562,9 @@
     lineTarget=lines; const loop=[]; for (let i=0;i<=40;i++){ const a=i/40*6.283, r=.07+.012*Math.sin(a*3); loop.push([pk.x+Math.cos(a)*r,pk.z+Math.sin(a)*r*.9]); }
     polyStrip(loop,.0025,G+.006,[.93,.87,.70]);                                                                          // loop path
     polyStrip([[pk.x-.09,pk.z+.01],[pk.x-.04,pk.z+.005],[pk.x,pk.z-.01],[pk.x+.03,pk.z-.05],[pk.x+.05,pk.z-.075]],.002,G+.006,[.93,.87,.70]);   // cross path
-    addCylinder(pk.x-.045,G,pk.z+.035,.012,.006,[.96,.95,.92],14); addDome(pk.x-.045,G+.006,pk.z+.035,.011,[.97,.97,.95]);   // pavilion
+    addModel('RUH_Park_CulturalPavilion',pk.x-.045,pk.z+.032,.026,{hk:1.5});                                         // cultural pavilion
+    addModel('RUH_Park_GardenPavilion',pk.x+.045,pk.z-.035,.024,{hk:1.4});                                            // garden pavilion
+    addModel('RUH_Park_WaterFeature',pk.x-.035,pk.z-.035,.014,{hk:1.5});                                              // water feature
     const clumps=[[-.055,-.05],[.0,-.075],[.06,-.055],[.075,.02],[.05,.07],[-.03,.075],[-.08,.02]];
     for (const [cx,cz] of clumps) for (let i=0;i<5;i++){ const x=pk.x+cx+(rn()-.5)*.03, z=pk.z+cz+(rn()-.5)*.025;
       if (Math.hypot(x-pk.x,z-pk.z) > R0-.008 || Math.hypot(x-pk.pad[0],z-pk.pad[1]) < .035) continue; addTree(x,z,.3+rn()*.22,[.18+rn()*.1,.50+rn()*.16,.24]); }
@@ -582,45 +594,44 @@
     riyadhDowntown(ry, rn);
     // Riyadh Metro: a broad curved canopy over King Fahd Road; blue rails around King Salman Park and north to the airport.
     const mt=P('metro'); addDisc(mt.x,G+.003,mt.z,.056,[.86,.84,.80],22);
-    for (let i=0;i<=12;i++){ const a=Math.PI*i/12, x=mt.x+Math.cos(a)*.048, z=mt.z-.004+Math.sin(a)*.012; addBox(x,G+.026+Math.sin(a)*.006,z,.011,.005,.034,[.95,.97,.99]); }
-    for (const dx of [-.046,.046]) addBox(mt.x+dx,G,mt.z,.005,.026,.03,[.78,.80,.86]);
+    addModel('RUH_MetroStation',mt.x,mt.z-.004,fitFoot(mt,1.6),{hk:1.6});                               // vaulted elevated station (narrow plan, so wider than the pad square)
     const MR=LY.METRO_ROUTE; polyStrip(MR,.0075,G+.008,[.93,.94,.96]); polyStrip(MR,.0055,G+.009,[.14,.30,.66]);          // trackbed with white edges
     for (const q of MR.slice(1,-1)) { addDisc(q[0],G+.008,q[1],.0075,[.93,.94,.96],12); addDisc(q[0],G+.009,q[1],.0055,[.14,.30,.66],12); }   // smooth bends
     lineTarget=lines; polyLine(MR,G+.0105,[.50,.80,1],.0022); polyLine(MR,G+.0105,[.50,.80,1],-.0022);
     for (const q of [MR[2], MR[5]]) { addBox(q[0],G,q[1],.02,.011,.012,[.95,.96,.98]); addBox(q[0],G+.011,q[1],.024,.003,.016,[.20,.42,.82]); }   // intermediate stations
+    { const a=MR[3], b=MR[4]; addModel('RUH_MetroTrain',(a[0]+b[0])/2,(a[1]+b[1])/2,.05,{rot:Math.atan2(b[1]-a[1],b[0]-a[0]),hk:1.4,y:G+.009}); }   // a train on the line
     const pk=P('park'); riyadhPark(pk, ry, rn);
     // New Murabba: one monumental gold cube in a landscaped square, low buildings around it, clear space on every side.
     const mu=P('newmurabba'); keepOut.push([mu.x,mu.z,mu.foot]); addBox(mu.x,G+.002,mu.z,.15,.004,.15,[.62,.78,.48]); addBox(mu.x,G+.003,mu.z,.11,.004,.11,[.90,.86,.74]);
-    addBox(mu.x,G,mu.z-.006,.084,.084,.084,[.88,.62,.20]); addBox(mu.x,G+.084,mu.z-.006,.086,.004,.086,[.99,.84,.40]);
-    for (let k=1;k<4;k++) addBox(mu.x,G+k*.021,mu.z-.006+.0425,.086,.002,.002,[.99,.86,.46]);                // facade bands facing the camera
+    addModel('RUH_Mukaab',mu.x,mu.z-.006,.086);                                                                 // the Mukaab: bronze cube behind a gold lattice
     for (let i=0;i<8;i++){ const a=i/8*6.283+.39; addBox(mu.x+Math.cos(a)*.086,G,mu.z+Math.sin(a)*.086,.018,.012,.018,[.93,.88,.76]); }
     // ROSHN: orderly low cream homes on shaded streets with planted avenues — far lower than the Mukaab and downtown.
     const rs=P('roshn'); keepOut.push([rs.x,rs.z,rs.foot]);
-    for (let i=-2;i<=2;i++) for (let j=-2;j<=2;j++){ const x=rs.x+i*.03, z=rs.z+j*.03; if (Math.hypot(x-rs.x,z-rs.z)>.072 || Math.hypot(x-rs.pad[0],z-rs.pad[1])<.04) continue; addHouse(x,z,.32,[.96,.90,.74]); }
-    for (let i=-2;i<=2;i++){ addTree(rs.x+i*.03,rs.z-.015,.28,[.24,.60,.30]); }
+    addModel('RUH_ROSHN_Cluster',rs.x,rs.z-.012,fitFoot(rs),{hk:1.8});                                          // homes, courtyards, shaded streets
     const ks=P('ksip'); riyadhAirport(ks);
     riyadhExpo(rn, ks);
     // Diriyah: compact warm-earth heritage blocks and courtyards beside the wadi, an escarpment behind King Khalid Road.
     const dr=P('diriyah'); keepOut.push([dr.x,dr.z,dr.foot]);
-    for (const [dx,dz,w,h] of [[0,0,.04,.035],[-.035,.012,.028,.028],[.034,.018,.03,.04],[-.018,-.036,.034,.026],[.03,-.03,.026,.03],[-.05,-.02,.02,.022],[.01,.042,.03,.024],[.052,-.004,.018,.03]])
-      addBox(dr.x+dx,G,dr.z+dz,w,h,w*.9,[.72+rn()*.06,.47,.27]);
+    addModel('RUH_Diriyah_AtTuraif',dr.x,dr.z-.01,fitFoot(dr,1.15),{hk:1.6});                                      // At-Turaif on its plateau; the escarpment (+x) faces the wadi
     polyStrip(LY.WADI,.022,G+.004,[.46,.70,.38]); polyStrip(LY.WADI,.009,G+.006,[.28,.60,.80]);
     { const prev=target; target=detailMesh; const W2=LY.WADI; for (let i=1;i<W2.length;i++){ const a=W2[i-1], b=W2[i], L=Math.hypot(b[0]-a[0],b[1]-a[1]), nx=-(b[1]-a[1])/L, nz=(b[0]-a[0])/L;
         for (let t=.02;t<L;t+=.045) for (const s2 of [-1,1]) { const x=a[0]+(b[0]-a[0])*t/L+nx*.04*s2, z=a[1]+(b[1]-a[1])*t/L+nz*.04*s2; if (LY.decorAllowed(x,z,.03,.045,true)) addPalm(x,z,.5+rn()*.2); } } target=prev; }
     for (let z=-.85; z<=.12; z+=.07) { const x=ry.x-.79+Math.sin(z*7)*.015, zz=ry.z+z; if (LY.roadDist(x,zz) < .05) continue; addMound(x,zz,.05,.04,.045+rn()*.03,rn(),[.80,.56,.36],7); }
     // Sports Boulevard: one continuous planted ribbon with walking and cycling paths, a bridge over King Fahd Road and activity areas.
     const sp=P('sports'); polyStrip(sp.ribbon.pts,.026,G+.005,[.44,.72,.36]); lineTarget=lines; polyLine(sp.ribbon.pts,G+.008,[.93,.86,.66],.008); polyLine(sp.ribbon.pts,G+.008,[.86,.62,.52],-.008);
-    ownRibbonTrees(sp,.035,.02,.32); addBox(ry.x,G+.012,sp.ribbon.pts[2][1],.03,.004,.05,[.90,.88,.84]);
-    for (const t of [-.32,.12,.32]) addDisc(ry.x+t,G+.007,sp.ribbon.pts[0][1],.012,[.94,.52,.34],12);
+    ownRibbonTrees(sp,.035,.02,.32);
+    addModel('RUH_Sports_CycleBridge',ry.x,sp.ribbon.pts[2][1],.06,{hk:1.6});                                       // cycle bridge over King Fahd Road
+    addModel('RUH_Sports_ExercisePavilion',ry.x-.32,sp.ribbon.pts[0][1],.016,{hk:1.8});
+    addModel('RUH_Sports_Court',ry.x+.12,sp.ribbon.pts[0][1],.022,{hk:1.8});
+    addModel('RUH_Sports_ExercisePavilion',ry.x+.32,sp.ribbon.pts[0][1],.016,{hk:1.8,rot:Math.PI});
     // Renewables: ordered solar rows and slim turbines on the outer north-west, with modest service tracks.
-    const re=P('renewables'); keepOut.push([re.x,re.z,re.foot]); addSolar(re.x-.018,re.z-.005,6,4,.026); for (let i=0;i<3;i++) addTurbine(re.x+.066,re.z-.045+i*.04,.55);
+    const re=P('renewables'); keepOut.push([re.x,re.z,re.foot]);
+    for (let i=0;i<5;i++) for (let j=0;j<4;j++) addModel('RUH_SolarUnit',re.x-.068+i*.025,re.z-.05+j*.022,.024,{hk:2});   // repeated solar units
+    for (let i=0;i<3;i++) addTurbine(re.x+.066,re.z-.045+i*.04,.55);
     addLine([re.x-.09,G+.006,re.z+.045],[re.x+.09,G+.006,re.z+.045],[.86,.78,.60]); addLine([re.x+.045,G+.006,re.z-.07],[re.x+.045,G+.006,re.z+.07],[.86,.78,.60]);
     // Qiddiya: entertainment on stepped rocky terraces beyond the Tuwaiq cliffs.
     const qd=P('qiddiya'); keepOut.push([qd.x,qd.z,qd.foot]);
-    addCylinder(qd.x,G,qd.z,.09,.012,[.80,.56,.36],18); addCylinder(qd.x-.01,G+.012,qd.z-.01,.066,.016,[.84,.60,.38],16); addCylinder(qd.x-.02,G+.028,qd.z-.02,.04,.012,[.88,.64,.40],14);
-    addCylinder(qd.x-.02,G+.04,qd.z-.02,.026,.018,[.91,.37,.24],16);
-    for (let i=1;i<18;i++){ const f=j=>[qd.x+.035+Math.cos(j/17*6.283)*.028,G+.02+Math.sin(j/17*6.283*2)*.02+.02,qd.z+.03+Math.sin(j/17*6.283)*.02]; addLine(f(i-1),f(i),[.92,.25,.62]); }
-    addBox(qd.x+.05,G+.012,qd.z-.04,.02,.016,.02,[.95,.86,.52]); addBox(qd.x-.055,G+.012,qd.z+.03,.02,.014,.02,[.62,.72,.95]);
+    addModel('RUH_Qiddiya',qd.x,qd.z-.012,fitFoot(qd,1.25),{hk:1.3});                                             // stepped rock base, coaster, loop, venues
     // Tuwaiq escarpment: stepped cliffs between the city and Qiddiya (kept off roads and footprints).
     { const RG=LY.RIDGES; for (let i=1;i<RG.length;i++){ const a=RG[i-1], b=RG[i], L=Math.hypot(b[0]-a[0],b[1]-a[1]), rot=Math.atan2(b[1]-a[1],b[0]-a[0]);
         for (let t=0;t<L;t+=.045){ const x=a[0]+(b[0]-a[0])*t/L, z=a[1]+(b[1]-a[1])*t/L; for (const [o,h] of [[0,.05],[.04,.034],[.08,.018]]) { const xx=x+Math.sin(rot)*o, zz=z-Math.cos(rot)*o;   // stepped terraces, highest on the city side
@@ -681,7 +692,9 @@
     addBox(x, SEA, z, L, .016, L * .22, col, rot); addBox(x, SEA + .016, z, L * .96, .003, L * .2, [.94, .94, .92], rot);
     addBox(x - cs * L * .38, SEA + .019, z - sn * L * .38, L * .14, .016, L * .16, [.97, .97, .96], rot);
     for (let i = 0; i < 4; i++) { const o = -L * .2 + i * L * .13; addBox(x + cs * o, SEA + .019, z + sn * o, L * .11, .008, L * .15, [[.22,.48,.78],[.86,.30,.26],[.95,.72,.22],[.30,.62,.42]][i % 4], rot); } };
-  const boat = (x, z, rot, k = 1) => { addBox(x, SEA, z, .014 * k, .005, .005 * k, [.97, .97, .96], rot); addBox(x, SEA + .005, z, .006 * k, .004, .004 * k, [.85, .90, .95], rot); };
+  // Marina craft: the shared yacht and workboat models (alternating by position), hull down to the waterline.
+  const boat = (x, z, rot, k = 1) => { const yacht = ((x * 997 + z * 613) % 1 + 1) % 1 < .7;
+    if (!addModel(yacht ? 'SHR_Yacht' : 'SHR_Workboat', x, z, (yacht ? .014 : .01) * k, {rot, y:SEA + .002, hk:1.6})) { addBox(x, SEA, z, .014 * k, .005, .005 * k, [.97, .97, .96], rot); addBox(x, SEA + .005, z, .006 * k, .004, .004 * k, [.85, .90, .95], rot); } };
   const pier = (a, b) => addStrip(a, b, .0025, SEA + .012, [.86, .76, .58]);
   const marina = (x, z, rot, n, rn) => { const cs = Math.cos(rot), sn = Math.sin(rot);
     for (let i = 0; i < n; i++) { const o = (i - (n - 1) / 2) * .016, px = x - sn * o, pz = z + cs * o; pier([px, pz], [px + cs * .04, pz + sn * .04]);
@@ -722,47 +735,54 @@
     // Jubail: planned industrial parcels (factories, tank farms, stacks) and its cargo port with gantry cranes and ships.
     const jb = P1('eastern'); keepOut.push([jb.x, jb.z, jb.foot]);
     addDisc(jb.x, G + .003, jb.z, jb.foot - .004, [.82, .78, .70], 28);
-    for (const [dx, dz] of [[-.045, -.035], [-.045, .01], [-.015, .045], [.02, .03]]) { factory(jb.x + dx, jb.z + dz, .026, .018, .012, [.84, .84, .86]); stack(jb.x + dx + .014, jb.z + dz - .006, .05); }
-    for (const [dx, dz] of [[-.01, -.05], [.012, -.052], [-.01, -.028], [.012, -.03], [-.035, -.06]]) tank(jb.x + dx, jb.z + dz, .0095, .012);
-    lineTarget = lines; for (const dz of [-.012, .0]) addLine([jb.x - .06, G + .012, jb.z + dz], [jb.x + .02, G + .012, jb.z + dz], [.62, .64, .66]);   // pipe racks
-    const cE = RG_coast('east', jb.z);                                    // port on the Gulf shore
-    quay([cE - .012, jb.z - .015], [cE + .07, jb.z - .015], .012); quay([cE - .012, jb.z + .03], [cE + .06, jb.z + .03], .01);
-    for (let i = 0; i < 3; i++) gantry(cE + .015 + i * .02, jb.z - .004, 0);
-    containers(cE + .03, jb.z - .026, 5, 0, rn); ship(cE + .1, jb.z - .045, .05, .07, [.78, .22, .22], rn); ship(cE + .13, jb.z + .06, -.2, .06, [.25, .35, .55], rn);
+    // Three smaller industrial modules (tank farm, processing unit, factory halls) instead of one enormous complex.
+    const kJ = modelK('EP_Jubail_Processing', .052);
+    addModel('EP_Jubail_TankFarm', jb.x - .03, jb.z - .04, 0, {k:kJ, hk:1.8});
+    addModel('EP_Jubail_Processing', jb.x - .035, jb.z + .02, 0, {k:kJ, hk:1.5});
+    addModel('EP_Jubail_Factories', jb.x + .03, jb.z - .005, 0, {k:kJ, hk:1.8});
+    const cE = RG_coast('east', jb.z);                                    // port on the Gulf shore: quay deck out over the water, sea side east
+    quay([cE - .012, jb.z - .015], [cE + .05, jb.z - .015], .022);
+    addModel('EP_Jubail_Port', cE + .02, jb.z - .015, .06, {rot:Math.PI / 2, hk:1.6, y:G - .003});
+    ship(cE + .1, jb.z - .045, .05, .07, [.78, .22, .22], rn); ship(cE + .13, jb.z + .06, -.2, .06, [.25, .35, .55], rn);
     // Al Qatif and Tarout: dense heritage fabric, palms, a waterfront and shallow-water islands.
     const qt = PLv('qatif'); keepOut.push([qt.x, qt.z, qt.r]);
-    heritage(qt.x, qt.z, qt.r - .008, 26, rn, (x, z) => onLand(x, z) && inCircle(qt.x, qt.z, qt.r - .006)(x, z));
-    addCylinder(qt.x - .012, G, qt.z - .01, .004, .045, [.95, .92, .84], 8); addDome(qt.x + .006, G, qt.z - .01, .01, [.95, .95, .92]);
+    addModel('EP_Qatif_Waterfront', qt.x - .006, qt.z, 2 * qt.r - .02, {rot:Math.PI / 2, hk:2});   // low warm facades, souq stalls, palm promenade facing the Gulf
     palmGrove(qt.x - .02, qt.z + .05, .05, 16, rn);
-    const tr = P.isles[0]; const ty = island(tr[0], tr[1], tr[2]); for (let i = 0; i < 5; i++) villa(tr[0] - .01 + (i % 3) * .01, tr[1] - .008 + Math.floor(i / 3) * .012, ty, 0, [.86, .74, .56]); islePalm(tr[0] + .014, tr[1] + .01, ty);
+    const tr = P.isles[0]; const ty = island(tr[0], tr[1], tr[2]); addModel('EP_TaroutCastle', tr[0], tr[1], 1.3 * tr[2], {y:ty, hk:1.4}); islePalm(tr[0] + .014, tr[1] + .012, ty);
     for (const [x, z, r] of P.isles.slice(1, 3)) { const y = island(x, z, r); islePalm(x, z, y, .8); }
     for (let i = 0; i < 3; i++) boat(qt.x + .09 + i * .012, qt.z + .02, .4, .8);
     // Dammam: a modest skyline on a curved corniche, and King Abdulaziz Port kept apart from the centre.
     const dm = PLv('dammam'); keepOut.push([dm.x, dm.z, dm.r]);
-    skyline(dm.x - .006, dm.z, dm.r - .01, 14, .12, rn, (x, z) => onLand(x, z) && inCircle(dm.x, dm.z, dm.r - .008)(x, z));
+    { const kit = ['EP_Dammam_GlassOffice', 'EP_Dammam_Civic', 'EP_Dammam_Commercial', 'EP_Dammam_MidriseBlock'], kD = modelK('EP_Dammam_Civic', .018);   // reusable city kit, varied
+      scatterIn(dm.x - .006, dm.z, dm.r - .016, 12, rn, (x, z, n) => { const nm = kit[n % 4], d = Math.hypot(x - dm.x, z - dm.z) / dm.r;
+        addModel(nm, x, z, 0, {k:kD, rot:Math.round(rn() * 3) * Math.PI / 2, hk:nm === 'EP_Dammam_GlassOffice' ? 1.4 + (1 - d) : 1.6}); },
+        (x, z) => onLand(x, z) && inCircle(dm.x, dm.z, dm.r - .012)(x, z) && RG_coast('east', z) - x > .012); }
     { const pts = []; for (let i = 0; i <= 12; i++) { const z = dm.z - .03 + i * .01; pts.push([RG_coast('east', z) - .006 - Math.sin(i / 12 * Math.PI) * .012, z]); } polyStrip(pts, .003, G + .006, [.93, .86, .66]); for (const q of pts.filter((_, i) => i % 2)) addPalm(q[0] - .008, q[1], .32); }
     const dp = LY.MISSION_SITES['east:dport'], cD = RG_coast('east', dp[1]);
-    quay([cD - .01, dp[1]], [cD + .09, dp[1]], .014); quay([cD + .085, dp[1] - .02], [cD + .085, dp[1] + .04], .008);
-    for (let i = 0; i < 4; i++) gantry(cD + .02 + i * .018, dp[1] - .015, 0); containers(cD + .04, dp[1] + .008, 7, 0, rn);
+    quay([cD - .01, dp[1]], [cD + .05, dp[1]], .02);                                     // cargo terminal on the shared crane/container kit
+    addModel('EP_Dammam_CargoPort', cD + .02, dp[1], .05, {rot:Math.PI / 2, hk:1.6, y:G - .003});
     ship(cD + .06, dp[1] - .04, 0, .075, [.82, .26, .22], rn); ship(cD + .13, dp[1] + .075, .5, .06, [.22, .30, .50], rn);
     // Dhahran: a landscaped knowledge and energy campus — low modern buildings around plazas and a domed hall.
     const dh = PLv('dhahran'); keepOut.push([dh.x, dh.z, dh.r]);
     addDisc(dh.x, G + .003, dh.z, dh.r - .004, [.58, .76, .46], 28); addDisc(dh.x, G + .004, dh.z, .018, [.92, .90, .84], 16);
-    addCylinder(dh.x, G, dh.z, .012, .008, [.95, .96, .97], 16); addDome(dh.x, G + .008, dh.z, .011, [.78, .88, .94]);
-    for (let i = 0; i < 7; i++) { const a = i / 7 * 6.283 + .3, x = dh.x + Math.cos(a) * .038, z = dh.z + Math.sin(a) * .036; addBox(x, G, z, .018, .008 + (i % 3) * .003, .011, [.93, .92, .88], a); addBox(x, G + .011 + (i % 3) * .003, z, .016, .002, .009, [.40, .58, .70], a); }
-    treeGrove(dh.x, dh.z, dh.r - .006, 14, rn, (x, z) => Math.hypot(x - dh.x, z - dh.z) > .022 && Math.hypot(x - dh.x, z - dh.z) < dh.r - .008);
+    addModel('EP_Dhahran_Campus', dh.x, dh.z, 2 * dh.r - .016, {hk:1.4});                  // spaced courtyard buildings, covered walks, central tower
     // Al Khobar: waterfront skyline, promenade, marina — and the King Fahd Causeway heading out over the Gulf.
     const kh = PLv('khobar'); keepOut.push([kh.x, kh.z, kh.r]);
-    skyline(kh.x - .008, kh.z, kh.r - .01, 11, .1, rn, (x, z) => onLand(x, z) && inCircle(kh.x, kh.z, kh.r - .008)(x, z) && RG_coast('east', z) - x > .012);
-    { const pts = []; for (let i = 0; i <= 8; i++) { const z = kh.z - .045 + i * .012; pts.push([RG_coast('east', z) - .005, z]); } polyStrip(pts, .0028, G + .006, [.93, .86, .66]); }
-    marina(RG_coast('east', kh.z + .025) + .004, kh.z + .025, 0, 3, rn);
-    const bh = [LY.PLANS.east.roads.find(r => r.id === 'eCauseway').pts]; for (const q of [bh[0][1]]) { const y = island(q[0], q[1], .01, false); addBox(q[0], y, q[1], .01, .008, .008, [.95, .95, .95]); }
+    // Towers behind a curved marina edge (the model's basin opens to +y, turned to face the Gulf).
+    { const cK = RG_coast('east', kh.z); addModel('EP_Khobar_Waterfront', Math.min(kh.x, cK - .046), kh.z - .006, 2 * kh.r - .018, {rot:Math.PI / 2, hk:1.3}); }
+    // King Fahd Causeway: the route itself is drawn by buildPlanNetworks(); the mid-way island carries the checkpoint group,
+    // and the repeatable low span model is laid along each causeway segment over the water.
+    const cw = LY.PLANS.east.roads.find(r => r.id === 'eCauseway').pts;
+    { const q = cw[1]; const y = island(q[0], q[1], .014, false); addModel('EP_Causeway_Checkpoint', q[0], q[1], .026, {y, hk:1.4}); }
+    for (let i = 1; i < cw.length; i++) { const a = cw[i - 1], b = cw[i], L = Math.hypot(b[0] - a[0], b[1] - a[1]), rot = Math.atan2(b[1] - a[1], b[0] - a[0]), n = Math.max(1, Math.round(L / .012));
+      for (let k = 0; k < n; k++) { const t = (k + .5) / n; addModel('EP_Causeway_Span', a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, L / n, {rot, hk:2.2, y:SEA + .034 - 8.5 * (L / n / 100) * 2.2}); } }
     // Al Ahsa / Hofuf: a broad palm oasis with irrigation channels, heritage town and the rail station.
     const gr = P1('green'); keepOut.push([gr.x, gr.z, gr.foot]);
     addDisc(gr.x, G + .003, gr.z, gr.foot - .004, [.54, .70, .38], 30);
-    lineTarget = lines; for (let k = -2; k <= 2; k++) { const z = gr.z + k * .03, pts = []; for (let i = 0; i <= 10; i++) { const x = gr.x - .08 + i * .016; if (Math.hypot(x - gr.x, z - gr.z) < gr.foot - .01) pts.push([x, z + Math.sin(i * .9 + k) * .004]); } if (pts.length > 1) polyStrip(pts, .002, G + .0045, [.30, .62, .82]); }
-    palmGrove(gr.x, gr.z, gr.foot - .012, 70, rn, (x, z) => Math.hypot(x - gr.x, z - gr.z) < gr.foot - .01 && Math.hypot(x - gr.pad[0], z - gr.pad[1]) > .03);
-    const hf = PLv('hofuf'); keepOut.push([hf.x, hf.z, hf.r]); heritage(hf.x, hf.z, hf.r - .005, 16, rn, inCircle(hf.x, hf.z, hf.r - .004));
+    addModel('EP_AlAhsa_Oasis', gr.x, gr.z - .012, fitFoot(gr, 1.2), {hk:1.4});            // dense date-palm grove, irrigation channels, spring, mud houses
+    { const prev = target; target = detailMesh; scatterIn(gr.x, gr.z, gr.foot - .008, 14, rn, (x, z, n) => addModel(n % 3 ? 'EP_DatePalm_Tall' : 'EP_DatePalm_Young', x, z, .006, {hk:1.3}),   // stand-alone palms at the grove edge
+        (x, z) => { const d = Math.hypot(x - gr.x, z - gr.z); return d > fitFoot(gr, 1.2) * .72 && d < gr.foot - .006 && Math.hypot(x - gr.pad[0], z - gr.pad[1]) > .03; }); target = prev; }
+    const hf = PLv('hofuf'); keepOut.push([hf.x, hf.z, hf.r]); addModel('EP_Hofuf_HeritageCore', hf.x - .004, hf.z - .004, 2 * hf.r - .018, {hk:1.6});
     addCylinder(hf.x + .01, G, hf.z - .01, .0035, .04, [.92, .84, .66], 8); station(hf.x - .012, hf.z + .028, 0);
     station(2.07, -1.125, -.6);                                                         // Dammam rail station
     // King Fahd International Airport (inland of Dammam) and inland desert hills on the west edge.
@@ -785,64 +805,86 @@
     // Madinah: a calm, spacious city around the Prophet's Mosque — white arcades, green dome, minarets, open courtyards.
     const md = PLv('madinah'); keepOut.push([md.x, md.z, md.r]);
     addDisc(md.x, G + .003, md.z, md.r - .002, [.95, .94, .90], 28);
-    addBox(md.x, G, md.z, .06, .012, .044, [.97, .96, .92]); addBox(md.x, G + .012, md.z, .062, .002, .046, [.88, .86, .80]);
-    addDisc(md.x - .008, G + .0142, md.z, .012, [.92, .90, .84], 14);
-    addDome(md.x + .018, G + .014, md.z - .01, .0085, [.20, .60, .34]);
-    for (const [dx, dz] of [[-.03, -.022], [.03, -.022], [-.03, .022], [.03, .022], [0, -.024], [0, .024]]) { addCylinder(md.x + dx, G, md.z + dz, .0028, .05, [.97, .96, .92], 8); addCone(md.x + dx, G + .05, md.z + dz, .0035, .01, [.86, .76, .44], 8); }
-    fabric(md.x, md.z, .15, 34, rn, [[.97,.94,.88],[.94,.90,.82],[.90,.86,.78]], (x, z) => openAt(x, z, .012) && Math.hypot(x - md.x, z - md.z) > md.r + .012);
+    // The Prophet's Mosque (simplified massing: courtyards, minarets, green dome; qibla to the south) on an uncluttered plaza,
+    // with quiet light-stone city blocks around it that never compete with it.
+    addModel('WC_ProphetsMosque', md.x, md.z, 2 * md.r - .01, {hk:1.25});
+    { const prev = target; target = detailMesh; scatterIn(md.x, md.z, .15, 16, rn, (x, z) => addModel('WC_Madinah_Block', x, z, .022, {hk:1.5}),
+        (x, z) => openAt(x, z, .016) && Math.hypot(x - md.x, z - md.z) > md.r + .016); target = prev; }
     // Rua Al Madinah: hospitality and public space immediately east of the mosque, inside the city.
     const ru = P1('madinah'); keepOut.push([ru.x, ru.z, ru.foot]);
     addDisc(ru.x, G + .003, ru.z, ru.foot - .003, [.90, .88, .82], 22);
-    for (const [dx, dz, h] of [[-.018, -.016, .03], [.0, -.02, .04], [.018, -.012, .034], [-.016, .016, .026], [.016, .018, .03]]) addTower(ru.x + dx, ru.z + dz, .012, h, [.93, .90, .84], null);
-    addStrip([ru.x - .034, ru.z], [ru.x + .034, ru.z], .004, G + .005, [.60, .78, .52]);
+    addModel('WC_RuaAlMadinah', ru.x, ru.z - .006, 2 * ru.foot - .022, {hk:1.6});          // warm-stone hospitality blocks, planted courtyards, passages
     // KAEC / Ceer: a planned economic-city parcel — port, logistics and the Ceer EV campus with its test track.
     const ce = P1('ceer'); keepOut.push([ce.x, ce.z, ce.foot]); const cK = RG_coast('west', ce.z);
     addDisc(ce.x + .006, G + .003, ce.z, ce.foot - .01, [.84, .84, .80], 24);
-    quay([cK + .012, ce.z - .03], [cK - .06, ce.z - .03], .012); quay([cK - .058, ce.z - .03], [cK - .058, ce.z + .02], .006);
-    for (let i = 0; i < 3; i++) gantry(cK - .015 - i * .018, ce.z - .018, Math.PI); ship(cK - .045, ce.z - .06, 0, .06, [.30, .40, .60], rn);
-    factory(ce.x + .012, ce.z - .018, .04, .022, .012, [.88, .90, .92]); addSolar(ce.x + .012, ce.z - .018, 4, 2, .01);
-    factory(ce.x + .02, ce.z + .012, .03, .018, .01, [.90, .90, .92]);
-    { const cx = ce.x + .01, cz = ce.z + .038, pts = []; for (let i = 0; i <= 24; i++) { const a = i / 24 * 6.283; pts.push([cx + Math.cos(a) * .022, cz + Math.sin(a) * .009]); } polyStrip(pts, .0025, G + .005, [.36, .37, .40]); }
+    // KAEC: its compact port on the Red Sea (sea side west), the planned waterfront district north of it, and the Ceer campus.
+    quay([cK + .012, ce.z - .03], [cK - .05, ce.z - .03], .02);
+    addModel('WC_KAEC_Port', cK - .015, ce.z - .03, .042, {rot:-Math.PI / 2, hk:1.6, y:G - .003}); ship(cK - .06, ce.z - .06, 0, .06, [.30, .40, .60], rn);
+    { const zW = ce.z - ce.foot - .03, xW = RG_coast('west', zW) + .03; if (!LY.footprintAt(xW, zW)) addModel('WC_KAEC_Waterfront', xW, zW, .045, {rot:-Math.PI / 2, hk:1.6}); }
+    addModel('WC_Ceer_Facility', ce.x + .016, ce.z - .006, .056, {hk:1.6});
     // Electric Vehicle Manufacturing: the neighbouring KAEC plant (long assembly halls, solar roofs).
     const lu = P1('lucid'); keepOut.push([lu.x, lu.z, lu.foot]);
     addDisc(lu.x, G + .003, lu.z, lu.foot - .004, [.84, .84, .80], 20); factory(lu.x, lu.z - .008, .05, .018, .011, [.90, .91, .93]); addSolar(lu.x, lu.z - .008, 5, 2, .009); factory(lu.x + .004, lu.z + .018, .036, .012, .008, [.86, .88, .90]);
     // Jeddah: corniche, contemporary skyline, maritime activity; Jeddah Central waterfront; Al Balad heritage; the port.
     const jd = PLv('jeddah'); keepOut.push([jd.x, jd.z, jd.r]);
     skyline(jd.x + .004, jd.z, jd.r - .008, 18, .2, rn, (x, z) => onLand(x, z) && inCircle(jd.x, jd.z, jd.r - .006)(x, z) && x - RG_coast('west', z) > .012);
-    addBox(jd.x - .01, G, jd.z - .018, .012, .17, .012, [.62, .78, .86]); addCone(jd.x - .01, G + .17, jd.z - .018, .005, .04, [.80, .86, .90], 6);   // Jeddah Tower
-    { const pts = []; for (let i = 0; i <= 14; i++) { const z = jd.z - .09 + i * .013; pts.push([RG_coast('west', z) + .006, z]); } polyStrip(pts, .003, G + .006, [.93, .86, .66]); for (const q of pts.filter((_, i) => i % 3 === 0)) addPalm(q[0] + .008, q[1], .3); }
+    addModel('WC_JeddahTower', jd.x - .01, jd.z - .018, .02, {hk:1.3});                    // three-winged tapering tower, ~1 km
+    // Corniche: promenade with its separate modules (landscaped plaza, sculptural canopy, seaside pavilion), facing the sea.
+    { const pts = []; for (let i = 0; i <= 14; i++) { const z = jd.z - .09 + i * .013; pts.push([RG_coast('west', z) + .006, z]); } polyStrip(pts, .003, G + .006, [.93, .86, .66]);
+      const mods = [['WC_Corniche_Plaza', .012], ['WC_Corniche_Canopy', .009], ['WC_Corniche_Pavilion', .006]];
+      pts.forEach((q, i) => { if (i % 3) return; const [nm, s] = mods[(i / 3) % 3]; addModel(nm, q[0] + .009, q[1], s, {rot:-Math.PI / 2, hk:1.8}); }); }
     addCylinder(RG_coast('west', jd.z - .05) - .02, SEA, jd.z - .05, .003, .08, [.95, .95, .95], 6);   // King Fahd's Fountain
     const jc = P1('jeddahcentral'); keepOut.push([jc.x, jc.z, jc.foot]); const cJ = RG_coast('west', jc.z);
-    addDisc(jc.x, G + .003, jc.z, jc.foot - .003, [.92, .88, .76], 20); addDisc(jc.x - .012, G + .0035, jc.z, .014, [.96, .90, .72], 14);   // beach
-    addBox(jc.x + .012, G, jc.z - .01, .018, .012, .012, [.95, .94, .92]); addDome(jc.x + .012, G + .012, jc.z + .01, .008, [.88, .74, .52]);   // cultural buildings
+    addDisc(jc.x, G + .003, jc.z, jc.foot - .003, [.92, .88, .76], 20);
+    addModel('WC_JeddahCentral', jc.x - .002, jc.z - .006, fitFoot(jc, 1.15), {rot:-Math.PI / 2, hk:1.6});   // compact parcel: venue shell, terraces, marina edge to the sea
     marina(cJ - .002, jc.z + .012, Math.PI, 3, rn);
-    const bl = LY.MISSION_SITES['west:balad']; heritage(bl[0], bl[1], .025, 18, rn, (x, z) => onLand(x, z) && LY.decorAllowed(x, z, .004, .012));
-    const jp = LY.MISSION_SITES['west:jport'], cP = RG_coast('west', jp[1]); quay([cP + .01, jp[1]], [cP - .07, jp[1] - .01], .012); for (let i = 0; i < 3; i++) gantry(cP - .02 - i * .018, jp[1] - .004, Math.PI); ship(cP - .05, jp[1] + .03, .1, .065, [.80, .26, .22], rn);
+    // Al Balad: individual historic houses (pale plaster, coral stone, wooden roshan) set along narrow lanes.
+    { const bl = LY.MISSION_SITES['west:balad'], hs = ['WC_AlBalad_House_A', 'WC_AlBalad_House_B', 'WC_AlBalad_House_C'], kB = modelK('WC_AlBalad_House_C', .0085);
+      for (let i = -2; i <= 2; i++) for (let j = -2; j <= 2; j++) { const x = bl[0] + i * .0095 + (j % 2) * .003, z = bl[1] + j * .0085;
+        if (Math.hypot(i, j) > 2.3 || !onLand(x, z) || !LY.decorAllowed(x, z, .003, .01)) continue; addModel(hs[(i * 7 + j * 3 + 15) % 3], x, z, 0, {k:kB, rot:(j % 2) * Math.PI, hk:1.6}); } }
+    // Jeddah Islamic Port: gate/terminal building plus the shared gantry cranes, container blocks and warehouse, south of the waterfront.
+    { const jp = LY.MISSION_SITES['west:jport'], cP = RG_coast('west', jp[1]), kP = modelK('SHR_GantryCrane', .016);
+      quay([cP + .01, jp[1]], [cP - .07, jp[1] - .01], .016);
+      for (let i = 0; i < 3; i++) addModel('SHR_GantryCrane', cP - .02 - i * .018, jp[1] - .006, 0, {k:kP, rot:-Math.PI / 2, hk:1.4, y:G - .003});
+      for (let i = 0; i < 2; i++) addModel('SHR_ContainerStack', cP - .03 - i * .022, jp[1] + .006, 0, {k:kP, hk:1.6, y:G - .003});
+      addModel('SHR_Warehouse', cP + .012, jp[1] + .014, 0, {k:kP, hk:1.6}); addModel('WC_JeddahPort_Terminal', cP + .03, jp[1] - .004, 0, {k:kP, hk:1.6});
+      ship(cP - .05, jp[1] + .03, .1, .065, [.80, .26, .22], rn); }
     const ka = LY.MISSION_SITES['west:kaia']; addStrip([ka[0] - .004, ka[1] - .04], [ka[0] - .004, ka[1] + .04], .006, G + .005, [.32, .33, .35]); addBox(ka[0] + .02, G, ka[1], .012, .008, .03, [.90, .92, .94]);   // King Abdulaziz Airport
     for (let i = 0; i < 4; i++) boat(RG_coast('west', jd.z + .02 * i) - .05 - i * .01, jd.z - .03 + .03 * i, .3 * i, 1.1);
     fabric(jd.x + .02, jd.z + .06, .07, 18, rn, [[.97,.94,.88],[.94,.86,.72],[.90,.82,.68]]);
     // Makkah: a compact city with a respectfully scaled Masjid al-Haram — white courtyard, the Kaaba, arcade and minarets.
     const mk = PLv('makkah'); keepOut.push([mk.x, mk.z, mk.r]);
-    addDisc(mk.x, G + .003, mk.z, .03, [.96, .95, .92], 28); addCylinder(mk.x, G, mk.z, .03, .008, [.94, .93, .88], 28, .03);
-    addDisc(mk.x, G + .0085, mk.z, .022, [.98, .97, .95], 24);
-    addBox(mk.x, G + .0085, mk.z, .006, .006, .006, [.06, .06, .06]); addBox(mk.x, G + .0125, mk.z, .0062, .0008, .0062, [.84, .66, .20]);
-    for (let i = 0; i < 6; i++) { const a = i / 6 * 6.283 + .5; addCylinder(mk.x + Math.cos(a) * .031, G, mk.z + Math.sin(a) * .031, .0024, .045, [.96, .95, .90], 8); addCone(mk.x + Math.cos(a) * .031, G + .045, mk.z + Math.sin(a) * .031, .003, .008, [.86, .76, .44], 8); }
+    // Masjid al-Haram (simplified: white courtyards, mataf arcade, main arcades, minarets) with the Kaaba as its own,
+    // separately placed asset in the clear centre. The Kaaba is drawn a little larger than true scale so it stays legible.
+    addModel('WC_Haram', mk.x, mk.z, .072, {hk:1.2});
+    addModel('WC_Kaaba', mk.x, mk.z, .0062, {hk:1.1});
     skyline(mk.x, mk.z, mk.r - .004, 14, .05, rn, (x, z) => Math.hypot(x - mk.x, z - mk.z) > .038 && Math.hypot(x - mk.x, z - mk.z) < mk.r - .004, [[.94,.92,.86],[.90,.88,.84],[.86,.84,.80]]);
     addBox(mk.x + .006, G, mk.z - .046, .012, .12, .012, [.88, .86, .80]); addCone(mk.x + .006, G + .12, mk.z - .046, .006, .025, [.86, .74, .36], 6);   // clock tower (just north of the courtyard)
     // Masar Makkah: a planned boulevard district extending west from central Makkah — wholly inland.
-    const ms = P1('masar'); { const pts = ms.ribbon.pts; polyStrip(pts, .006, G + .005, [.86, .80, .64]);
-      for (let i = 1; i < pts.length; i++) { const a = pts[i - 1], b = pts[i]; for (let t = .15; t < 1; t += .3) { const x = a[0] + (b[0] - a[0]) * t, z = a[1] + (b[1] - a[1]) * t; for (const s of [-1, 1]) addTower(x, z + s * .012, .009, .025 + rn() * .02, [.92, .88, .80], null); } } }
+    // Masar Makkah: repeatable hotel and commercial modules framing the pedestrian boulevard toward the Haram
+    // (module fronts face the route: north side turned to face south, south side faces north).
+    const ms = P1('masar'); { const pts = ms.ribbon.pts, kM = modelK('WC_Masar_HotelSlab', .011), mods = ['WC_Masar_HotelTower', 'WC_Masar_HotelSlab', 'WC_Masar_Commercial'];
+      for (let i = 1; i < pts.length; i++) { const a = pts[i - 1], b = pts[i], L = Math.hypot(b[0] - a[0], b[1] - a[1]), th = Math.atan2(b[1] - a[1], b[0] - a[0]);
+        addModel('WC_Masar_Boulevard', (a[0] + b[0]) / 2, (a[1] + b[1]) / 2, 0, {k:kM * .9, rot:th - Math.PI / 2, sx:1, hk:1.4}); polyStrip([a, b], .006, G + .004, [.86, .80, .64]);
+        for (let t = .15, n = 0; t < 1; t += .3, n++) { const x = a[0] + (b[0] - a[0]) * t, z = a[1] + (b[1] - a[1]) * t;
+          for (const s of [-1, 1]) addModel(mods[(n + i + (s > 0 ? 1 : 0)) % 3], x, z + s * .012, 0, {k:kM, rot:s < 0 ? Math.PI : 0, hk:1.5}); } } }
     // Holy Sites (Mina and Arafat): the white tent city east of Makkah, with the Mashaer rail alongside.
     const hj = P1('hajj'); keepOut.push([hj.x, hj.z, hj.foot]);
-    for (let i = -3; i <= 3; i++) for (let j = -3; j <= 3; j++) { const x = hj.x + i * .012, z = hj.z + j * .012; if (Math.hypot(x - hj.x, z - hj.z) > hj.foot - .01 || Math.hypot(x - hj.pad[0], z - hj.pad[1]) < .02) continue; addRoof(x, G, z, .009, .006, .009, [.98, .98, .96]); }
+    // Holy Sites as separate modules: repeated Mina tent blocks, a simple Arafat facility and a transport/service facility.
+    const kH = modelK('WC_Mina_TentModule', .0115), fac = [[-.026, -.02, 'WC_Arafat_Facility'], [.026, -.02, 'WC_HolySites_Transport']];
+    for (const [dx, dz, nm] of fac) addModel(nm, hj.x + dx, hj.z + dz, 0, {k:kH, hk:1.6});
+    for (let i = -3; i <= 3; i++) for (let j = -3; j <= 3; j++) { const x = hj.x + i * .012, z = hj.z + j * .012; if (Math.hypot(x - hj.x, z - hj.z) > hj.foot - .01 || Math.hypot(x - hj.pad[0], z - hj.pad[1]) < .02) continue;
+      if (fac.some(([dx, dz]) => Math.abs(x - hj.x - dx) < .016 && Math.abs(z - hj.z - dz) < .013)) continue; addModel('WC_Mina_TentModule', x, z, 0, {k:kH, hk:1.6}); }
     // Taif: an independent upland town — terraced slopes, rose-coloured planting, a winding approach.
     const tf = PLv('taif'); keepOut.push([tf.x, tf.z, tf.r]);
     for (let k = 0; k < 3; k++) addCylinder(tf.x, G, tf.z, tf.r - .006 - k * .014, .006, shade([.62, .72, .44], 1 + k * .04), 22);
-    fabric(tf.x, tf.z, tf.r - .012, 16, rn, [[.96,.90,.80],[.93,.84,.70]], inCircle(tf.x, tf.z, tf.r - .012));
+    addModel('WC_Taif_Cluster', tf.x, tf.z, 2 * tf.r - .03, {hk:1.5, y:G + .006});          // light hillside buildings on terraces climbing north
     { const prev = target; target = detailMesh; scatterIn(tf.x, tf.z, tf.r + .03, 16, rn, (x, z) => addTree(x, z, .22, [.92, .52, .66]), (x, z) => onLand(x, z) && LY.decorAllowed(x, z, .004, .012)); target = prev; }
     // Haramain High-Speed Railway: Madinah → KAEC → Jeddah → Makkah with integrated stations (it does not reach Taif).
     const hr = P1('haramain'); for (let i = 1; i < hr.ribbon.pts.length; i++) railSegment(hr.ribbon.pts[i - 1], hr.ribbon.pts[i], .012);
-    const hp = hr.ribbon.pts; for (const q of [hp[0], hp[3], hp[5], hp[hp.length - 1]]) station(q[0], q[1], Math.PI / 2, [.62, .40, .30]);
+    const hp = hr.ribbon.pts; for (const s of [0, 3, 5, hp.length - 1]) {                     // station buildings, turned along the line
+      const a = hp[Math.max(0, s - 1)], b = hp[Math.min(hp.length - 1, s + 1)]; addModel('WC_HaramainStation', hp[s][0], hp[s][1], .03, {rot:Math.atan2(b[1] - a[1], b[0] - a[0]), hk:1.6}); }
+    { const a = hp[1], b = hp[2]; addModel('WC_HaramainTrain', (a[0] + b[0]) / 2, (a[1] + b[1]) / 2, .045, {rot:Math.atan2(b[1] - a[1], b[0] - a[0]), hk:1.5, y:G + .006}); }   // a train on the line
     palmGrove(-2.60, .18, .06, 10, rn); palmGrove(-2.56, 1.02, .05, 8, rn); palmGrove(-2.52, -.02, .05, 10, rn);
   }
 
@@ -856,49 +898,65 @@
     range(-3.70, -1.05, .2, .2, 14, rn, [.78, .58, .42], .04, .07, hillOpen);
     range(-4.30, -2.24, .1, .05, 6, rn, [.72, .54, .42], .05, .09, hillOpen);
     // THE LINE: one slim, reflective corridor from the NEOM coast inland through the valley.
-    const ln = P1('neom'); { const pts = ln.ribbon.pts; for (let i = 1; i < pts.length; i++) { const a = pts[i - 1], b = pts[i], L = Math.hypot(b[0] - a[0], b[1] - a[1]), rot = Math.atan2(b[1] - a[1], b[0] - a[0]);
-      addBox((a[0] + b[0]) / 2, G, (a[1] + b[1]) / 2, L, .03, .006, [.62, .84, .90], rot); addBox((a[0] + b[0]) / 2, G + .03, (a[1] + b[1]) / 2, L, .002, .007, [.90, .98, 1], rot); } }
+    // THE LINE: one mirrored segment model (two reflective walls, flat top, gardens between) repeated along the route,
+    // each copy stretched slightly so whole segments tile each straight run exactly.
+    const ln = P1('neom'); { const pts = ln.ribbon.pts, kL = .007 / 200, seg = 500 * kL * 2.2;
+      for (let i = 1; i < pts.length; i++) { const a = pts[i - 1], b = pts[i], L = Math.hypot(b[0] - a[0], b[1] - a[1]), rot = Math.atan2(b[1] - a[1], b[0] - a[0]), n = Math.max(1, Math.round(L / seg));
+        for (let k = 0; k < n; k++) { const t = (k + .5) / n; addModel('NW_TheLine_Segment', a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, 0, {k:kL, sx:L / n / (500 * kL), rot, hk:.03 / (500 * kL)}); } } }
     // Trojena: an elevated mountain destination — snow-tipped peaks, a small lake, terraced lodges.
     const tj = P1('trojena'); keepOut.push([tj.x, tj.z, tj.foot]);
     for (let i = 0; i < 6; i++) { const a = i / 6 * 6.283 + .4, x = tj.x + Math.cos(a) * .052, z = tj.z + Math.sin(a) * .046, h = .12 + rn() * .06; addCone(x, G, z, .035, h, [.60, .52, .46], 7); addCone(x, G + h * .72, z, .011, h * .28, [.97, .97, .99], 7); }
     addDisc(tj.x, G + .006, tj.z + .004, .02, [.34, .70, .86], 18);
-    for (let k = 0; k < 3; k++) addBox(tj.x - .012 + k * .012, G + k * .006, tj.z - .02 - k * .004, .012, .01, .008, [.94, .94, .96]);
+    addModel('NW_Trojena_Resort', tj.x - .006, tj.z - .022, .03, {hk:1.6});                   // angular lodges above the lake
+    addModel('NW_Trojena_Lakeside', tj.x, tj.z + .004, .032, {hk:1.5, y:G + .004});             // the long mirrored structure spanning the lake
+    addModel('NW_Trojena_SkiFacility', tj.x + .03, tj.z - .012, .024, {hk:1.2, rot:-Math.PI / 4});   // lodge and lift line climbing toward a peak
     // Oxagon: a near-octagonal floating industrial city — engineered perimeter, blue inner harbour, quays, cranes, factories.
     const ox = P1('oxagon'); keepOut.push([ox.x, ox.z, ox.foot]);
     const R0 = ox.foot - .006, oct = i => [ox.x + Math.cos(i / 8 * 6.283 + Math.PI / 8) * R0, ox.z + Math.sin(i / 8 * 6.283 + Math.PI / 8) * R0];
     for (let i = 0; i < 8; i++) quay(oct(i), oct(i + 1), .014, [.80, .80, .78]);
     for (let i = 0; i < 8; i++) { const [x, z] = oct(i); addCylinder(x, SEA, z, .014, G - SEA - .003, [.80, .80, .78], 8); }
-    addCylinder(ox.x, SEA + .004, ox.z, R0 * .62, .004, [.24, .56, .80], 8);                                        // inner harbour
-    for (let i = 0; i < 8; i++) { const a = (i + .5) / 8 * 6.283 + Math.PI / 8, x = ox.x + Math.cos(a) * R0 * .82, z = ox.z + Math.sin(a) * R0 * .82;
-      if (i % 2) gantry(x, z, a); else factory(x, z, .016, .01, .008, [.86, .88, .92], a + Math.PI / 2); }
-    ship(ox.x - .005, ox.z + .005, .3, .04, [.24, .34, .58], rn); addBox(ox.x + .02, SEA + .006, ox.z - .02, .012, .004, .004, [.95, .95, .95]);
+    // The octagonal deck (rim, perimeter buildings, dock cranes, central industry) sits on the engineered sea wall above.
+    // Its octagon matches the wall (vertices at 22.5° + 45°k); the crane sides face the open sea to the west.
+    addModel('NW_Oxagon', ox.x, ox.z, 2 * R0 * Math.cos(Math.PI / 8) * 1.04, {rot:-Math.PI / 2, hk:1.4, y:G - .004});
     // Green Hydrogen: the compound on Oxagon's inland side — solar rows, turbines, processing halls, spherical storage.
     const h2 = P1('hydrogen'); keepOut.push([h2.x, h2.z, h2.foot]);
-    addDisc(h2.x, G + .003, h2.z, h2.foot - .004, [.82, .80, .70], 22); addSolar(h2.x + .012, h2.z - .016, 5, 3, .012);
-    for (let i = 0; i < 3; i++) addTurbine(h2.x + .04, h2.z - .03 + i * .022, .4);
-    factory(h2.x - .025, h2.z + .015, .02, .014, .01, [.92, .94, .95]); for (const d of [-.01, .004]) { addCylinder(h2.x - .006 + d, G, h2.z + .03, .007, .006, [.94, .96, .96], 10); addDome(h2.x - .006 + d, G + .006, h2.z + .03, .007, [.96, .98, .98]); }
+    addDisc(h2.x, G + .003, h2.z, h2.foot - .004, [.82, .80, .70], 22);
+    addModel('NW_GreenHydrogen', h2.x, h2.z - .006, fitFoot(h2, 1.3), {hk:1.3});             // electrolyser halls, tanks, pipe racks, turbines, solar field
     // Sindalah: a small offshore island with its marina, resort buildings and yachts.
-    const sd = P1('sindalah'); { const y = island(sd.x, sd.z, sd.foot - .01); addDisc(sd.x, y + .001, sd.z, .012, [.34, .72, .84], 12);
-      for (let i = 0; i < 6; i++) { const a = i / 6 * 6.283; villa(sd.x + Math.cos(a) * .022, sd.z + Math.sin(a) * .018, y, a); }
-      for (let i = 0; i < 4; i++) boat(sd.x + .038, sd.z - .015 + i * .01, 0, 1.2); pier([sd.x + .028, sd.z - .02], [sd.x + .028, sd.z + .02]); }
+    // Sindalah: the island outline stays the map's; its sculptural resort buildings and the marina piers are separate models.
+    const sd = P1('sindalah'); { const y = island(sd.x, sd.z, sd.foot - .01);
+      addModel('NW_Sindalah_Buildings', sd.x - .004, sd.z - .004, 1.55 * (sd.foot - .01), {y, hk:1.6});
+      addModel('NW_Sindalah_Piers', sd.x + .036, sd.z, .03, {rot:Math.PI / 2, y:SEA + .004, hk:3});
+      for (let i = 0; i < 4; i++) boat(sd.x + .044, sd.z - .012 + i * .008, 0, 1.1);
+      addModel('NW_PassengerShuttle', sd.x + .07, sd.z + .02, .008, {rot:Math.PI * .9, y:SEA, hk:1.3}); }   // island shuttle
     // Tabuk: an established inland city east of NEOM.
     const tb = PLv('tabuk'); keepOut.push([tb.x, tb.z, tb.r]);
-    fabric(tb.x, tb.z, tb.r - .004, 26, rn, [[.94,.86,.72],[.90,.80,.64],[.96,.90,.80]], (x, z) => inCircle(tb.x, tb.z, tb.r - .004)(x, z)); addCylinder(tb.x + .01, G, tb.z - .012, .003, .04, [.94, .90, .82], 8);
+    addModel('NW_Tabuk_Set', tb.x, tb.z, 2 * tb.r - .016, {hk:1.6});                        // light-stone blocks, domed civic building, palm streets
     fabric(tb.x + .03, tb.z + .06, .05, 10, rn, [[.94,.86,.72],[.90,.80,.64]]); palmGrove(tb.x - .02, tb.z + .08, .05, 10, rn);
     // AlUla: monumental sandstone, an oasis and a compact heritage settlement.
     const au = P1('alula'); keepOut.push([au.x, au.z, au.foot]);
-    for (let i = 0; i < 9; i++) { const a = i / 9 * 6.283 + rn() * .3, r = .05 + rn() * .035, x = au.x + Math.cos(a) * r, z = au.z + Math.sin(a) * r * .8, h = .05 + rn() * .06, w = .018 + rn() * .012;
-      if (Math.hypot(x - au.pad[0], z - au.pad[1]) < .03) continue; addBox(x, G, z, w, h, w * .9, [.76 + rn() * .06, .42, .24], rn()); addBlob(x, G + h, z, w * .6, .012, w * .55, [.80, .48, .28], -.2, .2); }
-    palmGrove(au.x, au.z + .01, .035, 16, rn, inCircle(au.x, au.z, .04)); heritage(au.x - .03, au.z - .01, .02, 10, rn, inCircle(au.x - .03, au.z - .01, .022));
+    // AlUla cues (stylised, not specific monuments): weathered sandstone formations, the old oasis town, a carved facade.
+    for (let i = 0; i < 6; i++) { const a = i / 6 * 6.283 + rn() * .3, r = .058 + rn() * .025, x = au.x + Math.cos(a) * r, z = au.z + Math.sin(a) * r * .8;
+      if (Math.hypot(x - au.pad[0], z - au.pad[1]) < .035) continue; addModel('NW_AlUla_RockFormation', x, z, .03 + rn() * .015, {rot:rn() * 6.283, hk:1.5 + rn() * .5}); }
+    palmGrove(au.x + .012, au.z + .012, .03, 14, rn, inCircle(au.x + .012, au.z + .012, .034));
+    addModel('NW_AlUla_OasisCluster', au.x - .028, au.z - .012, .04, {hk:1.8});
+    addModel('NW_AlUla_Facade', au.x + .03, au.z - .03, .02, {hk:1.5, rot:Math.PI / 6});
     addBox(au.x + .045, G, au.z - .045, .03, .014, .02, [.80, .88, .92]);                                        // Maraya mirrored hall
     // AMAALA: a calm multi-bay wellness and marina destination on the coast, outside NEOM.
     const am = P1('amaala'); keepOut.push([am.x, am.z, am.foot]); const cA = RG_coast('west', am.z);
     for (const dz of [-.035, 0, .035]) { addCylinder(cA - .012, SEA, am.z + dz, .02, G - SEA - .004, [.93, .84, .62], 14); for (let i = 0; i < 3; i++) villa(cA - .018 + i * .008, am.z + dz - .006 + i * .004, G - .004, i); }
-    for (let i = 0; i < 5; i++) villa(am.x + .01 + (i % 2) * .016, am.z - .03 + i * .014, G, .3); marina(cA - .03, am.z + .018, Math.PI, 2, rn);
+    addModel('NW_AMAALA_Resort', am.x + .008, am.z - .004, fitFoot(am, 1.1), {rot:-Math.PI / 2, hk:1.8});   // low terraces stepping down to the beach (west)
+    marina(cA - .03, am.z + .018, Math.PI, 2, rn);
     // The Red Sea Destination: low resort islands, coral shallows and boats — farther south and distinct from AMAALA.
     const rs = P1('redsea'); addDisc(rs.x, SEA + .002, rs.z, rs.foot, [.36, .80, .82], 28);                    // coral shallows
-    for (const [dx, dz, r] of [[0, 0, .022], [-.042, .025, .016], [.035, .032, .014], [.03, -.035, .015], [-.035, -.03, .013]]) { const y = island(rs.x + dx, rs.z + dz, r); villa(rs.x + dx, rs.z + dz, y, dx * 30); islePalm(rs.x + dx + r * .5, rs.z + dz, y, .8);
-      for (let i = 0; i < 3; i++) { const a = i * 2.1, x = rs.x + dx + Math.cos(a) * (r + .008), z = rs.z + dz + Math.sin(a) * (r + .008); addBox(x, SEA + .006, z, .006, .006, .006, [.92, .86, .74]); } }
+    // Resort islands: island villas, a jetty and a hospitality pavilion on the main island; low islets and reef accents
+    // between them, used sparingly so the water routes stay readable.
+    for (const [dx, dz, r] of [[0, 0, .022], [-.042, .025, .016], [.035, .032, .014], [.03, -.035, .015], [-.035, -.03, .013]]) { const y = island(rs.x + dx, rs.z + dz, r);
+      if (!dx) { addModel('NW_RedSea_Pavilion', rs.x - .006, rs.z - .004, .012, {y, hk:1.6}); addModel('NW_RedSea_Villa', rs.x + .008, rs.z + .006, .01, {y, hk:1.6}); addModel('NW_RedSea_Jetty', rs.x + r * .9, rs.z - .004, .022, {y:SEA + .006, rot:Math.PI / 2, hk:2}); }
+      else addModel('NW_RedSea_Villa', rs.x + dx, rs.z + dz, r * 1.1, {y, hk:1.6, rot:dx * 30});
+      islePalm(rs.x + dx + r * .5, rs.z + dz + r * .3, y, .8); }
+    for (const [dx, dz, nm, s] of [[.068, .01, 'NW_Islet_Rocky', .014], [-.07, -.005, 'NW_Islet_Sandy', .02], [.0, -.068, 'NW_Islet_Palms', .016], [-.062, .05, 'NW_Reef_Accent', .03], [.065, -.05, 'NW_Reef_Accent', .024]])
+      addModel(nm, rs.x + dx, rs.z + dz, s, {y:SEA + .002, hk:2.5, rot:dx * 40});
     for (let i = 0; i < 3; i++) boat(rs.x + .06 + i * .012, rs.z - .01 + i * .01, .5, 1);
     palmGrove(-3.76, -.62, .03, 6, rn);
   }
@@ -920,35 +978,37 @@
     // Jazan Industrial City: orderly factories, tank farm, logistics yards and its own cargo port.
     const ji = P1('jazan'); keepOut.push([ji.x, ji.z, ji.foot]); const cJ = RG_coast('west', ji.z);
     addDisc(ji.x, G + .003, ji.z, ji.foot - .004, [.82, .80, .74], 26);
-    for (const [dx, dz] of [[.02, -.04], [.04, -.012], [.035, .025], [0, .045]]) factory(ji.x + dx, ji.z + dz, .024, .016, .011, [.86, .88, .90]);
-    for (const [dx, dz] of [[-.012, -.03], [.004, -.018], [-.02, -.012], [-.004, 0]]) tank(ji.x + dx, ji.z + dz, .009, .012);
-    containers(ji.x + .02, ji.z + .01, 6, 0, rn);
-    quay([cJ + .01, ji.z + .02], [cJ - .07, ji.z + .02], .012); for (let i = 0; i < 3; i++) gantry(cJ - .015 - i * .018, ji.z + .032, Math.PI); ship(cJ - .05, ji.z + .055, .1, .06, [.78, .24, .22], rn);
+    addModel('SW_JazanIndustrial', ji.x + .006, ji.z - .01, fitFoot(ji, 1.2), {rot:-Math.PI / 2, hk:1.5});   // halls, tanks, pipe racks; its service quay faces the sea (west)
+    quay([cJ + .01, ji.z + .02], [cJ - .07, ji.z + .02], .012);
+    { const kP = modelK('SHR_GantryCrane', .014); for (let i = 0; i < 2; i++) addModel('SHR_GantryCrane', cJ - .02 - i * .02, ji.z + .02, 0, {k:kP, rot:Math.PI, hk:1.4, y:G - .003}); }
+    ship(cJ - .05, ji.z + .055, .1, .06, [.78, .24, .22], rn);
     // Jazan: a southern coastal civic city — compact buildings, palms, a waterfront marina and small boats.
     const jz = PLv('jazanc'); keepOut.push([jz.x, jz.z, jz.r]); const cZ = RG_coast('west', jz.z);
-    fabric(jz.x + .006, jz.z, jz.r - .006, 24, rn, [[.98,.96,.92],[.96,.92,.84],[.94,.88,.78]], (x, z) => inCircle(jz.x, jz.z, jz.r - .006)(x, z) && onLand(x, z));
-    addCylinder(jz.x - .01, G, jz.z - .02, .004, .05, [.97, .96, .92], 8); marina(cZ - .002, jz.z + .02, Math.PI, 3, rn); palmGrove(jz.x + .03, jz.z - .05, .03, 8, rn);
+    addModel('SW_JazanCity', Math.max(jz.x + .006, cZ + .05), jz.z, 2 * jz.r - .022, {rot:-Math.PI / 2, hk:1.6});   // warm coastal blocks, civic dome, palm waterfront (west)
+    marina(cZ - .002, jz.z + .02, Math.PI, 3, rn); palmGrove(jz.x + .03, jz.z - .05, .03, 8, rn);
     for (let i = 0; i < 4; i++) boat(cZ - .06 - i * .012, jz.z - .02 + i * .015, i, 1);
     // Soudah: the highest forested ridge, west of Abha — viewpoints, terraces, small hospitality buildings.
     const so = P1('soudah'); keepOut.push([so.x, so.z, so.foot]);
     addCylinder(so.x, G, so.z, so.foot - .004, .02, [.34, .54, .30], 18); addCylinder(so.x, G + .02, so.z, so.foot - .02, .02, [.38, .58, .32], 16); addCone(so.x - .008, G + .04, so.z - .006, .02, .04, [.40, .60, .34], 10);
-    for (let k = 0; k < 3; k++) addBox(so.x + .02 - k * .014, G + .02 + (k === 1 ? .02 : 0), so.z + .02, .01, .006, .008, [.96, .95, .92]);
+    addModel('SW_Soudah', so.x + .004, so.z + .004, .05, {y:G + .02, hk:1.6});                // viewing platform (facing south), chalets, juniper stands on the ridge
     { const prev = target; target = detailMesh; for (let i = 0; i < 12; i++) { const a = i / 12 * 6.283, r = so.foot - .012; addTree(so.x + Math.cos(a) * r, so.z + Math.sin(a) * r, .22, [.16, .44, .22]); } target = prev; }
     // Abha: a distinct highland city on a green plateau — Aseer-inspired architecture, squares and gardens.
     const ab = PLv('abha'); keepOut.push([ab.x, ab.z, ab.r]);
     addCylinder(ab.x, G, ab.z, ab.r - .002, .012, [.50, .66, .38], 22);
-    for (let i = 0; i < 18; i++) { const a = rn() * 6.283, d = Math.sqrt(rn()) * (ab.r - .014), x = ab.x + Math.cos(a) * d, z = ab.z + Math.sin(a) * d; if (Math.hypot(x - ab.x, z - ab.z) < .012) continue;
-      const w = .01 + rn() * .006, h = .012 + rn() * .014; addBox(x, G + .012, z, w, h, w, [.86, .78, .66]); for (let y = .004; y < h; y += .006) addBox(x, G + .012 + y, z, w * 1.04, .0015, w * 1.04, [.70, .42, .30]); }
-    addDisc(ab.x, G + .0125, ab.z, .01, [.92, .88, .78], 12);
+    addModel('SW_Abha_Cluster', ab.x, ab.z, 2 * ab.r - .02, {y:G + .012, hk:1.5});            // plateau town: stepped rocky flanks, light buildings, terraces
+    { const kA = modelK('SW_AseerHouse', .007); for (const [dx, dz] of [[-.07, .02], [-.066, .035], [.07, -.03], [.062, .05]]) if (openAt(ab.x + dx, ab.z + dz, .004)) addModel('SW_AseerHouse', ab.x + dx, ab.z + dz, 0, {k:kA, hk:1.6, rot:dx * 20}); }   // outlying Aseer houses
     // Najran: an independent inland oasis city — wadi greenery, palms, earth-toned architecture.
     const nj = PLv('najran'); keepOut.push([nj.x, nj.z, nj.r]);
     const wadi = [[-.80, 3.30], [-.66, 3.40], [-.52, 3.44], [-.40, 3.46], [-.30, 3.47]]; polyStrip(wadi, .012, G + .004, [.50, .70, .40]); polyStrip(wadi, .004, G + .005, [.30, .60, .80]);
-    heritage(nj.x, nj.z, nj.r - .006, 24, rn, inCircle(nj.x, nj.z, nj.r - .006)); addCylinder(nj.x + .012, G, nj.z - .02, .004, .04, [.82, .66, .46], 8);
-    palmGrove(-.55, 3.45, .08, 26, rn, (x, z) => LY.polyDist(x, z, wadi) < .03 && openAt(x, z, .01));
+    addModel('SW_Najran_Buildings', nj.x - .014, nj.z + .01, .056, {hk:1.8});                 // earth-toned mud tower houses
+    addModel('SW_Najran_Heritage', nj.x + .026, nj.z - .022, .03, {hk:1.6});                   // the compact fortified heritage palace on its knoll
+    // Wadi vegetation along the channel: mature palms, young palm clusters and dryland shrubs (separate reusable models).
+    { const prev = target; target = detailMesh; const veg = [['SW_Palm_Mature', .008], ['SW_Palm_Cluster', .009], ['SW_Shrub_Cluster', .007]];
+      scatterIn(-.55, 3.45, .08, 30, rn, (x, z, n) => { const [nm, s] = veg[n % 3]; addModel(nm, x, z, s * (.8 + rn() * .4), {hk:1.4, rot:rn() * 6.283}); }, (x, z) => LY.polyDist(x, z, wadi) < .03 && openAt(x, z, .01)); target = prev; }
     // Khamis Mushait and Abha airport (mission sites) as small, quiet settlements; Rijal Almaa on the western slope.
     const km = LY.MISSION_SITES['south:khamis']; fabric(km[0], km[1], .03, 10, rn, [[.90,.84,.74],[.86,.78,.66]]);
     const aa = LY.MISSION_SITES['south:abhair']; addStrip([aa[0] - .03, aa[1]], [aa[0] + .03, aa[1]], .005, G + .005, [.32, .33, .35]);
-    const rj = LY.MISSION_SITES['south:rijal']; heritage(rj[0], rj[1], .014, 8, rn, (x, z) => onLand(x, z) && LY.decorAllowed(x, z, .004, .012));
+    const rj = LY.MISSION_SITES['south:rijal']; addModel('SW_AseerVillage_Cluster', rj[0], rj[1], .028, {hk:1.6});   // Rijal Almaa: a traditional Aseer village cluster
     palmGrove(-1.62, 2.86, .05, 10, rn); palmGrove(-1.30, 3.36, .05, 12, rn);
   }
   // ----------------------------------------------------------------- shared
@@ -1357,7 +1417,7 @@
   for (const l of D.labels) { if (l.kind==='place' && LY.planAt(...geo(l.lon,l.lat), .1)) continue; const [x,z]=geo(l.lon,l.lat); makeLabel(l.text, l.kind, x, l.kind==='sea'?SEA:l.kind==='place'?G:NEI, z, l.kind==='place'?8:l.kind==='sea'?1:0); }
   // City labels sit where the city is drawn (its place on a regional plan); on a plan they select that place.
   const placeOfCity = name => Object.values(LY.places || {}).find(q => q.city === name);
-  for (const c of D.cities) { const d=LY.cityDisplay[c.name]||[c.x,c.z], pl=placeOfCity(c.name), L=makeLabel(c.name, 'city pal-'+c.palette+(c.capital?' capital':''), d[0], G+.1, d[1], c.priority||(3+c.size*4)); L.dx=pl?0:(c.dx||0); L.dy=pl?0:(c.dy||0); if (pl) { L.el.dataset.pid=pl.id; L.place=true; } }
+  for (const c of D.cities) { const d=LY.cityDisplay[c.name]||[c.x,c.z], pl=placeOfCity(c.name), L=makeLabel(c.name, 'city pal-'+c.palette+(c.capital?' capital':''), d[0], G+.1, d[1], c.priority||(3+c.size*4)); L.dx=pl?0:(c.dx||0); L.dy=pl?0:(c.dy||0); L.minor=!c.capital&&c.size<.4; if (pl) { L.el.dataset.pid=pl.id; L.place=true; } }
   // Districts that are not cities (Al Qatif, Dhahran, Al Khobar...), the subtle regional headings, and clickable region
   // names on the national view.
   for (const q of Object.values(LY.places || {})) if (!q.city) { const L=makeLabel(q.name.en, 'city pal-coast place', q.x, G+.08, q.z, 4); L.el.dataset.pid=q.id; L.place=true; L.district=true; }
@@ -1415,7 +1475,7 @@
     const focus = (hoverViaLabel ? null : hoverId) || selectedId, cand = [];
     for (const L of labels) {
       let show = true, x=L.x, y=L.y, z=L.z, pri=L.priority;
-      if (L===projLabel) { const p=focus&&P(focus); if(!p||!projLabelsOn){show=false;} else { if (L.el.textContent!==mapName(p)) { L.el.textContent=mapName(p); } L.el.dataset.pid=p.id; x=p.x; z=p.z; y=topY[p.id]+.035; } }
+      if (L===projLabel) { const p=focus&&P(focus); if(!p||!projLabelsOn){show=false;} else { const k=Math.min(6,(projectState[p.id]||{}).done||0), key=p.id+':'+k; if (L.key!==key) { L.key=key; L.el.innerHTML=''; const b=document.createElement('b'); b.textContent=mapName(p); const m=document.createElement('small'); m.className='pl-metric'; m.textContent=k+'/6'; L.el.append(b, m); L.w=0; } L.el.dataset.pid=p.id; x=p.x; z=p.z; y=topY[p.id]+.035; } }
       else if ((L.cluster||L.small) && !projLabelsOn) show = false;
       else if (L.cluster) show = far > CLUSTER_DIST;
       else if (L.region) show = far > 9;
@@ -1425,7 +1485,7 @@
       else if (L.road) show = projLabelsOn && far < 4.2;
       else if (L.small) { show = far < (innerWidth < 600 ? 6.2 : 5.2) && L.pid!==focus;   /* phones frame regions from further out */ y = topY[L.pid]+.012; }
       else if (L.el.classList.contains('country')||L.el.classList.contains('sea')) show = far > 6.5;
-      else if (!L.el.classList.contains('capital')) show = far < 24;
+      else if (!L.el.classList.contains('capital')) show = L.minor ? far < 11 : far < 24;   // distant view: major cities only
       const s = show && project([x,y,z]);
       if (!s || s[2]>1 || s[0]<-60 || s[1]<-30 || s[0]>innerWidth+60 || s[1]>innerHeight+30) { hideLabel(L); continue; }
       if (L.small) pri = 2 + .9 * (1 - Math.min(1, Math.hypot(s[0]-cx, s[1]-cy) / diag)) + (ESSENTIAL_LABELS.has(L.pid) ? 1 : 0);   // nearer the middle = more relevant; key districts first

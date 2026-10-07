@@ -50,6 +50,7 @@
   G.closeCity = next => { if (ui.active) leaveCity(next); };
   G.cityStatus = () => { try { const d = VC.dateOf(); return {date:`${G.month(d.month, d.year)}`, dirty:VC.rev() !== ui.savedRev}; } catch(e) { return null; } };
   addEventListener('pagehide', () => { if (ui.active) save(); });
+  addEventListener('resize', () => { if (ui.active) document.documentElement.style.setProperty('--ctop', ($('#cTop').offsetHeight || 60) + 'px'); });
   // Edits made while paused (build, demolish, undo, routes, tax, funding, loans) save within about half a second. A timer, not
   // the animation frame, so it also runs when the tab is in the background.
   setInterval(() => {
@@ -57,7 +58,7 @@
     if (VC.rev() !== ui.savedRev && !ui.navDirty) { ui.navDirty = true; G.renderNav && G.renderNav('city'); }   // show "saving changes…"
     if (VC.autosaveDue(ui.savedRev) && !(ui.saveFailAt && Date.now() - ui.saveFailAt < 5000)) save();
   }, 250);
-  function leaveCity(next){ save(); ui.active = false; W.setDynamicLabels([]); W.setHazard(null); W.setProjectLabels(true); W.onGroundDrag(null); W.onGroundHover(null); W.setCity(null); W.setOverlay([]); W.setEntities([]); W.setMissionLights([]); $('#chud').classList.add('hidden'); if (typeof next === 'function') next(); else G.showMenu(); }
+  function leaveCity(next){ save(); ui.active = false; W.setDynamicLabels([]); W.setHazard(null); W.setProjectLabels(true); W.onGroundDrag(null); W.onGroundHover(null); W.setCity(null); W.setOverlay([]); W.setEntities([]); W.setMissionLights([]); $('#chud').classList.add('hidden'); { const nav = $('#modeNav'); if (nav && nav.parentNode !== document.body) document.body.appendChild(nav); } if (typeof next === 'function') next(); else G.showMenu(); }
   function save(){ try { const prev = localStorage.getItem(VC.KEY); if (prev) localStorage.setItem(VC.KEY + '.backup', prev); const rv = VC.rev(); localStorage.setItem(VC.KEY, VC.serialize()); ui.savedRev = rv; ui.navDirty = false; if (ui.active && G.renderNav) G.renderNav('city');
       const S = VC.state, deltas = VC.factorDeltas(), old = (G.profile.city && G.profile.city.deltas) || [], d = VC.dateOf();
       G.profile.compEvents = G.profile.compEvents || [];
@@ -124,6 +125,7 @@
   function renderHUD(){
     const S = VC.state, m = S.m, d = VC.dateOf(), beyond = d.year > 2030;
     const bar = k => { const v = m.demand[k]; return `<button class="dem" data-dem="${k}" title="${esc(t('demandWhy'))}"><span>${k}</span><i class="${v >= 0 ? 'pos' : 'neg'}" style="--v:${Math.min(100, Math.abs(v))}%"></i></button>`; };
+    { const nav = $('#modeNav'); if (nav && $('#cTop').contains(nav)) document.body.appendChild(nav); }
     $('#cTop').innerHTML = `<div class="ct-title"><b>🏗 ${esc(t('cityTitle'))}</b><small>${beyond ? esc(t('beyond2030')) + ' · ' : ''}${month(S.month)}</small></div>
       <div class="ct-speed">${[0,1,3].map(s => `<button class="${ui.speed === s ? 'on' : ''}" data-speed="${s}" aria-label="${s ? s + '×' : t('pause')}">${s ? s + '×' : 'Ⅱ'}</button>`).join('')}</div>
       <div class="ct-stat" title="${esc(t('creditsNote'))}"><small>${esc(t('budget'))}</small><b class="${S.budget < 0 ? 'neg' : ''}">◆ ${S.budget.toFixed(1)}</b><em class="${m.budget.net < 0 ? 'neg' : 'pos'}">${m.budget.net >= 0 ? '+' : ''}${m.budget.net}/${esc(t('mo'))}</em></div>
@@ -132,7 +134,9 @@
       <div class="ct-stat"><small>${esc(t('commute'))}</small><b>${m.commute}′</b></div>
       <div class="ct-dem"><small>${esc(t('demand'))}</small>${bar('R')}${bar('C')}${bar('I')}</div>
       <div class="ct-stat"><small>${esc(t('weather'))}</small><b>${S.weather && S.weather.type === 'dust' ? '🌪' : (S.month % 12 >= 5 && S.month % 12 <= 7) ? '🔥' : '☀'}</b></div>
-      <div class="ct-btns"><button class="icon-btn" data-panel="missions" title="${esc(t('cityMissions'))}">🏅</button><button class="icon-btn" data-panel="goals" title="${esc(t('goals'))}">🎯</button><button class="icon-btn" data-panel="budget" title="${esc(t('budget'))}">◆</button><button class="icon-btn" data-panel="overlays" title="${esc(t('overlays'))}">🗺</button><button class="icon-btn" id="cLens" title="Competitiveness">📊</button><button class="icon-btn" id="cKingdom" title="${esc(t('toKingdom'))}">🌍</button><button class="icon-btn" id="cExit" title="${esc(t('backMenu'))}">✕</button></div>`;
+      <div class="ct-btns"><button class="icon-btn" data-panel="missions" title="${esc(t('cityMissions'))}">🏅</button><button class="icon-btn" data-panel="goals" title="${esc(t('goals'))}">🎯</button><button class="icon-btn" data-panel="budget" title="${esc(t('budget'))}">◆</button><button class="icon-btn" data-panel="overlays" title="${esc(t('overlays'))}">🗺</button><button class="icon-btn" id="cLens" title="Competitiveness">📊</button><button class="icon-btn" id="cKingdom" title="${esc(t('toKingdom'))}">🌍</button><button class="icon-btn" id="cExit" title="${esc(t('backMenu'))}">✕</button></div><div class="nav-slot" id="cNavSlot"></div>`;
+    G.renderNav && G.renderNav();
+    document.documentElement.style.setProperty('--ctop', ($('#cTop').offsetHeight || 60) + 'px');   // panels sit under the real (possibly wrapped) bar
     $$('#cTop [data-speed]').forEach(b => b.onclick = () => { ui.speed = +b.dataset.speed; renderHUD(); });
     $$('#cTop [data-panel]').forEach(b => b.onclick = () => openPanel(ui.panel === b.dataset.panel ? null : b.dataset.panel));
     $$('#cTop [data-dem]').forEach(b => b.onclick = () => openPanel('demand:' + b.dataset.dem));
@@ -142,17 +146,19 @@
     renderTools(); renderMissionCard();
   }
   const TOOLS = [
-    {id:'select', icon:'👆'}, {id:'road', icon:'🛣', cost:VC.COST.road}, {id:'avenue', icon:'🛣️', cost:VC.COST.avenue, cap:'avenue'}, {id:'remove', icon:'🧹'},
-    {id:'rail', icon:'🛤', cost:VC.COST.rail},
-    {id:'zoneR', icon:'🏠', dens:true}, {id:'zoneC', icon:'🏬', dens:true}, {id:'zoneI', icon:'🏭', dens:true}, {id:'zoneT', icon:'🏨', dens:true}, {id:'zoneM', icon:'🏘', dens:true, cap:'mixed'},
-    {id:'gas', fac:1}, {id:'solar', fac:1}, {id:'battery', fac:1}, {id:'pump', fac:1}, {id:'tower', fac:1},
-    {id:'school', fac:1}, {id:'training', fac:1}, {id:'clinic', fac:1}, {id:'park', fac:1}, {id:'emergency', fac:1}, {id:'digital', fac:1, cap:'digital'}, {id:'terminal', fac:1}, {id:'invest', fac:1},
-    {id:'route', icon:'🚌'}
+    {id:'select', icon:'👆', grp:0}, {id:'road', icon:'🛣', cost:VC.COST.road, grp:1}, {id:'avenue', icon:'🛣️', cost:VC.COST.avenue, cap:'avenue', grp:1}, {id:'remove', icon:'🧹', grp:1},
+    {id:'rail', icon:'🛤', cost:VC.COST.rail, grp:1},
+    {id:'zoneR', icon:'🏠', dens:true, grp:2}, {id:'zoneC', icon:'🏬', dens:true, grp:2}, {id:'zoneI', icon:'🏭', dens:true, grp:2}, {id:'zoneT', icon:'🏨', dens:true, grp:2}, {id:'zoneM', icon:'🏘', dens:true, cap:'mixed', grp:2},
+    {id:'gas', fac:1, grp:3}, {id:'solar', fac:1, grp:3}, {id:'battery', fac:1, grp:3}, {id:'pump', fac:1, grp:3}, {id:'tower', fac:1, grp:3},
+    {id:'school', fac:1, grp:4}, {id:'training', fac:1, grp:4}, {id:'clinic', fac:1, grp:4}, {id:'park', fac:1, grp:4}, {id:'emergency', fac:1, grp:4}, {id:'digital', fac:1, cap:'digital', grp:4}, {id:'terminal', fac:1, grp:4}, {id:'invest', fac:1, grp:4},
+    {id:'route', icon:'🚌', grp:5}
   ];
   function renderTools(){
     const S = VC.state;
-    $('#cTools').innerHTML = TOOLS.map(tl => { const f = VC.FAC[tl.id], locked = tl.cap && !S.caps.includes(tl.cap);
-      return `<button class="ctool ${ui.tool === tl.id ? 'on' : ''} ${locked ? 'locked' : ''}" data-tool="${tl.id}" title="${esc(f ? t(f.name) : t('tool_' + tl.id))}"><span>${locked ? '🔒' : f ? f.icon : tl.icon}</span><small>${esc(f ? t(f.name) : t('tool_' + tl.id))}</small>${f ? `<em>◆${f.cost}</em>` : tl.cost ? `<em>◆${tl.cost}/▢</em>` : ''}</button>`; }).join('')
+    $('#cTools').innerHTML = TOOLS.map((tl, i) => { const f = VC.FAC[tl.id], locked = tl.cap && !S.caps.includes(tl.cap), name = f ? t(f.name) : t('tool_' + tl.id);
+      const cost = f ? `◆${f.cost}` : tl.cost ? `◆${tl.cost}/▢` : '', poor = !!(f && S.budget < f.cost);
+      const sep = i && TOOLS[i - 1].grp !== tl.grp ? '<span class="ct-sep" aria-hidden="true"></span>' : '';
+      return `${sep}<button class="ctool ${ui.tool === tl.id ? 'on' : ''} ${locked ? 'locked' : ''} ${poor ? 'poor' : ''}" data-tool="${tl.id}" aria-pressed="${ui.tool === tl.id}" ${locked ? 'aria-disabled="true"' : ''} title="${esc(name + (cost ? ' · ' + cost : '') + (locked ? ' · 🔒 ' + t(VC.CAPS[tl.cap].how) : ''))}"><span class="ci">${locked ? '🔒' : f ? f.icon : tl.icon}</span><small>${esc(name)}</small><em>${cost || '&nbsp;'}</em></button>`; }).join('')
       + (['zoneR','zoneC','zoneI','zoneT','zoneM'].includes(ui.tool) ? `<div class="dens">${[1,2,3].map(d => `<button class="${ui.density === d ? 'on' : ''} ${(d === 2 && !S.caps.includes('medium')) || (d === 3 && !S.caps.includes('high')) ? 'locked' : ''}" data-dens="${d}">${esc(t('dens' + d))}</button>`).join('')}</div>` : '')
       + `<button class="ctool" id="cUndo" ${VC.canUndo() ? '' : 'disabled'}><span>↶</span><small>${esc(t('undo'))}</small></button>`;
     $$('#cTools [data-tool]').forEach(b => b.onclick = () => selectTool(b.dataset.tool));
@@ -296,9 +302,17 @@
         ${act ? '' : `<button class="primary sm" data-cm="${d.id}">${esc(t(rec.medal ? 'replay' : 'startMission'))}</button>`}</div>`; }).join('') + (act ? `<button class="secondary sm" id="cmAbandon">${esc(t('abandonMission'))}</button>` : ''); }
   function renderMissionCard(){ const el = $('#cMission'), st = VC.missionStatus();
     if (!st || st.mission.done) { el.classList.add('hidden'); return; }
-    el.innerHTML = `<div class="cm-head"><span class="arc-tag sm">${st.def.arc}</span> <b>${esc(t(st.def.title))}</b><small>${st.left} ${esc(t('monthsLeft'))}</small></div>
-      <ul class="needs">${st.checks.map(c => `<li>${c.ok ? '✅' : '⬜'} ${esc(t(c.label))}${c.v != null ? ` <b>${esc(String(c.v))}</b>` : ''}</li>`).join('')}</ul>
-      ${st.def.id === 'cD' && VC.state.invest && !VC.state.invest.offer && (VC.state.m.readiness || 0) >= 70 ? offersHTML() : ''}<p class="hint">${esc(t(st.def.hint))}</p>`;
+    const done = st.checks.filter(c => c.ok).length, n = st.checks.length, next = st.checks.find(c => !c.ok), pct = Math.round(done / Math.max(1, n) * 100);
+    const offer = st.def.id === 'cD' && VC.state.invest && !VC.state.invest.offer && (VC.state.m.readiness || 0) >= 70;
+    el.innerHTML = `<div class="cm-head"><span class="arc-tag sm">${st.def.arc}</span><b>${esc(t(st.def.title))}</b><small>${esc(t('cmLeft', {n:st.left}))}</small></div>
+      <dl class="cm-grid">
+        <div class="cm-row"><dt>${esc(t('cmProgress'))}</dt><dd><span class="cm-meter" role="progressbar" aria-valuemin="0" aria-valuemax="${n}" aria-valuenow="${done}"><i style="width:${pct}%"></i></span><b>${done}/${n}</b></dd></div>
+        <div class="cm-row"><dt>${esc(t('cmTarget'))}</dt><dd>${next ? `${esc(t(next.label))}${next.v != null ? ` <b class="cm-v">${esc(String(next.v))}</b>` : ''}` : esc(t('cmAllMet'))}</dd></div>
+        <div class="cm-row cm-next"><dt>${esc(t('cmNext'))}</dt><dd>${esc(t(st.def.hint))}</dd></div>
+      </dl>${offer ? offersHTML() : ''}
+      <details class="cm-more" ${ui.cmOpen ? 'open' : ''}><summary>${esc(t('cmDetails'))}</summary><p class="cm-obj">${esc(t(st.def.brief))}</p>
+        <ul class="needs">${st.checks.map(c => `<li class="${c.ok ? 'ok' : ''}">${c.ok ? '✓' : '○'} ${esc(t(c.label))}${c.v != null ? ` <b>${esc(String(c.v))}</b>` : ''}</li>`).join('')}</ul></details>`;
+    el.querySelector('.cm-more').ontoggle = e => { ui.cmOpen = e.target.open; };
     el.classList.remove('hidden'); bindOffers('#cMission'); }
   function showCityResult(r, id){
     const d = VC.CMISSIONS.find(x => x.id === id), el = $('#cResult'), b = r.before, a = r.after, rec = G.profile.missions['city:' + id] || {};

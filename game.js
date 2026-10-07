@@ -137,10 +137,10 @@
     if (ui.filter === 'all' && !ui.search) rows.sort((a, b) => rank[a.s.health] - rank[b.s.health] || (b.s.expoCritical - a.s.expoCritical));
     $('#navCount').textContent = rows.length;
     const list = $('#projectList'), scroll = list.scrollTop;
-    list.innerHTML = rows.map(({p, s}) => `<button class="project-item h-${s.health}${ui.selected===p.id?' active':''}" data-project="${p.id}">
-      <span class="health" title="${s.health}"></span>
-      <span class="pi-main"><b>${esc(p.name)}${s.expoCritical?' <em class="expo" title="Expo 2030-critical">★</em>':''}</b><small>${esc(s.status)}</small></span>
-      <span class="pi-meta"><span class="pk" title="Work packages complete">${s.done}/6</span><span class="deps" title="${s.deps.length} connected projects">⇄${s.deps.length}</span></span></button>`).join('') || '<p class="empty">No projects match. Clear the search or pick another filter.</p>';
+    const HEALTH = {waiting:'Waiting', blocked:'Blocked', ready:'Ready', active:'Active', idle:'Idle', operating:'Operating'};
+    list.innerHTML = rows.map(({p, s}) => `<button class="project-item h-${s.health}${ui.selected===p.id?' active':''}" data-project="${p.id}" aria-pressed="${ui.selected===p.id}" title="${esc(s.status)}">
+      <span class="pi-main"><b>${esc(p.name)}${s.expoCritical?' <em class="expo" title="Expo 2030-critical">★</em>':''}</b></span>
+      <span class="pi-meta"><span class="pk" title="Stage: work packages complete">${s.done}/6</span><span class="pi-status"><span class="health"></span><span>${HEALTH[s.health] || s.health}</span></span></span></button>`).join('') || '<p class="empty">No projects match. Clear the search or pick another filter.</p>';
     list.scrollTop = scroll;
     $$('#projectList [data-project]').forEach(b => b.onclick = () => selectProject(b.dataset.project));
   }
@@ -149,7 +149,8 @@
     $$('[data-region]').forEach(b => b.classList.remove('active'));
     if (focus) W.focusProject(P(id));
     if (ui.speed > 0 && !S().challenge) { ui.speed = 0; syncSpeed(); setMessage('Paused while you decide — press 1× to resume time.', 'PLANNING PAUSE'); }
-    $('#dock').classList.remove('collapsed');
+    $('#dock').classList.remove('collapsed'); $('[data-collapse="dock"]').setAttribute('aria-expanded', 'true');
+    if (innerWidth < 900) { $('#navigator').classList.add('collapsed'); $('[data-collapse="navigator"]').setAttribute('aria-expanded', 'false'); }
     renderNavigator(); renderDock(); pushWorld();
     const it = $(`#projectList [data-project="${id}"]`); if (it) it.scrollIntoView({block:'nearest'});
   }
@@ -230,22 +231,37 @@
     body.innerHTML = `
       ${sug ? `<button class="suggest" data-goto="${sug.pid}">Suggested next: <b>${esc(P(sug.pid).name)} · ${esc(SIM.TEMPLATE.find(t=>t.k===sug.k).name)}</b><small>High downstream value for Expo and connected projects.</small></button>` : ''}
       <h4>Shared capacity</h4>
-      ${Object.entries(SIM.POOLS).map(([pool, label]) => { const t = SIM.total(pool), f = SIM.free(pool); return `<div class="pool"><span>${esc(label)}</span><div class="bar"><i style="width:${(t-f)/Math.max(1,t)*100}%"></i></div><small>${t-f} in use · ${f} free of ${t}</small></div>`; }).join('')}
-      <h4>Build capacity <small>takes time — never buys progress</small></h4>
-      ${Object.entries(SIM.PROGRAMS).map(([id, pr]) => `<div class="program"><div><b>${esc(pr.name)}</b><small>${esc(pr.note)} ${pr.months?`${pr.months} months`:'Available now'} · ${pr.cost}B</small></div><button class="secondary sm" data-program="${id}" ${st.budget<pr.cost?'disabled':''}>Start</button></div>`).join('')}
+      ${Object.entries(SIM.POOLS).map(([pool, label]) => { const t = SIM.total(pool), f = SIM.free(pool); return `<div class="pool cap-row"><span>${esc(label)}</span><b class="cap-n">${f}/${t}</b><div class="bar"><i style="width:${(t-f)/Math.max(1,t)*100}%"></i></div></div>`; }).join('')}
       ${pending.length ? `<p class="pending">In progress: ${pending.map(p => `${esc(SIM.PROGRAMS[p.id].name)} (ready ${SIM.dateOf(p.due)})`).join(' · ')}</p>` : ''}
+      <details class="dock-more" data-sec="build" ${ui.open && ui.open.build ? 'open' : ''}><summary>Build capacity</summary><p class="hint">takes time — never buys progress</p>
+      ${Object.entries(SIM.PROGRAMS).map(([id, pr]) => `<div class="program"><div><b>${esc(pr.name)}</b><small>${esc(pr.note)} ${pr.months?`${pr.months} months`:'Available now'} · ${pr.cost}B</small></div><button class="secondary sm" data-program="${id}" ${st.budget<pr.cost?'disabled':''}>Start</button></div>`).join('')}
+      </details>
+      <details class="dock-more" data-sec="ops" ${ui.open && ui.open.ops ? 'open' : ''}><summary>Maintenance, gateways and grid</summary>
       <h4>Preventive maintenance</h4>
       <div class="maint"><input type="range" min="0" max="100" value="${Math.round(st.maintenance*100)}" id="maintSlider" aria-label="Maintenance level" /><b>${Math.round(st.maintenance*100)}%</b></div>
       <small class="hint">Below about 62%, operating assets lose condition — reliability, trust and resilience fall gradually.</small>
       <h4>Material gateways</h4>
       ${SIM.GATEWAYS.map(g => { const l = st.gatewayLoad[g.id] || 0; return `<div class="pool"><span>${esc(g.name)}</span><div class="bar ${l>g.cap?'over':''}"><i style="width:${Math.min(100,l/g.cap*100)}%"></i></div><small>${l} loads requested · ${g.cap} slots/month</small></div>`; }).join('')}
       <h4>National grid headroom</h4>
-      <div class="pool"><div class="bar"><i style="width:${Math.min(100,grid.use/grid.cap*100)}%"></i></div><small>${fmt(grid.free,1)} free of ${fmt(grid.cap,1)} · renewables, hydrogen and eastern energy projects add headroom once operating</small></div>`;
+      <div class="pool"><div class="bar"><i style="width:${Math.min(100,grid.use/grid.cap*100)}%"></i></div><small>${fmt(grid.free,1)} free of ${fmt(grid.cap,1)} · renewables, hydrogen and eastern energy projects add headroom once operating</small></div></details>`;
+    body.querySelectorAll('details[data-sec]').forEach(d => d.ontoggle = () => { ui.open = ui.open || {}; ui.open[d.dataset.sec] = d.open; });
     body.querySelectorAll('[data-program]').forEach(b => b.onclick = () => { const r = SIM.startProgram(b.dataset.program); if (!r.ok) setMessage(r.why, 'CAPACITY'); });
     const ms = body.querySelector('#maintSlider'); if (ms) ms.onchange = () => SIM.setMaintenance(ms.value / 100);
     body.querySelectorAll('[data-goto]').forEach(b => b.onclick = () => selectProject(b.dataset.goto));
   }
-  $$('[data-collapse]').forEach(b => b.onclick = () => { const el = $('#' + b.dataset.collapse); const c = el.classList.toggle('collapsed'); b.setAttribute('aria-expanded', String(!c)); });
+  $$('[data-collapse]').forEach(b => b.onclick = () => { const el = $('#' + b.dataset.collapse); const c = el.classList.toggle('collapsed'); b.setAttribute('aria-expanded', String(!c));
+    if (!c && innerWidth < 900) for (const id of ['navigator','dock']) if (id !== b.dataset.collapse) { $('#' + id).classList.add('collapsed'); const o = $(`[data-collapse="${id}"]`); if (o) o.setAttribute('aria-expanded', 'false'); } });
+  // Panels and the status line sit below the real top bar and above the real bottom bar, whatever their wrapped height.
+  { const root = document.documentElement, fit = () => { const tb = $('.topbar'), bb = $('#bottombar');
+      if (tb && tb.offsetHeight) root.style.setProperty('--top', tb.offsetHeight + 'px'); if (bb && bb.offsetHeight) root.style.setProperty('--bottom', bb.offsetHeight + 'px');
+      // narrowed with both side panels open: keep the one in use (details when a project is selected), fold the other
+      if (innerWidth < 900 && !$('#navigator').classList.contains('collapsed') && !$('#dock').classList.contains('collapsed')) { const id = ui.selected ? 'navigator' : 'dock';
+        $('#' + id).classList.add('collapsed'); const b = $(`[data-collapse="${id}"]`); if (b) b.setAttribute('aria-expanded', 'false'); } };
+    if (window.ResizeObserver) { const ro = new ResizeObserver(fit); ro.observe($('.topbar')); ro.observe($('#bottombar')); } addEventListener('resize', fit); setTimeout(fit, 0); }
+  // The strategic timeline folds down to its heading (remembered in this browser).
+  { const bb = $('#bottombar'), tg = $('#tlToggle'), set = c => { bb.classList.toggle('tl-collapsed', c); tg.setAttribute('aria-expanded', String(!c)); };
+    let c0 = false; try { c0 = localStorage.getItem('vn.timelineCollapsed') === '1'; } catch(e) {} set(c0 || innerWidth < 600);
+    tg.onclick = () => { const c = !bb.classList.contains('tl-collapsed'); set(c); try { localStorage.setItem('vn.timelineCollapsed', c ? '1' : '0'); } catch(e) {} }; }
 
   /* ============================= TIMELINE ============================= */
   function buildTimeline(){
