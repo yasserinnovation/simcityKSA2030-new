@@ -3,7 +3,12 @@
 
   const D = window.VISION_DATA;
   const canvas = document.getElementById('world');
-  const gl = canvas.getContext('webgl', {antialias:true, alpha:false});
+  // three.js renderer (vendor/three, loaded by boot.js). It owns the GL context, buffers, render targets and draw calls;
+  // the scene below reproduces the original renderer exactly (same geometry, same shaders as RawShaderMaterials).
+  const THREE = window.THREE;
+  let renderer = null;
+  try { THREE.ColorManagement.enabled = false; renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:false, powerPreference:'high-performance'}); } catch (e) { renderer = null; }
+  const gl = renderer && renderer.getContext();
   if (!gl) {
     document.body.innerHTML = '<div style="padding:40px;color:#153f38;background:#9edee2;font-family:sans-serif">WebGL is required to run Vision Nexus 2030. Try the latest Chrome or Edge with hardware acceleration switched on.</div>';
     return;
@@ -109,8 +114,8 @@
   }
 
   /* --------------------------- shaders ------------------------------ */
-  function shader(type, src){const s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(s));return s;}
-  function program(vs, fs){const p=gl.createProgram();gl.attachShader(p,shader(gl.VERTEX_SHADER,vs));gl.attachShader(p,shader(gl.FRAGMENT_SHADER,fs));gl.linkProgram(p);if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(p));return p;}
+  // The original shaders, unchanged in what they compute. Attributes use three.js names; the *_I variants read the
+  // per-instance matrix/colour of InstancedMesh (instance colour tints only the vertices whose aTintK > 0, e.g. foliage).
   const hp = gl.getShaderPrecisionFormat(gl.FRAGMENT_SHADER, gl.HIGH_FLOAT);
   const PREC = hp && hp.precision > 0 ? 'precision highp float;' : 'precision mediump float;';
   const FOG = `
@@ -120,13 +125,16 @@
       float f=clamp((w-uDist*.95)/(uDist*1.7),0.,1.);
       vec3 sky=mix(mix(vec3(.64,.86,.96),vec3(.10,.14,.30),uNight),uTint,uStorm*.75);
       c=mix(c,sky,f*.6); c=mix(c,uTint*.9,uStorm*.34); return c; }`;
+  const INST_ATTR = 'attribute mat4 instanceMatrix; attribute vec3 instanceColor; attribute float aTintK;';
+  const WPOS = inst => inst ? '(instanceMatrix*vec4(position,1.0)).xyz' : 'position';
   // Lit, shadow-receiving mesh shader: sun + sky/ground hemisphere + soft PCF shadows + contact darkening.
-  const meshProgram = program(`
-    attribute vec3 aPosition; attribute vec3 aColor; attribute vec3 aNormal;
+  const MESH_VS = inst => `precision highp float;
+    attribute vec3 position; attribute vec3 color; attribute vec3 normal; ${inst ? INST_ATTR : ''}
     uniform mat4 uVP; uniform mat4 uLightVP; uniform vec3 uOffset;
     varying vec3 vColor; varying vec3 vNormal; varying vec3 vWorld; varying vec4 vLight; varying float vW;
-    void main(){ vec3 w=aPosition+uOffset; vWorld=w; vec4 p=uVP*vec4(w,1.0); gl_Position=p; vW=p.w; vColor=aColor; vNormal=aNormal; vLight=uLightVP*vec4(w,1.0); }
-  `, PREC + `
+    void main(){ vec3 w=${WPOS(inst)}+uOffset; vWorld=w; vec4 p=uVP*vec4(w,1.0); gl_Position=p; vW=p.w;
+      vColor=${inst ? 'color+aTintK*instanceColor' : 'color'}; vNormal=${inst ? 'mat3(instanceMatrix)*normal' : 'normal'}; vLight=uLightVP*vec4(w,1.0); }`;
+  const MESH_FS = PREC + `
     uniform sampler2D uShadow; uniform vec3 uSun; uniform vec3 uEye; uniform float uStorm; uniform float uDist;
     uniform float uShadowOn; uniform float uTexel; uniform float uGlow; uniform float uGround; uniform float uTime;
     varying vec3 vColor; varying vec3 vNormal; varying vec3 vWorld; varying vec4 vLight; varying float vW;
@@ -136,9 +144,9 @@
       vec3 s=vLight.xyz/vLight.w*0.5+0.5;
       if(uShadowOn<0.5||s.x<0.0||s.x>1.0||s.y<0.0||s.y>1.0||s.z>1.0) return 1.0;
       float bias=0.0012+0.0025*(1.0-ndl), sum=0.0;
-      for(int i=-1;i<=1;i++) for(int j=-1;j<=1;j++){
-        float d=unpack(texture2D(uShadow, s.xy+vec2(float(i),float(j))*uTexel*1.3));
-        sum += (s.z-bias>d) ? 0.0 : 1.0; }
+      // 3×3 PCF, unrolled (a texture fetch inside a loop warns on Direct3D/ANGLE)
+      #define TAP(i,j) sum += (s.z-bias>unpack(texture2D(uShadow, s.xy+vec2(i,j)*uTexel*1.3))) ? 0.0 : 1.0;
+      TAP(-1.,-1.) TAP(-1.,0.) TAP(-1.,1.) TAP(0.,-1.) TAP(0.,0.) TAP(0.,1.) TAP(1.,-1.) TAP(1.,0.) TAP(1.,1.)
       return sum/9.0;
     }
     void main(){
@@ -154,21 +162,17 @@
       float l=dot(c,vec3(.299,.587,.114)); c=mix(vec3(l),c,1.02);           // natural saturation
       c=mix(c, c*vec3(.26,.32,.58)+vec3(.012,.018,.05)+vColor*uGlow*.6, uNight);   // dusk to night
       gl_FragColor=vec4(applyAtmos(c,vW),1.0);
-    }
-  `);
-  // Depth-only pass for the sun shadow map (packed into RGBA for WebGL1).
-  const depthProgram = program(`
-    attribute vec3 aPosition; uniform mat4 uLightVP; uniform vec3 uOffset;
-    void main(){ gl_Position=uLightVP*vec4(aPosition+uOffset,1.0); }
-  `, PREC + `
-    void main(){ vec4 e=fract(vec4(1.0,255.0,65025.0,16581375.0)*gl_FragCoord.z); e-=e.yzww*vec4(1.0/255.0,1.0/255.0,1.0/255.0,0.0); gl_FragColor=e; }
-  `);
+    }`;
+  // Depth-only pass for the sun shadow map (packed into RGBA).
+  const DEPTH_VS = inst => `precision highp float; attribute vec3 position; ${inst ? INST_ATTR : ''} uniform mat4 uLightVP; uniform vec3 uOffset;
+    void main(){ gl_Position=uLightVP*vec4(${WPOS(inst)}+uOffset,1.0); }`;
+  const DEPTH_FS = PREC + `
+    void main(){ vec4 e=fract(vec4(1.0,255.0,65025.0,16581375.0)*gl_FragCoord.z); e-=e.yzww*vec4(1.0/255.0,1.0/255.0,1.0/255.0,0.0); gl_FragColor=e; }`;
   // Animated sea: reef-to-deep colour from distance-to-shore, moving foam line and sun glints.
-  const waterProgram = program(`
-    attribute vec3 aPosition; attribute float aShore; uniform mat4 uVP;
+  const WATER_VS = `precision highp float; attribute vec3 position; attribute float aShore; uniform mat4 uVP;
     varying vec3 vWorld; varying float vShore; varying float vW;
-    void main(){ vec4 p=uVP*vec4(aPosition,1.0); gl_Position=p; vW=p.w; vWorld=aPosition; vShore=aShore; }
-  `, PREC + `
+    void main(){ vec4 p=uVP*vec4(position,1.0); gl_Position=p; vW=p.w; vWorld=position; vShore=aShore; }`;
+  const WATER_FS = PREC + `
     uniform float uTime; uniform vec3 uSun; uniform vec3 uEye; uniform float uStorm; uniform float uDist;
     varying vec3 vWorld; varying float vShore; varying float vW;
     ` + FOG + `
@@ -190,25 +194,23 @@
       float fres=pow(1.0-max(dot(N,V),0.0),4.0); c=mix(c,vec3(.75,.90,1.0),fres*0.25);
       c=mix(c, c*vec3(.22,.30,.55)+vec3(.0,.02,.06), uNight);
       gl_FragColor=vec4(applyAtmos(c,vW),1.0);
-    }
-  `);
-  const pickProgram = program(`
-    attribute vec3 aPosition; attribute vec3 aColor; uniform mat4 uVP; varying vec3 vC;
-    void main(){ gl_Position=uVP*vec4(aPosition,1.0); vC=aColor; }
-  `, `
-    precision mediump float; varying vec3 vC; void main(){ gl_FragColor=vec4(vC,1.0); }
-  `);
-  const pointProgram = program(`
-    attribute vec3 aPosition; attribute vec3 aColor; attribute float aSize; uniform mat4 uVP; uniform float uScale; varying vec3 vColor;
-    void main(){ vec4 p=uVP*vec4(aPosition,1.0); gl_Position=p; gl_PointSize=aSize*uScale*clamp(13.0/p.w,0.55,2.4); vColor=aColor; }
-  `, `
-    precision mediump float; uniform float uRound; varying vec3 vColor;
-    void main(){ if(uRound>.5){ vec2 q=gl_PointCoord-.5; float d=dot(q,q); if(d>.25)discard; gl_FragColor=vec4(vColor*(1.08-d*.9),smoothstep(.25,.12,d)); } else gl_FragColor=vec4(vColor,.9); }
-  `);
+    }`;
+  // Picking: project id colour per triangle (aPick) or per instance; occluders render black (uOcc).
+  const PICK_VS = inst => `precision highp float; attribute vec3 position; attribute vec3 aPick; ${inst ? 'attribute mat4 instanceMatrix;' : ''} uniform mat4 uVP; varying vec3 vC;
+    void main(){ gl_Position=uVP*vec4(${inst ? '(instanceMatrix*vec4(position,1.0)).xyz' : 'position'},1.0); vC=aPick; }`;
+  const PICK_FS = `precision mediump float; uniform float uOcc; varying vec3 vC; void main(){ gl_FragColor=vec4(uOcc>0.5?vec3(0.0):vC,1.0); }`;
+  const POINT_VS = `precision highp float; attribute vec3 position; attribute vec3 color; attribute float aSize; uniform mat4 uVP; uniform float uScale; varying vec3 vColor;
+    void main(){ vec4 p=uVP*vec4(position,1.0); gl_Position=p; gl_PointSize=aSize*uScale*clamp(13.0/p.w,0.55,2.4); vColor=color; }`;
+  const POINT_FS = `precision mediump float; varying vec3 vColor;
+    void main(){ vec2 q=gl_PointCoord-.5; float d=dot(q,q); if(d>.25)discard; gl_FragColor=vec4(vColor*(1.08-d*.9),smoothstep(.25,.12,d)); }`;
+  const LINE_VS = `precision highp float; attribute vec3 position; attribute vec3 color; uniform mat4 uVP; varying vec3 vColor;
+    void main(){ gl_Position=uVP*vec4(position,1.0); vColor=color; }`;
+  const LINE_FS = `precision mediump float; varying vec3 vColor; void main(){ gl_FragColor=vec4(vColor,.9); }`;
 
   /* --------------------------- geometry ----------------------------- */
-  const Geo = () => ({p:[], c:[], n:[]});
-  const mesh = Geo(), detailMesh = Geo(), cloudGeo = Geo(), lines = {p:[], c:[]};
+  // inst: repeated props (trees, palms, ghaf, houses, turbines, vehicles) recorded as instances → InstancedMesh.
+  const Geo = (inst) => ({p:[], c:[], n:[], inst:inst ? {} : null});
+  const mesh = Geo(1), detailMesh = Geo(1), cloudGeo = Geo(), lines = {p:[], c:[]};
   const DETAIL_DIST = 7.2;   // decorative detail appears as the camera approaches a region; the Kingdom overview stays clean
   let target = mesh, lineTarget = lines;
   const norm3 = v => { const l=Math.hypot(v[0],v[1],v[2])||1; return [v[0]/l,v[1]/l,v[2]/l]; };
@@ -297,8 +299,14 @@
   /* ------------------------------ props ------------------------------ */
   const s = .75; // global prop scale
   const TREE_GREENS=[[.36,.74,.24],[.30,.66,.22],[.48,.80,.26],[.26,.60,.28]];
+  // Instances: [x, y, z, yaw, scale, r, g, b] per prototype key, in the current target layer.
+  function inst(key, x, y, z, rot, k, col){ (target.inst[key] = target.inst[key] || []).push(x, y, z, rot, k, col ? col[0] : 0, col ? col[1] : 0, col ? col[2] : 0); }
   function addTree(x,z,k=1,col){ // chunky round "toy" tree
     const q=k*s, c=col||TREE_GREENS[Math.floor(rng()*TREE_GREENS.length)];
+    if (target.inst) return inst('tree', x, G, z, 0, q, c);
+    treeRaw(x,z,q,c);
+  }
+  function treeRaw(x,z,q,c){
     addCylinder(x,G,z,.011*q,.05*q,[.52,.33,.18],6,.008*q);
     addBlob(x,G+.075*q,z,.045*q,.042*q,.045*q,c);
     addBlob(x+.026*q,G+.064*q,z+.012*q,.032*q,.03*q,.032*q,shade(c,1.08));
@@ -306,16 +314,23 @@
     addBlob(x+.004*q,G+.105*q,z-.004*q,.028*q,.026*q,.028*q,mix(c,[.72,.90,.36],.35));
   }
   function addGhaf(x,z,k=1){ // flat-topped desert acacia
-    const q=k*s, c=[.40,.62,.24]; addCylinder(x,G,z,.009*q,.05*q,[.50,.36,.22],5,.006*q);
+    if (target.inst) return inst('ghaf', x, G, z, 0, k*s); ghafRaw(x,z,k*s); }
+  function ghafRaw(x,z,q){
+    const c=[.40,.62,.24]; addCylinder(x,G,z,.009*q,.05*q,[.50,.36,.22],5,.006*q);
     addBlob(x,G+.058*q,z,.048*q,.026*q,.044*q,c,-.5,.35); addBlob(x+.02*q,G+.07*q,z-.008*q,.028*q,.018*q,.026*q,shade(c,1.12),-.5,.3);
   }
   function addPalm(x,z,k=1){ // curved trunk + drooping fronds
-    const q=k*s, h=.15*q, lean=rng()*6.283, lx=Math.cos(lean)*.018*q, lz=Math.sin(lean)*.018*q;
+    const q=k*s, lean=rng()*6.283, jit=[]; for(let i=0;i<8;i++) jit.push(rng()*.3);
+    if (target.inst) return inst('palm', x, G, z, lean, q);   // the lean becomes the instance's yaw
+    palmRaw(x,z,q,lean,jit);
+  }
+  function palmRaw(x,z,q,lean,jit){
+    const h=.15*q, lx=Math.cos(lean)*.018*q, lz=Math.sin(lean)*.018*q;
     const seg=4; let px=x,pz=z,py=G;
     for(let i=0;i<seg;i++){const t=(i+1)/seg,nx=x+lx*t*t,nz=z+lz*t*t,ny=G+h*t;addBeam([px,py,pz],[nx,ny,nz],.012*q*(1-.25*t),[.62,.44,.24]);px=nx;pz=nz;py=ny;}
     const top=[px,py,pz], greens=[[.20,.62,.24],[.28,.70,.26],[.16,.54,.22]];
     for(let i=0;i<8;i++){
-      const a=i/8*6.283+rng()*.3, ca=Math.cos(a), sa=Math.sin(a), L=.085*q, w=.016*q, col=greens[i%3];
+      const a=i/8*6.283+jit[i], ca=Math.cos(a), sa=Math.sin(a), L=.085*q, w=.016*q, col=greens[i%3];
       const mid=[top[0]+ca*L*.5, top[1]+.012*q, top[2]+sa*L*.5], tip=[top[0]+ca*L, top[1]-.03*q, top[2]+sa*L];
       const side=[-sa*w, 0, ca*w];
       const m1=[mid[0]+side[0],mid[1],mid[2]+side[2]], m2=[mid[0]-side[0],mid[1],mid[2]-side[2]];
@@ -325,13 +340,17 @@
   }
   // Saudi flat-roof house with parapet, door, windows and the classic rooftop water tank.
   function addHouse(x,z,k,col,rot=0){
+    if (target.inst) { const tank=rng()>.55; return inst(tank ? 'houseT' : 'house', x, G, z, rot, k, col); }
+    houseRaw(x,z,k,col,rot,rng()>.55);
+  }
+  function houseRaw(x,z,k,col,rot,tank){
     const w=.075*k, h=.055*k, d=.065*k, pt=.01*k;
     addBox(x,G,z,w,h,d,col,rot);
     const trim=shade(col,.92), cs=Math.cos(rot), sn=Math.sin(rot), off=(dx,dz)=>[x+dx*cs-dz*sn,z+dx*sn+dz*cs];
     for(const [dx,dz,ww,dd] of [[0,-d/2,w,pt*.5],[0,d/2,w,pt*.5],[-w/2,0,pt*.5,d],[w/2,0,pt*.5,d]]){const [px,pz]=off(dx,dz);addBox(px,G+h,pz,ww,pt,dd,trim,rot);}
     const [dxp,dzp]=off(0,d/2+.0015); addBox(dxp,G,dzp,w*.22,h*.55,.003,[.55,.36,.20],rot);
     for(const wx of [-.3,.3]){const [wxp,wzp]=off(w*wx,d/2+.0015);addBox(wxp,G+h*.55,wzp,w*.16,h*.2,.003,[.32,.46,.56],rot);}
-    if(rng()>.55){const [tx,tz]=off(w*.22,-d*.2);addCylinder(tx,G+h,tz,.009*k,.016*k,[.97,.97,.95],8);}
+    if(tank){const [tx,tz]=off(w*.22,-d*.2);addCylinder(tx,G+h,tz,.009*k,.016*k,[.97,.97,.95],8);}
   }
   function addTower(x,z,w,h,col,crown){
     addBox(x,G,z,w,h,w,col);
@@ -371,7 +390,8 @@
   // Largest model width that sits inside a project's footprint and keeps its marker pad clear.
   const fitFoot = (p, k=1) => Math.min(2*p.foot-.016, 2*(Math.hypot(p.pad[0]-p.x,p.pad[1]-p.z)-.014))*k;
   const turbines=[];
-  function addTurbine(x,z,k=1){const h=.2*k;addCylinder(x,G,z,.006*k,h,[.96,.96,.94],6,.003*k);addBox(x,G+h-.004*k,z,.02*k,.01*k,.01*k,[.94,.94,.92]);turbines.push([x,G+h,z+.007*k,k]);}
+  function addTurbine(x,z,k=1){ if (target.inst) { inst('turbine', x, G, z, 0, k); turbines.push([x,G+.2*k,z+.007*k,k]); return; } turbineRaw(x,z,k); }
+  function turbineRaw(x,z,k){const h=.2*k;addCylinder(x,G,z,.006*k,h,[.96,.96,.94],6,.003*k);addBox(x,G+h-.004*k,z,.02*k,.01*k,.01*k,[.94,.94,.92]);turbines.push([x,G+h,z+.007*k,k]);}
   function addCloud(x,y,z,k){
     const n=5+Math.floor(rng()*3);
     for(let i=0;i<n;i++){const a=i/n*6.283,r=(.12+rng()*.08)*k,ox=Math.cos(a)*.16*k*(0.6+rng()*.6),oz=Math.sin(a)*.09*k;
@@ -1074,7 +1094,7 @@
   })();
 
   /* ------------------------------ vehicles --------------------------- */
-  const vehGeo = Geo();
+  const vehGeo = Geo(1);
 
 
   /* ---------------------- per-project stage mesh -------------------- */
@@ -1084,10 +1104,10 @@
   const lowStalk = id => !!(id && LY.projects[id] && LY.projects[id].illustrative);
   const stalkH = (k, id) => lowStalk(id) ? .02 + k*.004 : .08 + k*.014;
   const beaconTop = (st, id) => { const k=tierCount(st); return G + k*.012 + stalkH(k, id); };
-  const stageMesh = Geo(), stageLines = {p:[], c:[]};
+  const stageMesh = Geo(1), stageLines = {p:[], c:[]};
   let stageDirty = true;
   function buildStageMesh(){
-    stageMesh.p.length=stageMesh.c.length=stageMesh.n.length=stageLines.p.length=stageLines.c.length=0;
+    stageMesh.p.length=stageMesh.c.length=stageMesh.n.length=stageLines.p.length=stageLines.c.length=0; stageMesh.inst={};
     target=stageMesh; lineTarget=stageLines;
     for (const p of D.projects) {
       const st=projectState[p.id], k=tierCount(st), d=st.doneKeys||[], [px,pz]=p.pad, f=p.foot;   // progress lives on the marker pad at the footprint's south edge
@@ -1104,14 +1124,14 @@
   }
   buildStageMesh();
 
-  const missionMesh = Geo(), missionLines = {p:[], c:[]}; let missionDirty = false;
+  const missionMesh = Geo(1), missionLines = {p:[], c:[]}; let missionDirty = false;
   const KIND_OFF = {metro:.014, brt:-.014, wide:0, power:.02};
   function addRibbon(a, b, prog, w, y, h, col){
     const dx=b[0]-a[0], dz=b[1]-a[1], L=Math.hypot(dx,dz); if (L<1e-4||prog<=0) return; const len=L*Math.min(1,prog), ux=dx/L, uz=dz/L;
     addBox(a[0]+ux*len/2, y, a[1]+uz*len/2, len, h, w, col, Math.atan2(dz,dx));
   }
   function buildMission(){
-    missionMesh.p.length=missionMesh.c.length=missionMesh.n.length=missionLines.p.length=missionLines.c.length=0;
+    missionMesh.p.length=missionMesh.c.length=missionMesh.n.length=missionLines.p.length=missionLines.c.length=0; missionMesh.inst={};
     target=missionMesh; lineTarget=missionLines;
     const sc=missionScene||{links:[],sites:[]};
     // A link follows its routed path (layout.routeBetween): straight when clear, else along the plan's roads. Each path
@@ -1165,11 +1185,11 @@
   }
 
   /* ------------------------------ city builder ------------------------ */
-  const cityMesh = Geo(), cityLines = {p:[], c:[]}; let cityDirty = false, cityDesc = null;
+  const cityMesh = Geo(1), cityLines = {p:[], c:[]}; let cityDirty = false, cityDesc = null;
   const ZCOL = {R:[.55,.78,.45], C:[.45,.66,.92], I:[.92,.78,.38], T:[.86,.52,.78], M:[.48,.78,.72]};
   const RES = [[.96,.88,.72],[.93,.80,.62],[.98,.92,.80],[.90,.84,.74]], COM = [[.36,.62,.78],[.30,.55,.72],[.52,.72,.84]], IND = [[.78,.74,.68],[.70,.70,.72],[.82,.76,.62]];
   function buildCity(){
-    cityMesh.p.length=cityMesh.c.length=cityMesh.n.length=cityLines.p.length=cityLines.c.length=0;
+    cityMesh.p.length=cityMesh.c.length=cityMesh.n.length=cityLines.p.length=cityLines.c.length=0; cityMesh.inst={};
     target=cityMesh; lineTarget=cityLines;
     const d=cityDesc, CY=G+.011; if (d) {
       const {x0,z0,ts,n}=d, X=i=>x0+(i+.5)*ts, Z=j=>z0+(j+.5)*ts, h=ts/2;
@@ -1241,61 +1261,152 @@
     target=mesh; lineTarget=lines; cityDirty=true;
   }
 
-  /* ------------------------------ buffers --------------------------- */
-  function upload(geo, buf, usage=gl.STATIC_DRAW){
-    buf = buf || {p:gl.createBuffer(), c:gl.createBuffer(), n:gl.createBuffer()};
-    gl.bindBuffer(gl.ARRAY_BUFFER,buf.p); gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(geo.p),usage);
-    gl.bindBuffer(gl.ARRAY_BUFFER,buf.c); gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(geo.c),usage);
-    if (geo.n && buf.n) { gl.bindBuffer(gl.ARRAY_BUFFER,buf.n); gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(geo.n),usage); }
-    buf.count = geo.p.length/3; return buf;
-  }
+  /* ------------------------------ three.js scene -------------------- */
   // Picking colours: each triangle is tagged with the project whose footprint contains it (0 = not a project).
   function idColors(geo){ const P3=geo.p, n=P3.length/3, out=new Float32Array(n*3);
     for (let v=0; v+2<n; v+=3) { const i=v*3, cx=(P3[i]+P3[i+3]+P3[i+6])/3, cz=(P3[i+2]+P3[i+5]+P3[i+8])/3, id=LY.footprintAt(cx,cz), k=id?PIDX[id]:0;
       if (!k) continue; for (let j=0;j<3;j++){ out[(v+j)*3]=(k&255)/255; out[(v+j)*3+1]=((k>>8)&255)/255; out[(v+j)*3+2]=1; } }
     return out; }
-  function uploadIds(geo, buf){ buf.id = buf.id || gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,buf.id); gl.bufferData(gl.ARRAY_BUFFER,idColors(geo),gl.STATIC_DRAW); return buf; }
-  const meshBuf = uploadIds(mesh, upload(mesh)), detailBuf = upload(detailMesh), cloudBuf = upload(cloudGeo), lineBuf = upload({p:lines.p,c:lines.c}, {p:gl.createBuffer(),c:gl.createBuffer()});
-  // Top of each project's model (for label placement): the highest vertex inside its footprint.
-  const topY = Object.fromEntries(D.projects.map(p => [p.id, G+.1]).concat([[CORE_ID, G+.1]], PLACE_IDS.map(id => [id, G+.06])));
-  for (let i=0;i<mesh.p.length;i+=3) { const id=LY.footprintAt(mesh.p[i],mesh.p[i+2]); if (id && mesh.p[i+1]>topY[id]) topY[id]=mesh.p[i+1]; }
-  let stageBuf = null, stageLineBuf = null, vehBuf = null, missionBuf = null, missionLineBuf = null, cityBuf = null, cityLineBuf = null;
-  const waterBuf = {p:gl.createBuffer(), s:gl.createBuffer(), i:gl.createBuffer(), count:WATER.idx.length};
-  gl.bindBuffer(gl.ARRAY_BUFFER,waterBuf.p); gl.bufferData(gl.ARRAY_BUFFER,WATER.pos,gl.STATIC_DRAW);
-  gl.bindBuffer(gl.ARRAY_BUFFER,waterBuf.s); gl.bufferData(gl.ARRAY_BUFFER,WATER.shore,gl.STATIC_DRAW);
-  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,waterBuf.i); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,WATER.idx,gl.STATIC_DRAW);
-  const dynPB=gl.createBuffer(), dynCB=gl.createBuffer(), dynSB=gl.createBuffer();
-  window.__visionStats={triangles:(meshBuf.count+detailBuf.count+cloudBuf.count)/3, detailTriangles:detailBuf.count/3, water:WATER.idx.length/3, lines:lineBuf.count/2};
-
-  const U = (prog, names) => Object.fromEntries(names.map(n => [n, gl.getUniformLocation(prog, n)]));
-  const loc = {
-    m:{pos:gl.getAttribLocation(meshProgram,'aPosition'),col:gl.getAttribLocation(meshProgram,'aColor'),nrm:gl.getAttribLocation(meshProgram,'aNormal'),
-       ...U(meshProgram,['uVP','uLightVP','uOffset','uShadow','uSun','uEye','uStorm','uDist','uShadowOn','uTexel','uGlow','uGround','uTime','uTint','uNight'])},
-    d:{pos:gl.getAttribLocation(depthProgram,'aPosition'), ...U(depthProgram,['uLightVP','uOffset'])},
-    k:{pos:gl.getAttribLocation(pickProgram,'aPosition'),col:gl.getAttribLocation(pickProgram,'aColor'),uVP:gl.getUniformLocation(pickProgram,'uVP')},
-    w:{pos:gl.getAttribLocation(waterProgram,'aPosition'),shore:gl.getAttribLocation(waterProgram,'aShore'), ...U(waterProgram,['uVP','uTime','uSun','uEye','uStorm','uDist','uTint','uNight'])},
-    p:{pos:gl.getAttribLocation(pointProgram,'aPosition'),col:gl.getAttribLocation(pointProgram,'aColor'),size:gl.getAttribLocation(pointProgram,'aSize'),vp:gl.getUniformLocation(pointProgram,'uVP'),scale:gl.getUniformLocation(pointProgram,'uScale'),round:gl.getUniformLocation(pointProgram,'uRound')}
-  };
-  const MAXA=gl.getParameter(gl.MAX_VERTEX_ATTRIBS);
-  function resetAttribs(){ for(let i=0;i<Math.min(8,MAXA);i++) gl.disableVertexAttribArray(i); }
-  function attr(l, b, size){ if(l<0) return; gl.bindBuffer(gl.ARRAY_BUFFER,b); gl.enableVertexAttribArray(l); gl.vertexAttribPointer(l,size,gl.FLOAT,false,0,0); }
-  function bindAttr(l, pb, cb){ attr(l.pos,pb,3); attr(l.col,cb,3); }
+  const idOf = (x, z) => { const id=LY.footprintAt(x,z); return id ? PIDX[id] : 0; };
 
   /* ---------------------------- shadow map -------------------------- */
   const SUN = norm3([-0.55, 1.0, 0.62]);
   let resScale = 1;
   const SHADOW_SIZE = 2048;
-  const shadowTex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, shadowTex);
-  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,SHADOW_SIZE,SHADOW_SIZE,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
-  for (const [k,v] of [[gl.TEXTURE_MIN_FILTER,gl.NEAREST],[gl.TEXTURE_MAG_FILTER,gl.NEAREST],[gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE],[gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D,k,v);
-  const shadowFB = gl.createFramebuffer(), shadowRB = gl.createRenderbuffer();
-  gl.bindRenderbuffer(gl.RENDERBUFFER, shadowRB); gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, SHADOW_SIZE, SHADOW_SIZE);
-  gl.bindFramebuffer(gl.FRAMEBUFFER, shadowFB); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, shadowTex, 0);
-  gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, shadowRB);
-  let shadowsSupported = gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE;
-  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  const shadowsSupported = true;
   const ortho = (h, n, f) => new Float32Array([1/h,0,0,0, 0,1/h,0,0, 0,0,-2/(f-n),0, 0,0,-(f+n)/(f-n),1]);
   let lightVP = new Float32Array(16), quality = 'high';
+
+  renderer.setPixelRatio(1); renderer.autoClear = false;
+  const scene3 = new THREE.Scene(), cam3 = new THREE.PerspectiveCamera(.5 * 180 / Math.PI, 1, .1, 140), clearCol = new THREE.Color();
+  const nearest = {minFilter:THREE.NearestFilter, magFilter:THREE.NearestFilter, generateMipmaps:false, depthBuffer:true};
+  const shadowRT = new THREE.WebGLRenderTarget(SHADOW_SIZE, SHADOW_SIZE, nearest);
+  // Uniforms shared by every material (the same values the original renderer set once per frame).
+  const SU = {uVP:{value:new Float32Array(16)}, uLightVP:{value:lightVP}, uSun:{value:SUN}, uEye:{value:[0,0,0]}, uStorm:{value:0}, uDist:{value:1}, uTexel:{value:1/SHADOW_SIZE},
+    uGround:{value:G}, uTime:{value:0}, uTint:{value:[.80,.58,.32]}, uNight:{value:0}, uShadow:{value:shadowRT.texture}};
+  const RAW = (vs, fsrc, uniforms, o = {}) => new THREE.RawShaderMaterial(Object.assign({vertexShader:vs, fragmentShader:fsrc, uniforms, side:THREE.DoubleSide, blending:THREE.NoBlending, depthTest:true, depthWrite:true}, o));
+  const depthU = {uLightVP:SU.uLightVP, uOffset:{value:[0,0,0]}};
+  const DEPTH = [RAW(DEPTH_VS(0), DEPTH_FS, depthU), RAW(DEPTH_VS(1), DEPTH_FS, depthU)];
+  const pickU = o => ({uVP:SU.uVP, uOcc:{value:o}});
+  const PICK = {ids:[RAW(PICK_VS(0), PICK_FS, pickU(0)), RAW(PICK_VS(1), PICK_FS, pickU(0))], occ:[RAW(PICK_VS(0), PICK_FS, pickU(1)), RAW(PICK_VS(1), PICK_FS, pickU(1))]};
+  const OBJS = [];   // every drawable; userData: {L (layer), mats:{main, depth, pick}, inst}
+  const addObj = (o, ud) => { o.frustumCulled = false; o.userData = ud; scene3.add(o); OBJS.push(o); return o; };
+
+  // Grow-only dynamic attributes; the draw range follows the live vertex count.
+  function fillDyn(g, n, attrs){
+    for (const name in attrs) { const [arr, size] = attrs[name]; let a = g.getAttribute(name);
+      if (!a || a.count < n) { a = new THREE.BufferAttribute(new Float32Array(Math.max(n, a ? a.count * 2 : 0, 4) * size), size); a.setUsage(THREE.DynamicDrawUsage); g.setAttribute(name, a); }
+      if (n) { a.array.set(arr.length > n * size ? arr.slice(0, n * size) : arr); a.clearUpdateRanges(); a.addUpdateRange(0, n * size); a.needsUpdate = true; } }
+    g.setDrawRange(0, n);
+  }
+
+  // Layers in the original draw order and with the original flags: glow, shadow casting, picking role, visibility.
+  const LAYERS = {
+    mesh:{geo:mesh, glow:0, cast:1, pick:'ids'},
+    detail:{geo:detailMesh, glow:0, cast:1, pick:'occ', when:() => detailOn()},
+    stage:{geo:stageMesh, glow:.05, cast:1, pick:'ids'},
+    veh:{geo:vehGeo, glow:.08, cast:1, pick:'occ'},
+    mission:{geo:missionMesh, glow:.04, cast:1, pick:'ids'},
+    city:{geo:cityMesh, glow:.03, cast:1, pick:null},
+    cloud:{geo:cloudGeo, glow:.42, cast:0, pick:null}
+  };
+  for (const L of Object.values(LAYERS)) {
+    L.own = {uGlow:{value:L.glow}, uShadowOn:{value:0}, uOffset:{value:[0,0,0]}};
+    const u = Object.assign({}, SU, L.own);
+    L.main = RAW(MESH_VS(0), MESH_FS, u); L.mainI = RAW(MESH_VS(1), MESH_FS, u); L.insts = {};
+    L.obj = addObj(new THREE.Mesh(new THREE.BufferGeometry(), L.main), {L, mats:{main:L.main, depth:DEPTH[0], pick:L.pick ? PICK[L.pick][0] : null}});
+  }
+
+  // ---- Instanced props: one prototype geometry per kind, built once by the original builder at the origin.
+  // Colour = color + aTintK × instanceColor, so a tinted prop (tree foliage, house walls, convoy body) keeps its fixed
+  // parts (trunk, door, windows) exactly as before. aTintK is recovered by building the prototype at two tints.
+  const PROTOS = {};
+  const PROTO_DEF = key => {
+    const ship = /^ship(\d)(\d)$/.exec(key);
+    if (ship) { const hull = ship[1] === '1' ? [.92,.30,.24] : [.20,.36,.62], kk = +ship[2];
+      return {dy:0, build:() => { addBox(0,SEA-.004,0,.075,.016,.022,hull); addBox(0,SEA+.012,0,.07,.004,.02,[.97,.97,.95]); addBox(-.028,SEA+.016,0,.014,.022,.018,[1,1,1]);
+        for(let c=0;c<3;c++){const o=-.008+c*.016; addBox(o,SEA+.016,0,.013,.012,.017,[[.95,.62,.18],[.28,.66,.42],[.86,.26,.24]][(c+kk)%3]);} }}; }
+    return {
+      tree:{dy:G, tint:1, build:c => treeRaw(0,0,1,c)},
+      ghaf:{dy:G, build:() => ghafRaw(0,0,1)},
+      palm:{dy:G, build:() => palmRaw(0,0,1,0,[.15,.15,.15,.15,.15,.15,.15,.15])},
+      house:{dy:G, tint:1, build:c => houseRaw(0,0,1,c,0,false)},
+      houseT:{dy:G, tint:1, build:c => houseRaw(0,0,1,c,0,true)},
+      turbine:{dy:G, build:() => { const n = turbines.length; turbineRaw(0,0,1); turbines.length = n; }},
+      car0:{dy:0, build:() => { addBox(0,G+.006,0,.03,.013,.013,[.98,.96,.92]); addBox(0,G+.019,0,.03,.002,.014,[.86,.68,.30]); }},
+      car1:{dy:0, build:() => { addBox(0,G+.006,0,.03,.013,.013,[.30,.55,.85]); addBox(0,G+.019,0,.03,.002,.014,[.95,.95,.95]); }},
+      plane:{dy:0, build:() => { addBox(0,0,0,.07,.012,.012,[.98,.98,.98]); addBox(0,.004,0,.016,.003,.085,[.90,.92,.95]); addBox(-.03,.006,0,.012,.018,.004,[.14,.52,.34]); addBox(-.03,.006,0,.01,.003,.03,[.9,.92,.95]); }},
+      convoy:{dy:0, tint:1, build:c => { addBox(0,G+.003,0,.034,.016,.014,c); addBox(.024,G+.003,0,.013,.018,.014,[.96,.96,.94]); }}
+    }[key];
+  };
+  function protoBuild(fn){ const prev = target, tmp = Geo(); target = tmp; fn(); target = prev; return tmp; }
+  function proto(key){
+    if (PROTOS[key]) return PROTOS[key];
+    const def = PROTO_DEF(key), A = protoBuild(() => def.build(def.tint ? [0,0,0] : null)), B = def.tint ? protoBuild(() => def.build([.5,.5,.5])) : null;
+    const n = A.p.length / 3, pos = new Float32Array(A.p), tk = new Float32Array(n); let top = 0;
+    for (let i = 0; i < n; i++) { pos[i*3+1] -= def.dy; top = Math.max(top, pos[i*3+1]); if (B) tk[i] = (B.c[i*3] - A.c[i*3]) / .5; }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(A.c), 3));
+    g.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(A.n), 3)); g.setAttribute('aTintK', new THREE.BufferAttribute(tk, 1));
+    return PROTOS[key] = {g, top, tris:n / 3};
+  }
+  function makeInstanced(L, key, cap, old){
+    const P = proto(key), g = new THREE.BufferGeometry();
+    for (const nm of ['position', 'color', 'normal', 'aTintK']) g.setAttribute(nm, P.g.getAttribute(nm));
+    g.setAttribute('aPick', new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3));
+    const im = new THREE.InstancedMesh(g, L.mainI, cap); im.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    im.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3); im.count = 0;
+    if (old) { scene3.remove(old); OBJS.splice(OBJS.indexOf(old), 1); }
+    addObj(im, {L, inst:true, cap, mats:{main:L.mainI, depth:DEPTH[1], pick:L.pick ? PICK[L.pick][1] : null}});
+    return L.insts[key] = im;
+  }
+  // Instance record: [x, y, z, yaw, scale, r, g, b]. Yaw follows addBox: local +x → (cos, sin) in x/z.
+  function syncInstances(L){
+    const data = L.geo.inst || {};
+    for (const key of new Set([...Object.keys(L.insts), ...Object.keys(data)])) {
+      const arr = data[key] || [], n = arr.length / 8; let im = L.insts[key];
+      if (!im && !n) continue;
+      if (!im || im.userData.cap < n) im = makeInstanced(L, key, Math.max(16, n * 2), im);
+      const M = im.instanceMatrix.array, Cc = im.instanceColor.array, Pk = im.geometry.getAttribute('aPick').array;
+      for (let i = 0; i < n; i++) { const o = i * 8, x = arr[o], y = arr[o+1], z = arr[o+2], k = arr[o+4], cs = Math.cos(arr[o+3]) * k, sn = Math.sin(arr[o+3]) * k, m = i * 16;
+        M[m]=cs; M[m+1]=0; M[m+2]=sn; M[m+3]=0; M[m+4]=0; M[m+5]=k; M[m+6]=0; M[m+7]=0; M[m+8]=-sn; M[m+9]=0; M[m+10]=cs; M[m+11]=0; M[m+12]=x; M[m+13]=y; M[m+14]=z; M[m+15]=1;
+        Cc[i*3] = arr[o+5]; Cc[i*3+1] = arr[o+6]; Cc[i*3+2] = arr[o+7];
+        if (L.pick === 'ids') { const id = idOf(x, z); Pk[i*3] = (id & 255) / 255; Pk[i*3+1] = ((id >> 8) & 255) / 255; Pk[i*3+2] = id ? 1 : 0; } }
+      im.count = n; im.instanceMatrix.needsUpdate = true; im.instanceColor.needsUpdate = true; im.geometry.getAttribute('aPick').needsUpdate = true;
+    }
+  }
+  function syncLayer(name){
+    const L = LAYERS[name], geo = L.geo, n = geo.p.length / 3, at = {position:[geo.p, 3], color:[geo.c, 3], normal:[geo.n, 3]};
+    if (L.pick === 'ids') at.aPick = [idColors(geo), 3];
+    fillDyn(L.obj.geometry, n, at); syncInstances(L);
+  }
+
+  // Sea, line layers and dynamic points (main pass only).
+  { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(WATER.pos, 3)); g.setAttribute('aShore', new THREE.BufferAttribute(WATER.shore, 1)); g.setIndex(new THREE.BufferAttribute(WATER.idx, 1));
+    const w = addObj(new THREE.Mesh(g, RAW(WATER_VS, WATER_FS, Object.assign({}, SU))), {}); w.userData.mats = {main:w.material}; w.renderOrder = -1; }
+  const LINE_MAT = RAW(LINE_VS, LINE_FS, {uVP:SU.uVP}, {transparent:true, blending:THREE.NormalBlending});
+  const lineObj = (order) => { const o = addObj(new THREE.LineSegments(new THREE.BufferGeometry(), LINE_MAT), {}); o.userData.mats = {main:LINE_MAT}; o.renderOrder = order; return o; };
+  const linesObj = lineObj(10), stageLinesObj = lineObj(11), cityLinesObj = lineObj(12), missionLinesObj = lineObj(13), dynLinesObj = lineObj(14);
+  const POINT_MAT = RAW(POINT_VS, POINT_FS, {uVP:SU.uVP, uScale:{value:1}}, {transparent:true, blending:THREE.NormalBlending, depthWrite:false});
+  const pointsObj = addObj(new THREE.Points(new THREE.BufferGeometry(), POINT_MAT), {}); pointsObj.userData.mats = {main:POINT_MAT}; pointsObj.renderOrder = 20;
+  const syncLines = (o, L) => fillDyn(o.geometry, L.p.length / 3, {position:[L.p, 3], color:[L.c, 3]});
+
+  // Static layers: uploaded once.
+  syncLayer('mesh'); syncLayer('detail'); syncLayer('cloud'); syncLines(linesObj, lines);
+  // Top of each project's model (for label placement): the highest vertex (or instance) inside its footprint.
+  const topY = Object.fromEntries(D.projects.map(p => [p.id, G+.1]).concat([[CORE_ID, G+.1]], PLACE_IDS.map(id => [id, G+.06])));
+  for (let i=0;i<mesh.p.length;i+=3) { const id=LY.footprintAt(mesh.p[i],mesh.p[i+2]); if (id && mesh.p[i+1]>topY[id]) topY[id]=mesh.p[i+1]; }
+  for (const [key, arr] of Object.entries(mesh.inst)) { const P = proto(key); for (let i = 0; i < arr.length; i += 8) { const id = LY.footprintAt(arr[i], arr[i+2]), y = arr[i+1] + P.top * arr[i+4]; if (id && y > topY[id]) topY[id] = y; } }
+  const instTris = geo => Object.entries(geo.inst || {}).reduce((t, [k, a]) => t + proto(k).tris * a.length / 8, 0);
+  window.__visionStats = {triangles:(mesh.p.length + detailMesh.p.length + cloudGeo.p.length) / 9 + instTris(mesh) + instTris(detailMesh), detailTriangles:detailMesh.p.length / 9 + instTris(detailMesh),
+    water:WATER.idx.length / 3, lines:lines.p.length / 6, instances:Object.values(mesh.inst).concat(Object.values(detailMesh.inst)).reduce((n, a) => n + a.length / 8, 0), renderer:'three'};
+  // Each pass picks every object's material and visibility, mirroring what the original renderer drew in that pass.
+  function renderPass(pass){
+    for (const o of OBJS) { const u = o.userData, L = u.L; let v = !L || !L.when || L.when();
+      if (pass === 'depth') v = v && !!(L && L.cast); else if (pass === 'pick') v = v && !!(L && L.pick);
+      if (u.inst) v = v && o.count > 0;
+      o.visible = v; if (v) o.material = u.mats[pass]; }
+  }
 
   /* ------------------------------ camera ---------------------------- */
   const K = D.regions.kingdom;
@@ -1308,14 +1419,15 @@
   let night=0, nightTarget=0, camSpeed=1, beaconsOn=true, bursts=[], missionScene=null, missionLights=[];
   const bounds={minX:-7,maxX:8,minZ:-6,maxZ:7};
 
-  function resize(){dpr=Math.min(devicePixelRatio||1,quality==='low'?1:2)*resScale;const w=Math.floor(innerWidth*dpr),h=Math.floor(innerHeight*dpr);if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;}width=w;height=h;gl.viewport(0,0,w,h);}
+  function resize(){dpr=Math.min(devicePixelRatio||1,quality==='low'?1:2)*resScale;const w=Math.floor(innerWidth*dpr),h=Math.floor(innerHeight*dpr);if(canvas.width!==w||canvas.height!==h)renderer.setSize(w,h,false);width=w;height=h;}
   function updateCamera(dt){
     const k=1-Math.pow(.001,dt/1000*0.9*camSpeed);
     camera.az+=(camera.desired.az-camera.az)*k; camera.el+=(camera.desired.el-camera.el)*k; camera.dist+=(camera.desired.dist-camera.dist)*k;
     for (let i=0;i<3;i++) camera.target[i]+=(camera.desired.target[i]-camera.target[i])*k;
     const ce=Math.cos(camera.el), ed=camera.dist*EYE;
     eye=[camera.target[0]+Math.sin(camera.az)*ce*ed, camera.target[1]+Math.sin(camera.el)*ed, camera.target[2]+Math.cos(camera.az)*ce*ed];
-    vp=M4.multiply(M4.perspective(FOV,width/height,.1,140),M4.lookAt(eye,camera.target));
+    vp=M4.multiply(M4.perspective(FOV,width/height,.1,140),M4.lookAt(eye,camera.target)); SU.uVP.value=vp; SU.uEye.value=eye;
+    cam3.aspect=width/height; cam3.position.set(eye[0],eye[1],eye[2]); cam3.lookAt(camera.target[0],camera.target[1],camera.target[2]); cam3.updateProjectionMatrix(); cam3.updateMatrixWorld();
   }
   function setDesired(az,el,dist,x,z,y=0){camera.desired={az,el,dist,target:[x,y,z]};}
 
@@ -1332,24 +1444,17 @@
   const heading=(path,L,q,dir)=>{const a=along(path,L,Math.min(.9999,Math.max(0,q))),b=along(path,L,Math.min(.9999,Math.max(0,q+(dir?.002:-.002))));return [a[0],a[1],Math.atan2(b[1]-a[1],b[0]-a[0])];};
   const flights=[['Riyadh','Jeddah'],['Riyadh','Dammam'],['Jeddah','Tabuk'],['Riyadh','Abha'],['Madinah','Riyadh']].map(([a,b])=>[C(a),C(b)]);
   function buildVehicles(t){
-    vehGeo.p.length=vehGeo.c.length=vehGeo.n.length=0; wakes.length=0; target=vehGeo;
+    vehGeo.p.length=vehGeo.c.length=vehGeo.n.length=0; vehGeo.inst={}; wakes.length=0; target=vehGeo;
     shipLanes.forEach((path,r)=>{const L=shipL[r];for(let k=0;k<4;k++){
       const dir=k%2, q=((t*.000012)/L[L.length-1]*6+k/4+r*.13)%1, [x,z,rot]=heading(path,L,dir?q:1-q,dir), cs=Math.cos(rot), sn=Math.sin(rot);
-      const hull=(k+r)%3===0?[.92,.30,.24]:[.20,.36,.62];
-      addBox(x,SEA-.004,z,.075,.016,.022,hull,rot); addBox(x,SEA+.012,z,.07,.004,.02,[.97,.97,.95],rot);
-      addBox(x-cs*.028,SEA+.016,z-sn*.028,.014,.022,.018,[1,1,1],rot);
-      for(let c=0;c<3;c++){const o=-.008+c*.016;addBox(x+cs*o,SEA+.016,z+sn*o,.013,.012,.017,[[.95,.62,.18],[.28,.66,.42],[.86,.26,.24]][(c+k)%3],rot);}
+      inst('ship'+((k+r)%3===0?1:0)+(k%3), x, 0, z, rot, 1);
       for(let w=1;w<5;w++) wakes.push([x-cs*(.03+w*.018),z-sn*(.03+w*.018),5-w*.8]);
     }});
     railPaths.forEach((path,r)=>{const L=railL[r];for(let k=0;k<2;k++){const q0=((t*.00005)/L[L.length-1]*4+k*.5+r*.17)%1;
-      for(let c=0;c<4;c++){const q=Math.max(.001,q0-c*.0065*(3/L[L.length-1])),[x,z,rot]=heading(path,L,q,true);
-        addBox(x,G+.006,z,.03,.013,.013,r===0?[.98,.96,.92]:[.30,.55,.85],rot); addBox(x,G+.019,z,.03,.002,.014,r===0?[.86,.68,.30]:[.95,.95,.95],rot);}}});
+      for(let c=0;c<4;c++){const q=Math.max(.001,q0-c*.0065*(3/L[L.length-1])),[x,z,rot]=heading(path,L,q,true); inst(r===0?'car0':'car1', x, 0, z, rot, 1);}}});
     flights.forEach(([a,b],i)=>{const q=((t*.00002*(1+i*.13))+i*.21)%1, f=i%2?q:1-q, A=i%2?a:b, B=i%2?b:a;
-      const x=A.x+(B.x-A.x)*f, z=A.z+(B.z-A.z)*f, y=G+.12+Math.sin(Math.PI*f)*.45, rot=Math.atan2(B.z-A.z,B.x-A.x), cs=Math.cos(rot), sn=Math.sin(rot);
-      addBox(x,y,z,.07,.012,.012,[.98,.98,.98],rot); addBox(x,y+.004,z,.016,.003,.085,[.90,.92,.95],rot);
-      addBox(x-cs*.03,y+.006,z-sn*.03,.012,.018,.004,[.14,.52,.34],rot); addBox(x-cs*.03,y+.006,z-sn*.03,.01,.003,.03,[.9,.92,.95],rot);});
-    for (const cv of convoyList) { const cs=Math.cos(cv.rot), sn=Math.sin(cv.rot);
-      addBox(cv.x,G+.003,cv.z,.034,.016,.014,cv.color||[.95,.62,.18],cv.rot); addBox(cv.x+cs*.024,G+.003,cv.z+sn*.024,.013,.018,.014,[.96,.96,.94],cv.rot); }
+      const x=A.x+(B.x-A.x)*f, z=A.z+(B.z-A.z)*f, y=G+.12+Math.sin(Math.PI*f)*.45, rot=Math.atan2(B.z-A.z,B.x-A.x); inst('plane', x, y, z, rot, 1);});
+    for (const cv of convoyList) inst('convoy', cv.x, 0, cv.z, cv.rot, 1, cv.color||[.95,.62,.18]);
     const bladeCol=[.97,.97,.96];
     for (const [x,y,z,k] of turbines){ const a0=t*.003+x*7; for(let b=0;b<3;b++){const a=a0+b*2.094,L=.075*k,w=.006*k,ca=Math.cos(a),sa=Math.sin(a),px=-sa*w,py=ca*w;
       addTri([x+px,y+py,z],[x-px,y-py,z],[x+ca*L,y+sa*L,z],bladeCol);}}
@@ -1402,9 +1507,7 @@
     for (let bi=bursts.length-1; bi>=0; bi--) { const b=bursts[bi], age=t-b.t0; if (age>2400) { bursts.splice(bi,1); continue; }
       const pal=[[1,.84,.3],[.35,.85,.5],[1,1,1],[.98,.55,.2],[.45,.7,1]];
       for (let i=0;i<60;i++) { const a=i*2.399, sp=.00012+(i%7)*.000018, r=age*sp, vy=.00022+(i%5)*.00004; const y=G+.08+vy*age-2.2e-10*age*age; if (y<G) continue; push(b.x+Math.cos(a)*r,y,b.z+Math.sin(a)*r,pal[i%5],4.5*(1-age/2600)+1); } }
-    gl.bindBuffer(gl.ARRAY_BUFFER,dynPB);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(dp),gl.DYNAMIC_DRAW);
-    gl.bindBuffer(gl.ARRAY_BUFFER,dynCB);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(dc),gl.DYNAMIC_DRAW);
-    gl.bindBuffer(gl.ARRAY_BUFFER,dynSB);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(ds),gl.DYNAMIC_DRAW);
+    fillDyn(pointsObj.geometry, dp.length/3, {position:[dp,3], color:[dc,3], aSize:[ds,1]});
     return dp.length/3;
   }
 
@@ -1526,13 +1629,6 @@
 
   /* ------------------------------ render ---------------------------- */
   let lastT=performance.now(), frames=0, slowFrames=0;
-  function drawMesh(buf, glow=0, shadowOn=1){
-    if(!buf||!buf.count) return;
-    attr(loc.m.pos,buf.p,3); attr(loc.m.col,buf.c,3); attr(loc.m.nrm,buf.n,3);
-    gl.uniform1f(loc.m.uGlow,glow); gl.uniform1f(loc.m.uShadowOn,shadowOn&&shadowsOn()?1:0);
-    gl.drawArrays(gl.TRIANGLES,0,buf.count);
-  }
-  function drawDepth(buf){ if(!buf||!buf.count) return; attr(loc.d.pos,buf.p,3); gl.drawArrays(gl.TRIANGLES,0,buf.count); }
   const shadowsOn = () => shadowsSupported && quality==='high';
   const detailOn = () => camera.dist < DETAIL_DIST;
   function updateLight(){
@@ -1541,61 +1637,45 @@
     const e=[c[0]+SUN[0]*30, c[1]+SUN[1]*30, c[2]+SUN[2]*30];
     lightVP = M4.multiply(ortho(h, 1, 60), M4.lookAt(e, c, [0,1,0]));
   }
+  // ?debug=1: frame-time overlay (fps, ms, draw calls, triangles) — also readable through VisionWorld.debug.frameStats().
+  const fpsStat = {fps:0, ms:0, n:0, acc:0, at:performance.now()};
+  const fpsEl = window.VN_DEBUG ? (() => { const d=document.createElement('div'); d.id='fpsDebug';
+    d.style.cssText='position:fixed;left:8px;bottom:8px;z-index:60;padding:4px 8px;border-radius:6px;background:rgba(21,63,54,.85);color:#fff;font:600 11px/1.4 ui-monospace,Consolas,monospace;pointer-events:none;white-space:pre';
+    document.body.appendChild(d); return d; })() : null;
   function render(t){
-    const dt=Math.min(100,t-lastT); lastT=t;
+    const raw=t-lastT, dt=Math.min(100,raw); lastT=t;
+    fpsStat.acc+=raw; fpsStat.n++;
+    if (t-fpsStat.at>500 && fpsStat.n) { fpsStat.ms=fpsStat.acc/fpsStat.n; fpsStat.fps=1000/fpsStat.ms; fpsStat.acc=fpsStat.n=0; fpsStat.at=t;
+      if (fpsEl) fpsEl.textContent=`three.js · ${quality}\n${fpsStat.fps.toFixed(0)} fps · ${fpsStat.ms.toFixed(1)} ms\n${renderer.info.render.calls} calls · ${(renderer.info.render.triangles/1000).toFixed(0)}k tris`; }
     // Adaptive quality: drop shadows/tilt-shift automatically on slow machines.
     if (quality==='high' && ++frames>90 && frames<400) { if (dt>45) slowFrames++; if (slowFrames>60) setQuality('low', true); }
     resize(); updateCamera(dt); let st=stormTarget;
     if (hazard) { const d=Math.hypot(camera.target[0]-hazard.x,camera.target[2]-hazard.z); st=Math.max(st,(hazard.plumes?.55:1)*hazard.intensity*Math.max(0,Math.min(1,1.7-d/(hazard.r*2.2)))*(hazard.type==='heat'?.45:1)); const tt=TINTS[hazard.type]||TINTS.dust; for(let i=0;i<3;i++) tint[i]+=(tt[i]-tint[i])*.05; }
     storm+=(st*(directMode?.6:1)-storm)*Math.min(1,dt*.002);
     if (follow) { camera.desired.target[0]=follow[0]; camera.desired.target[2]=follow[1]; }
-    if (stageDirty) { stageBuf=uploadIds(stageMesh, upload(stageMesh, stageBuf, gl.DYNAMIC_DRAW)); stageLineBuf=upload({p:stageLines.p,c:stageLines.c}, stageLineBuf||{p:gl.createBuffer(),c:gl.createBuffer()}, gl.DYNAMIC_DRAW); stageDirty=false; }
-    if (cityDirty) { cityBuf=upload(cityMesh, cityBuf, gl.DYNAMIC_DRAW); cityLineBuf=upload({p:cityLines.p,c:cityLines.c}, cityLineBuf||{p:gl.createBuffer(),c:gl.createBuffer()}, gl.DYNAMIC_DRAW); cityDirty=false; }
-    if (missionDirty) { missionBuf=uploadIds(missionMesh, upload(missionMesh, missionBuf, gl.DYNAMIC_DRAW)); missionLineBuf=upload({p:missionLines.p,c:missionLines.c}, missionLineBuf||{p:gl.createBuffer(),c:gl.createBuffer()}, gl.DYNAMIC_DRAW); missionDirty=false; }
-    buildVehicles(t); vehBuf=upload(vehGeo, vehBuf, gl.DYNAMIC_DRAW);
-    gl.enable(gl.DEPTH_TEST); gl.disable(gl.CULL_FACE);
+    if (stageDirty) { syncLayer('stage'); syncLines(stageLinesObj, stageLines); stageDirty=false; }
+    if (cityDirty) { syncLayer('city'); syncLines(cityLinesObj, cityLines); cityDirty=false; }
+    if (missionDirty) { syncLayer('mission'); syncLines(missionLinesObj, missionLines); missionDirty=false; }
+    buildVehicles(t); syncLayer('veh');
+
+    night+=(nightTarget-night)*Math.min(1,dt*.0015);
+    SU.uStorm.value=storm; SU.uDist.value=camera.dist*EYE; SU.uTime.value=t*.001; SU.uTint.value=tint; SU.uNight.value=night; SU.uEye.value=eye; SU.uVP.value=vp;
+    for (const L of Object.values(LAYERS)) L.own.uShadowOn.value = L.cast && shadowsOn() ? 1 : 0;
+    LAYERS.cloud.own.uOffset.value=[Math.sin(t*.00005)*.25,0,0];
 
     // 1) Shadow map from the sun
     if (shadowsOn()) {
-      updateLight();
-      gl.bindFramebuffer(gl.FRAMEBUFFER, shadowFB); gl.viewport(0,0,SHADOW_SIZE,SHADOW_SIZE);
-      gl.clearColor(1,1,1,1); gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
-      gl.useProgram(depthProgram); resetAttribs(); gl.uniformMatrix4fv(loc.d.uLightVP,false,lightVP); gl.uniform3f(loc.d.uOffset,0,0,0);
-      gl.disableVertexAttribArray(loc.m.col); gl.disableVertexAttribArray(loc.m.nrm);
-      drawDepth(meshBuf); if (detailOn()) drawDepth(detailBuf); drawDepth(stageBuf); drawDepth(vehBuf); drawDepth(missionBuf); drawDepth(cityBuf);
-      gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0,0,width,height);
+      updateLight(); SU.uLightVP.value=lightVP;
+      renderer.setRenderTarget(shadowRT); renderer.setClearColor(0xffffff, 1); renderer.clear();
+      renderPass('depth'); renderer.render(scene3, cam3);
     }
-
-    // 2) Scene
-    night+=(nightTarget-night)*Math.min(1,dt*.0015);
+    // 2) Scene: sky clear, sea, meshes, lines, points
     const sky=[(.60+storm*.18)*(1-night)+.07*night,(.84-storm*.28)*(1-night)+.10*night,(.95-storm*.45)*(1-night)+.22*night];
-    gl.clearColor(sky[0],sky[1],sky[2],1); gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
-    const ed=camera.dist*EYE;
-    gl.useProgram(waterProgram); resetAttribs();
-    gl.uniformMatrix4fv(loc.w.uVP,false,vp); gl.uniform1f(loc.w.uTime,t*.001); gl.uniform3fv(loc.w.uSun,SUN); gl.uniform3fv(loc.w.uEye,eye); gl.uniform1f(loc.w.uStorm,storm); gl.uniform1f(loc.w.uDist,ed); gl.uniform3fv(loc.w.uTint,tint); gl.uniform1f(loc.w.uNight,night);
-    attr(loc.w.pos,waterBuf.p,3); attr(loc.w.shore,waterBuf.s,1); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,waterBuf.i); gl.drawElements(gl.TRIANGLES,waterBuf.count,gl.UNSIGNED_SHORT,0);
-    gl.disableVertexAttribArray(loc.w.shore);
-
-    gl.useProgram(meshProgram); resetAttribs();
-    gl.uniformMatrix4fv(loc.m.uVP,false,vp); gl.uniformMatrix4fv(loc.m.uLightVP,false,lightVP); gl.uniform3f(loc.m.uOffset,0,0,0);
-    gl.uniform3fv(loc.m.uSun,SUN); gl.uniform3fv(loc.m.uEye,eye); gl.uniform1f(loc.m.uStorm,storm); gl.uniform1f(loc.m.uDist,ed);
-    gl.uniform1f(loc.m.uTexel,1/SHADOW_SIZE); gl.uniform1f(loc.m.uGround,G); gl.uniform1f(loc.m.uTime,t*.001); gl.uniform3fv(loc.m.uTint,tint); gl.uniform1f(loc.m.uNight,night);
-    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D,shadowTex); gl.uniform1i(loc.m.uShadow,0);
-    drawMesh(meshBuf); if (detailOn()) drawMesh(detailBuf); drawMesh(stageBuf,.05); drawMesh(vehBuf,.08); drawMesh(missionBuf,.04); drawMesh(cityBuf,.03);
-    gl.uniform3f(loc.m.uOffset, Math.sin(t*.00005)*.25, 0, 0); drawMesh(cloudBuf,.42,0); gl.uniform3f(loc.m.uOffset,0,0,0);
-    gl.disableVertexAttribArray(loc.m.nrm);
-
-    gl.useProgram(pointProgram); resetAttribs(); gl.uniformMatrix4fv(loc.p.vp,false,vp);gl.uniform1f(loc.p.scale,dpr);
-    gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
-    gl.disableVertexAttribArray(loc.p.size);gl.vertexAttrib1f(loc.p.size,1);gl.uniform1f(loc.p.round,0);
-    bindAttr(loc.p,lineBuf.p,lineBuf.c);gl.drawArrays(gl.LINES,0,lineBuf.count);
-    if (stageLineBuf) { bindAttr(loc.p,stageLineBuf.p,stageLineBuf.c);gl.drawArrays(gl.LINES,0,stageLineBuf.count); }
-    if (cityLineBuf && cityLineBuf.count) { bindAttr(loc.p,cityLineBuf.p,cityLineBuf.c);gl.drawArrays(gl.LINES,0,cityLineBuf.count); }
-    if (missionLineBuf && missionLineBuf.count) { bindAttr(loc.p,missionLineBuf.p,missionLineBuf.c);gl.drawArrays(gl.LINES,0,missionLineBuf.count); }
-    buildDynLines(t); dynLineBuf=upload(dynLines, dynLineBuf||{p:gl.createBuffer(),c:gl.createBuffer()}, gl.DYNAMIC_DRAW);
-    if (dynLineBuf.count) { bindAttr(loc.p,dynLineBuf.p,dynLineBuf.c); gl.drawArrays(gl.LINES,0,dynLineBuf.count); }
-    const n=dynamicPoints(t); bindAttr(loc.p,dynPB,dynCB);gl.bindBuffer(gl.ARRAY_BUFFER,dynSB);gl.enableVertexAttribArray(loc.p.size);gl.vertexAttribPointer(loc.p.size,1,gl.FLOAT,false,0,0);
-    gl.uniform1f(loc.p.round,1);gl.depthMask(false);gl.drawArrays(gl.POINTS,0,n);gl.depthMask(true);gl.disableVertexAttribArray(loc.p.size);gl.disable(gl.BLEND);
+    renderer.setRenderTarget(null); renderer.setClearColor(clearCol.setRGB(sky[0],sky[1],sky[2]), 1); renderer.clear();
+    POINT_MAT.uniforms.uScale.value=dpr;
+    buildDynLines(t); syncLines(dynLinesObj, dynLines);
+    dynamicPoints(t);
+    renderPass('main'); renderer.render(scene3, cam3);
     updateLabels(); keyPan(dt);
     if (pendingHover && performance.now() - pendingHover.t > 90) { const h = pendingHover; pendingHover = null; runHover(h.x, h.y, h.touch); }   // hover picks only once the pointer rests
     requestAnimationFrame(render);
@@ -1632,24 +1712,16 @@
     if (d[1] >= -1e-4) return null; const k=(G-eye[1])/d[1]; return [eye[0]+d[0]*k, eye[2]+d[2]*k];
   }
   // ---- Depth-correct picking: render project IDs (front-most wins) under the pointer, then resolve with layout.js rules.
-  let selectable=false, pendingHover=null, pickFB=null, pickTex=null, pickRB=null, pickW=0, pickH=0;
-  function ensurePickFB(){
-    if (pickFB && pickW===width && pickH===height) return;
-    pickFB=pickFB||gl.createFramebuffer(); pickTex=pickTex||gl.createTexture(); pickRB=pickRB||gl.createRenderbuffer(); pickW=width; pickH=height;
-    gl.bindTexture(gl.TEXTURE_2D,pickTex); gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,width,height,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
-    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
-    gl.bindRenderbuffer(gl.RENDERBUFFER,pickRB); gl.renderbufferStorage(gl.RENDERBUFFER,gl.DEPTH_COMPONENT16,width,height);
-    gl.bindFramebuffer(gl.FRAMEBUFFER,pickFB); gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,pickTex,0); gl.framebufferRenderbuffer(gl.FRAMEBUFFER,gl.DEPTH_ATTACHMENT,gl.RENDERBUFFER,pickRB);
-    gl.bindFramebuffer(gl.FRAMEBUFFER,null);
-  }
+  let selectable=false, pendingHover=null, pickRT=null;
+  // Render project ids (front-most wins) into an offscreen target, only inside the scissor box under the pointer.
   function renderIds(x0, y0, w, h){
-    ensurePickFB(); gl.bindFramebuffer(gl.FRAMEBUFFER,pickFB); gl.viewport(0,0,width,height);
-    gl.enable(gl.SCISSOR_TEST); gl.scissor(x0,y0,w,h); gl.clearColor(0,0,0,0); gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT); gl.enable(gl.DEPTH_TEST); gl.disable(gl.BLEND);
-    gl.useProgram(pickProgram); resetAttribs(); gl.uniformMatrix4fv(loc.k.uVP,false,vp);
-    const draw=(buf, withIds)=>{ if(!buf||!buf.count) return; attr(loc.k.pos,buf.p,3); if (withIds && buf.id) attr(loc.k.col,buf.id,3); else { gl.disableVertexAttribArray(loc.k.col); gl.vertexAttrib3f(loc.k.col,0,0,0); } gl.drawArrays(gl.TRIANGLES,0,buf.count); };
-    draw(meshBuf,1); if (detailOn()) draw(detailBuf,0); draw(stageBuf,1); draw(missionBuf,1); draw(vehBuf,0);   // everything that can hide a project is drawn as an occluder
-    const px=new Uint8Array(w*h*4); gl.readPixels(x0,y0,w,h,gl.RGBA,gl.UNSIGNED_BYTE,px);
-    gl.disable(gl.SCISSOR_TEST); gl.bindFramebuffer(gl.FRAMEBUFFER,null); gl.viewport(0,0,width,height); resetAttribs(); return px;
+    if (!pickRT) pickRT=new THREE.WebGLRenderTarget(width, height, {minFilter:THREE.NearestFilter, magFilter:THREE.NearestFilter, generateMipmaps:false, depthBuffer:true});
+    if (pickRT.width!==width || pickRT.height!==height) pickRT.setSize(width, height);
+    pickRT.viewport.set(0,0,width,height); pickRT.scissor.set(x0,y0,w,h); pickRT.scissorTest=true;
+    renderer.setRenderTarget(pickRT); renderer.setClearColor(0x000000, 0); renderer.clear(true, true, false);
+    renderPass('pick'); renderer.render(scene3, cam3);
+    const px=new Uint8Array(w*h*4); renderer.readRenderTargetPixels(pickRT, x0, y0, w, h, px);
+    pickRT.scissorTest=false; renderer.setRenderTarget(null); return px;
   }
   function measurePick(cx, cy, tol){
     const R=Math.ceil(tol*dpr), x=Math.round(cx*dpr), y=Math.round(height-cy*dpr), x0=Math.max(0,x-R), y0=Math.max(0,y-R), w=Math.min(width,x+R+1)-x0, h=Math.min(height,y+R+1)-y0;
@@ -1803,7 +1875,8 @@
       screen(x,z,y=G){ const q=project([x,y,z]); return q?{x:q[0],y:q[1]}:null; },   // where a ground point is drawn (tests)
       lastPick(){ return lastPick; }, clearPick(){ lastPick=null; },
       regionView(id){ const r=D.regions[id]; selectedId=null; directMode=false; follow=null; const d=r.dist*regionFit(r); setDesired(r.az,r.el,d,r.x,r.z,0); camera.az=r.az; camera.el=r.el; camera.dist=d; camera.target=[r.x,0,r.z]; },   // a region's default view, instantly
-      state:() => ({dist:camera.dist, selectable, hoverId, selectedId, detail:detailOn()})
+      state:() => ({dist:camera.dist, selectable, hoverId, selectedId, detail:detailOn()}),
+      frameStats:() => ({fps:fpsStat.fps, ms:fpsStat.ms, quality, renderer:'three', calls:renderer.info.render.calls, triangles:renderer.info.render.triangles})
     }
   };
   requestAnimationFrame(render);

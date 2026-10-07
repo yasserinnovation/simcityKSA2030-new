@@ -11,6 +11,12 @@ The game runs from a tiny local web server, because browsers block the ES module
 - **Renderers:** http://localhost:8000/index.html uses the three.js renderer; add `?renderer=classic` for the original hand-written WebGL renderer (kept for comparison). Opening `index.html` directly from disk still works and uses the classic renderer. Add `?debug=1` for the frame-time counter.
 - **Tests:** `npm test` (game logic, headless) and `npm install && npm run test:render` (Playwright smoke test against your installed Chrome or Edge).
 
+## Renderer upgrade (build V8)
+The 3D world is drawn by **three.js** (vendored in `vendor/three`). The upgrade toward a cinematic, Unreal-like look happens in phases; each phase has notes and comparison screenshots in `docs/`.
+- **Phase 1 — renderer swap with parity (done):** `engine.js` now renders through three.js with the original shaders and geometry; the `VisionWorld` API is unchanged. Repeated props and vehicles use InstancedMesh. Picking and City Builder tools behave exactly as before. See `docs/phase1/NOTES.md`.
+- The original renderer stays available as `engine_classic.js` (`index.html?renderer=classic`).
+- Third-party files and licences: `ASSETS_CREDITS.md`.
+
 ## Play first
 **Mission 1 — Connect for the Opening.** Choose **Bus rapid transit**, tap *City Centre ↔ Expo 2030 site*, then **Add to plan**. Add *City Centre ↔ King Salman Airport* the same way, then press **End turn**. You will see the transformation moment. Finish the mission to see the victory moment.
 
