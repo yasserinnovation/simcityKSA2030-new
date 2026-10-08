@@ -473,7 +473,7 @@
     for (let i=0;i<spine.length-1;i++) for (let k=0;k<11;k++) {
       const t=rng(), lon=spine[i][0]+(spine[i+1][0]-spine[i][0])*t+(rng()-.5)*.9, lat=spine[i][1]+(spine[i+1][1]-spine[i][1])*t+(rng()-.5)*.6;
       const [x,z]=geo(lon,lat); if(!inSaudi(x,z)||inAnyPlan(x,z)) continue;   // regional plans draw their own mountains
-      const green=lat<20.2, c=green?mix([.42,.60,.32],[.58,.54,.40],rng()*.5):mix([.76,.56,.40],[.68,.52,.40],rng());
+      const green=lat<20.2, c=green?mix([.36,.57,.31],[.52,.52,.38],rng()*.5):mix(lat>26.5?[.82,.72,.62]:[.72,.50,.38],[.66,.52,.42],rng());   // V11: regional rock tones
       const r=.05+rng()*.06, hh=.05+rng()*.08; addBlob(x,G,z,r*1.1,hh*.55,r,c,0,.25); addCone(x+(rng()-.5)*r*.3,G+hh*.2,z,r*.62,hh*.8,shade(c,1.06),7); if(green&&rng()>.4) addTree(x+r*.6,z+r*.5,.7);
     }
     // Dune fields: Rub' al Khali, Nafud, Dahna
@@ -641,7 +641,7 @@
     polyStrip(LY.WADI,.022,G+.004,[.46,.70,.38]); polyStrip(LY.WADI,.009,G+.006,[.28,.60,.80]);
     { const prev=target; target=detailMesh; const W2=LY.WADI; for (let i=1;i<W2.length;i++){ const a=W2[i-1], b=W2[i], L=Math.hypot(b[0]-a[0],b[1]-a[1]), nx=-(b[1]-a[1])/L, nz=(b[0]-a[0])/L;
         for (let t=.02;t<L;t+=.045) for (const s2 of [-1,1]) { const x=a[0]+(b[0]-a[0])*t/L+nx*.04*s2, z=a[1]+(b[1]-a[1])*t/L+nz*.04*s2; if (LY.decorAllowed(x,z,.03,.045,true)) addPalm(x,z,.5+rn()*.2); } } target=prev; }
-    for (let z=-.85; z<=.12; z+=.07) { const x=ry.x-.79+Math.sin(z*7)*.015, zz=ry.z+z; if (LY.roadDist(x,zz) < .05) continue; addMound(x,zz,.05,.04,.045+rn()*.03,rn(),[.80,.56,.36],7); }
+    for (let z=-.85; z<=.12; z+=.07) { const x=ry.x-.79+Math.sin(z*7)*.015, zz=ry.z+z; if (LY.roadDist(x,zz) < .05) continue; addMound(x,zz,.05,.04,.045+rn()*.03,rn(),[.79,.64,.49],7); }   // V11: muted escarpment
     // Sports Boulevard: one continuous planted ribbon with walking and cycling paths, a bridge over King Fahd Road and activity areas.
     const sp=P('sports'); polyStrip(sp.ribbon.pts,.026,G+.005,[.44,.72,.36]); lineTarget=lines; polyLine(sp.ribbon.pts,G+.008,[.93,.86,.66],.008); polyLine(sp.ribbon.pts,G+.008,[.86,.62,.52],-.008);
     ownRibbonTrees(sp,.035,.02,.32);
@@ -660,7 +660,7 @@
     // Tuwaiq escarpment: stepped cliffs between the city and Qiddiya (kept off roads and footprints).
     { const RG=LY.RIDGES; for (let i=1;i<RG.length;i++){ const a=RG[i-1], b=RG[i], L=Math.hypot(b[0]-a[0],b[1]-a[1]), rot=Math.atan2(b[1]-a[1],b[0]-a[0]);
         for (let t=0;t<L;t+=.045){ const x=a[0]+(b[0]-a[0])*t/L, z=a[1]+(b[1]-a[1])*t/L; for (const [o,h] of [[0,.05],[.04,.034],[.08,.018]]) { const xx=x+Math.sin(rot)*o, zz=z-Math.cos(rot)*o;   // stepped terraces, highest on the city side
-          if (!LY.decorAllowed(xx,zz,.02,.035)) continue; const hh=h+rn()*.008; addBox(xx,G,zz,.052,hh,.042,[.74+rn()*.05,.52,.34],-rot); addBox(xx,G+hh,zz,.046,.003,.036,[.84,.64,.44],-rot); } } } }
+          if (!LY.decorAllowed(xx,zz,.02,.035)) continue; const hh=h+rn()*.008; addBox(xx,G,zz,.052,hh,.042,[.75+rn()*.04,.61,.47],-rot); addBox(xx,G+hh,zz,.046,.003,.036,[.86,.74,.58],-rot); } } } }   // V11: muted Tuwaiq terraces
     riyadhGreen(rn);
     // Short access spurs join each district to its road (none cross another parcel).
     for (const [p, tz] of [[mu,-.48],[rs,-.48],[re,-.48]]) addStrip([p.x,p.z+p.foot],[p.x,ry.z+tz],.005,G+.006,[.60,.54,.46]);
@@ -735,7 +735,7 @@
   const fabric = (cx, cz, r, n, rn, pal, test) => { const prev = target; target = detailMesh; scatterIn(cx, cz, r, n, rn, (x, z) => addHouse(x, z, .2 + rn() * .08, pal[Math.floor(rn() * pal.length)], 0), test); target = prev; };
   const skyline = (cx, cz, r, n, hmax, rn, test, pal = [[.52,.72,.84],[.62,.78,.86],[.70,.74,.80],[.48,.66,.78]]) =>
     scatterIn(cx, cz, r, n, rn, (x, z) => { const d = Math.hypot(x - cx, z - cz) / r, h = .03 + hmax * Math.pow(1 - d, 1.2) * (.5 + rn() * .5); addTower(x, z, .01 + rn() * .006, h, pal[Math.floor(rn() * pal.length)], rn() > .7 ? [.85, .9, .95] : null); }, test);
-  const mountain = (x, z, r, h, col, rn) => { addBlob(x, G, z, r * 1.05, h * .45, r, col, 0, .25); addCone(x + (rn() - .5) * r * .3, G + h * .2, z, r * .62, h * .8, shade(col, 1.06), 7); };
+  const mountain = (x, z, r, h, col, rn) => { addBlob(x, G, z, r * 1.05, h * .45, r, shade(col, .92), 0, .25); addCone(x + (rn() - .5) * r * .3, G + h * .2, z, r * .62, h * .8, shade(col, 1.05), 7); };   // V11: darker flanks, lighter peak
   const range = (cx, cz, rx, rz, n, rn, col, hmin, hmax, test) => { for (let i = 0, k = 0; i < n * 8 && k < n; i++) { const x = cx + (rn() * 2 - 1) * rx, z = cz + (rn() * 2 - 1) * rz; if (Math.pow((x - cx) / rx, 2) + Math.pow((z - cz) / rz, 2) > 1 || !test(x, z)) continue; k++; mountain(x, z, .03 + rn() * .035, hmin + rn() * (hmax - hmin), mix(col, [.66, .52, .40], rn() * .3), rn); } };
   const hillOpen = (x, z) => onLand(x, z) && LY.decorAllowed(x, z, .05, .045);
 
@@ -812,7 +812,7 @@
     station(2.07, -1.125, -.6);                                                         // Dammam rail station
     // King Fahd International Airport (inland of Dammam) and inland desert hills on the west edge.
     const ap = LY.MISSION_SITES['east:kfia']; addStrip([ap[0] - .045, ap[1] - .01], [ap[0] + .045, ap[1] - .01], .006, G + .005, [.32, .33, .35]); addBox(ap[0], G, ap[1] + .012, .04, .008, .012, [.90, .92, .94]);
-    for (const [x, z, r] of P.decor.hills) mountain(x, z, r, .05 + rn() * .03, [.80, .58, .40], rn);
+    for (const [x, z, r] of P.decor.hills) mountain(x, z, r, .05 + rn() * .03, [.80, .71, .60], rn);   // V11: cooler, paler eastern hills
     fabric(dm.x - .06, dm.z + .04, .05, 12, rn, [[.94,.88,.76],[.90,.82,.68]]); fabric(kh.x - .07, kh.z, .045, 10, rn, [[.94,.88,.76],[.90,.82,.68]]);
     palmGrove(1.95, -1.33, .06, 10, rn); palmGrove(2.18, -.68, .05, 8, rn);
   }
@@ -822,11 +822,11 @@
     const P = RPL.west; if (!P) return; const rn = mulberry32(502);
     // Mountains first (they frame everything): the Hejaz massif east of the rail line, the buffer between Jeddah and
     // Makkah, and the uplands round Taif. Never on a road, railway or landmark.
-    range(-2.40, .55, .15, .42, 40, rn, [.72, .52, .36], .05, .1, hillOpen);
-    range(-2.58, 1.44, .018, .08, 6, rn, [.70, .50, .36], .04, .07, hillOpen);
-    range(-2.30, 1.66, .16, .13, 18, rn, [.70, .52, .38], .05, .09, hillOpen);
-    range(-2.12, 1.30, .08, .1, 12, rn, [.66, .54, .40], .05, .09, hillOpen);
-    range(-2.30, -.30, .1, .08, 8, rn, [.74, .56, .40], .04, .07, hillOpen);
+    range(-2.40, .55, .15, .42, 40, rn, [.71, .48, .36], .05, .1, hillOpen);   // V11: Hejaz terracotta (#B97852 family)
+    range(-2.58, 1.44, .018, .08, 6, rn, [.69, .47, .36], .04, .07, hillOpen);
+    range(-2.30, 1.66, .16, .13, 18, rn, [.68, .48, .37], .05, .09, hillOpen);
+    range(-2.12, 1.30, .08, .1, 12, rn, [.66, .50, .40], .05, .09, hillOpen);
+    range(-2.30, -.30, .1, .08, 8, rn, [.72, .51, .39], .04, .07, hillOpen);
     // Madinah: a calm, spacious city around the Prophet's Mosque — white arcades, green dome, minarets, open courtyards.
     const md = PLv('madinah'); keepOut.push([md.x, md.z, md.r]);
     addDisc(md.x, G + .003, md.z, md.r - .002, [.95, .94, .90], 28);
@@ -917,11 +917,11 @@
   function buildNorthwest(){
     const P = RPL.northwest; if (!P) return; const rn = mulberry32(503);
     // Midian mountains: rugged peaks round Trojena, ranges framing THE LINE's valley (never on it), hills along the coast.
-    range(-4.42, -2.42, .2, .1, 26, rn, [.66, .50, .40], .07, .13, hillOpen);
-    range(-4.35, -1.98, .2, .05, 14, rn, [.74, .54, .40], .04, .08, hillOpen);
-    range(-3.95, -1.60, .18, .18, 16, rn, [.76, .56, .40], .04, .08, hillOpen);
-    range(-3.70, -1.05, .2, .2, 14, rn, [.78, .58, .42], .04, .07, hillOpen);
-    range(-4.30, -2.24, .1, .05, 6, rn, [.72, .54, .42], .05, .09, hillOpen);
+    range(-4.42, -2.42, .2, .1, 26, rn, [.74, .64, .56], .07, .13, hillOpen);   // V11: pale, rugged northwest stone
+    range(-4.35, -1.98, .2, .05, 14, rn, [.82, .72, .62], .04, .08, hillOpen);
+    range(-3.95, -1.60, .18, .18, 16, rn, [.84, .75, .64], .04, .08, hillOpen);
+    range(-3.70, -1.05, .2, .2, 14, rn, [.86, .77, .66], .04, .07, hillOpen);
+    range(-4.30, -2.24, .1, .05, 6, rn, [.80, .70, .62], .05, .09, hillOpen);
     // THE LINE: one slim, reflective corridor from the NEOM coast inland through the valley.
     // THE LINE: one mirrored segment model (two reflective walls, flat top, gardens between) repeated along the route,
     // each copy stretched slightly so whole segments tile each straight run exactly.
@@ -996,10 +996,10 @@
       let rr = r; while (rr > .02 && !Array.from({length:12}, (_, i) => i / 12 * 6.283).every(a => onLand(px + Math.cos(a) * rr, pz + Math.sin(a) * rr))) rr -= .01;   // whole rim on Saudi land
       if (rr > .02 && onLand(px, pz)) addDisc(px, G + .0025, pz, rr, [.54, .70, .40], 18); }
     for (let i = 1; i < belt.length; i++) { const a = belt[i - 1], b = belt[i]; for (let t = 0; t < 1; t += .14) { const x = a[0] + (b[0] - a[0]) * t, z = a[1] + (b[1] - a[1]) * t;
-      for (let k = 0; k < 5; k++) { const px = x + (rn() - .5) * .22, pz = z + (rn() - .5) * .1; if (!forest(px, pz)) continue; const h = .06 + rn() * .06; mountain(px, pz, .035 + rn() * .02, h, mix([.36, .56, .30], [.50, .48, .34], rn() * .4), rn);
+      for (let k = 0; k < 5; k++) { const px = x + (rn() - .5) * .22, pz = z + (rn() - .5) * .1; if (!forest(px, pz)) continue; const h = .06 + rn() * .06; mountain(px, pz, .035 + rn() * .02, h, mix([.32, .54, .29], [.46, .46, .33], rn() * .4), rn);   // V11: richer green
         if (rn() > .3) { const prev = target; target = detailMesh; addTree(px + .03, pz + .02, .28, [.18, .46, .24]); target = prev; } } } }
-    range(-.78, 3.05, .16, .12, 14, rn, [.76, .56, .40], .04, .07, hillOpen);
-    range(-.70, 3.60, .18, .12, 12, rn, [.78, .58, .42], .03, .06, hillOpen);
+    range(-.78, 3.05, .16, .12, 14, rn, [.64, .50, .40], .04, .07, hillOpen);   // V11: deeper southern rock
+    range(-.70, 3.60, .18, .12, 12, rn, [.67, .53, .42], .03, .06, hillOpen);
     // Jazan Industrial City: orderly factories, tank farm, logistics yards and its own cargo port.
     const ji = P1('jazan'); keepOut.push([ji.x, ji.z, ji.foot]); const cJ = RG_coast('west', ji.z);
     addDisc(ji.x, G + .003, ji.z, ji.foot - .004, [.82, .80, .74], 26);

@@ -1,4 +1,4 @@
-# Vision Nexus 2030 — The Kingdom in Motion (build V10 — navy & gold)
+# Vision Nexus 2030 — The Kingdom in Motion (build V11 — miniature world)
 
 The build label is shown in the bottom corner of the screen. If you see a "Strategic Actions" panel, "Path to 2030" or a calendar past 2030, you are running an older copy of the files.
 
@@ -16,6 +16,32 @@ The 3D world is drawn by **three.js** (vendored in `vendor/three`). The upgrade 
 - **Phase 1 — renderer swap with parity (done):** `engine.js` now renders through three.js with the original shaders and geometry; the `VisionWorld` API is unchanged. Repeated props and vehicles use InstancedMesh. Picking and City Builder tools behave exactly as before. See `docs/phase1/NOTES.md`.
 - The original renderer stays available as `engine_classic.js` (`index.html?renderer=classic`).
 - Third-party files and licences: `ASSETS_CREDITS.md`.
+
+## Miniature-world polish (build V11)
+
+Art direction: the illustrated Saudi map (`refrence.png`, kept outside the repository) for colour relationships, regional character and interface quality. It is treated as inspiration, not geography: nothing was moved, re-scaled or added to match it. V11 changes only colours, marker sizes, interface styling and a help control. **Palette and lighting cannot reproduce the reference's illustrated architecture**; that needs the new assets proposed below.
+
+- **Interface (A):** a localized **"?" map-controls help** (`help.js`) replaces the browser tooltip that covered the map edge. It finds a free spot beside the HUD, opens in English or Arabic and closes on Esc or a click on the map. Navigator titles are limited to two lines (full name when selected). KPI labels wrap to two short lines below 1280px instead of being cut off.
+- **Marker hierarchy (A):** idle projects get a smaller head, thinner pedestal tiers and a shorter stalk, so buildings lead. Selected, hovered, active and warning (blocked or waiting) projects keep a prominent head. Cluster beacons and footprint outlines are quieter. Selection targets are unchanged (footprint picking and the head, wherever it is drawn). The selection outline gains a navy keyline so it reads on light trees.
+- **Light, water, border (B):** the broad stepped yellow border becomes a thin, muted gold outline that is weaker than the selection outline. It came from a yellow base showing between the border grid cells; that base is now sand. Cliff lips are sand-coloured. Water shades from turquoise to blue over a wider distance, so the shoreline no longer shows triangular patches, and the foam and glints are quieter. Shadows are a little softer, and dunes sit just below the sand tone.
+- **Regions (C):** Hejaz mountains are terracotta, Northwest ranges pale stone, eastern hills cooler and paler, and the southern forest escarpment a richer green with deeper rock behind it. The Riyadh escarpment and Tuwaiq terraces, the strongest orange on the plan, are muted toward warm sand. Same rocks in the same places, with the same random sequence.
+- **Effects:** unchanged from V10 and still tied to real events: the interruptible camera, the gold ripple and caption on real completions (never replayed after a reload), off on Reduced and with reduced motion.
+
+Screenshots: `docs/style-before-v11/` (V10) and `docs/style-v11/` (V11) use identical seeds, camera views, game state and High quality. They cover Kingdom, Riyadh, a selection, West, NEOM/Northwest, East, South, mission, City Builder and a 1100×700 window, in EN and AR, plus `7_help_*` for the help panel. Side by side: `docs/style-compare-v11/`.
+
+Frame rate (Intel integrated GPU, D3D11, 1440×900, vsync off, two alternating runs per build): Kingdom High 93.7–94.1 (V10) vs 94.0–94.1 (V11); Medium 175.2–175.5 vs 174.7–177.5; Reduced 201.8–205.3 vs 201.6–204.6. Riyadh High 95.7–144.4 vs 98.1–98.2 (the 144 is a one-off spike); Medium 185.9–186.9 vs 185.8–186.2; Reduced 206.4–207.9 vs 208.5–209.5. No measurable change.
+
+**Asset proposal (not done; each needs new models or textures):**
+| Asset | Region / place | Visual benefit | Expected cost | Gameplay and selection |
+|---|---|---|---|---|
+| Sculpted mountain set (3–4 rugged rock meshes in place of blob + cone) | Hejaz, Northwest, Aseer ranges | Rugged, layered mountains like the reference, without orange "piles" | Similar triangle count if instanced; one shared mesh per type | Decorative only, placed by the existing `range()` positions; never on footprints |
+| Landmark detail models (Kaaba precinct, Prophet's Mosque domes, Kingdom Centre, Jeddah Tower) | Makkah, Madinah, Riyadh, Jeddah | Recognisable silhouettes at city scale | +20–60k triangles total | Same footprint, same `p.x/p.z` and pick id; size fitted with `fitFoot` |
+| Sand ripple and rock-strata ground texture (one tiling texture) | Kingdom surface, cliffs | Painted terrain variation instead of flat colour | One texture fetch per fragment; about 1 MB | Ground only; picking unaffected |
+| Window light (emissive) maps for towers | Riyadh, Jeddah, Dammam skylines | Warm lit windows at night | One small texture; no new pass | Visual only |
+| Low-poly palm and acacia variants, ports and ships with more detail | Coasts, oases, Jubail, Jeddah | Richer coasts and oases | Instanced; small | Decor stays off parcels (`LY.decorAllowed`) |
+| Custom icon set for region navigation and the action bar (SVG) | Interface | Consistent icons instead of emoji | Negligible | Same buttons and labels |
+
+**Remaining limitations:** the classic renderer (`?renderer=classic`) gets the interface changes but not the V11 world colours or markers. Mountains are still blob + cone shapes, only recoloured. The City Builder toolbar still scrolls sideways at about 1440px. Emoji icons remain.
 
 ## Navy & gold art direction (build V10)
 
