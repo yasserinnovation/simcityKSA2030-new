@@ -1041,3 +1041,151 @@ body.reduced .act:hover,body.reduced .ctool:hover{transform:none}
 @media (max-width:760px){
   body:has(#mhud:not(.hidden)) .mcard{top:calc(env(safe-area-inset-top,0px) + 74px)}
 }
+/* =====================================================================
+   V10 — Navy & gold art direction (visual only; no control, id or behaviour changes).
+   Navigation bars are compact navy with white text; information panels are warm-white cards; gold marks only what is
+   selected, the objective and the key action. The 3D world uses the same palette (engine.js PALETTE and shaders):
+     navy #142D46 · teal #176B70 · gold #E8B75A · panels #F7F3E9 · sand #DCC398 · terracotta #B97852
+     vegetation #62865A · shallow water #49BFC3 · deep water #176C99
+   ===================================================================== */
+:root{
+  --navy:#142D46;--navy-2:#1C3C5C;--navy-3:#0E2236;--teal:#176B70;--teal-2:#1E8086;
+  --gold:#E8B75A;--gold-2:#F0C877;--gold-ink:#8A6420;--gold-soft:#FBF1DC;--sel-ring:0 0 0 3px rgba(232,183,90,.38);
+  --panel:#F7F3E9;--paper:rgba(247,243,233,.97);--paper-solid:#F7F3E9;--surface:#FFFDF8;--surface-2:#EFE9DC;
+  --ink:#142D46;--ink-2:#36506A;--muted:#68768A;--line:rgba(20,45,70,.12);--line-2:rgba(20,45,70,.2);
+  --sand:#DCC398;--terra:#B97852;--veg:#62865A;--water:#49BFC3;--water-deep:#176C99;
+  --green:#2F8A5B;--red:#C0392B;--warn:#B96A2E;--warn-soft:#FBEBDD;
+  --on-navy-2:rgba(255,255,255,.74);--on-navy-3:rgba(255,255,255,.52);
+  --navy-tile:rgba(255,255,255,.06);--navy-line:rgba(255,255,255,.1);--navy-hover:rgba(255,255,255,.1);
+  --pos-on-navy:#86D9A8;--neg-on-navy:#FF9F8A;
+  --bar-bg:linear-gradient(180deg,#1A3856 0%,#142D46 100%);
+  --bar-shadow:0 10px 28px rgba(9,22,38,.28),0 2px 6px rgba(9,22,38,.18);
+  --shadow:0 8px 22px rgba(20,45,70,.12),0 1px 3px rgba(20,45,70,.08);
+  --shadow-lift:0 12px 28px rgba(20,45,70,.18),0 3px 8px rgba(20,45,70,.1);
+}
+html,body{background:#9fd3d6}
+#world{background:linear-gradient(#8fcfe0,#d9eef0)}
+.sun-glow{background:radial-gradient(ellipse at 82% -6%,rgba(255,226,168,.30),transparent 46%),radial-gradient(ellipse at 50% 46%,transparent 64%,rgba(12,32,52,.20) 100%);mix-blend-mode:normal}
+.tiltshift{backdrop-filter:blur(1.4px) saturate(1.05);-webkit-backdrop-filter:blur(1.4px) saturate(1.05)}
+.glass{background:var(--paper);border:1px solid rgba(20,45,70,.1);box-shadow:var(--shadow)}
+
+/* ---------- Navy navigation bars ---------- */
+.topbar,.ctop,.bottombar,.action-bar,.ctools,.mode-nav:not(.docked){background:var(--bar-bg);border:1px solid rgba(255,255,255,.08);box-shadow:var(--bar-shadow);color:#fff;backdrop-filter:none}
+.brand-mark{background:var(--gold);color:var(--navy)}
+.brand b{color:#fff}.brand small{color:var(--on-navy-3)}
+/* mode switcher, docked in a bar or floating */
+.mn-row button{color:var(--on-navy-2)}
+.mn-row button:hover{background:var(--navy-hover);border-color:transparent;color:#fff}
+.mn-row button.on{background:rgba(232,183,90,.16);border-color:rgba(232,183,90,.55);color:#fff;box-shadow:inset 0 -2px 0 var(--gold)}
+.mn-save,.mode-nav .mn-save{color:var(--on-navy-3)}
+/* KPI tiles on navy: the value leads */
+.kpi,.ct-stat,.ct-dem{background:var(--navy-tile);border:1px solid var(--navy-line);color:#fff}
+.kpi small,.ct-stat small,.ct-dem small,.mchip small{color:var(--on-navy-2)}
+.kpi strong,.ct-stat b,.mchip b{color:#fff;font-weight:800}
+.kpi em{color:var(--on-navy-3)}
+.kpi .spark polyline{stroke:var(--gold)}
+.kpi:hover,.kpi:focus-visible{background:var(--navy-hover);border-color:rgba(232,183,90,.6);transform:translateY(-1px)}
+.mchip:hover{border-color:rgba(232,183,90,.6);transform:translateY(-1px)}
+.kpi:active,.mchip:active{transform:translateY(0) scale(.985)}
+.trend.up,.mchip i.up,.ct-stat em.pos{color:var(--pos-on-navy)}.trend.down,.mchip i.down,.ct-stat em.neg{color:var(--neg-on-navy)}
+.ct-stat b.neg{color:var(--neg-on-navy)}
+.kpi.warn,.mchip.warn{border-color:rgba(255,140,120,.55);box-shadow:inset 0 -3px 0 rgba(255,120,100,.7)}
+.kpi.warn strong,.mchip.warn b{color:var(--neg-on-navy)}
+.mchip{background:var(--bar-bg);border:1px solid rgba(255,255,255,.08);box-shadow:var(--bar-shadow);color:#fff}
+.dem{background:rgba(255,255,255,.08);border-color:var(--navy-line)}.dem span{color:var(--on-navy-2)}
+/* calendar and speed */
+.clock-date small{color:var(--on-navy-3)}.clock-date strong{color:#fff}
+.speed-controls,.ct-speed,.ctop .ct-btns{background:rgba(255,255,255,.07)}
+.speed-controls button,.ct-speed button{color:var(--on-navy-2)}
+.speed-controls button:hover,.ct-speed button:hover{background:var(--navy-hover);color:#fff}
+.speed-controls button.active,.ct-speed button.on{background:var(--gold);color:var(--navy)}
+.quality-btn[aria-pressed="true"]{background:var(--teal)!important;color:#fff!important}
+.save-btn{background:rgba(232,183,90,.16)!important;color:var(--gold-2)!important}
+.ct-title b{color:#fff}.ct-title small{color:var(--on-navy-3)}
+.ctop .ct-btns .icon-btn{color:#fff}
+.ctop .ct-btns .icon-btn:hover{background:var(--navy-hover)}
+.mtop-right .icon-btn{background:var(--bar-bg);color:#fff;border:1px solid rgba(255,255,255,.08);box-shadow:var(--bar-shadow)}
+.mtop-right .icon-btn:hover{background:var(--navy-2);border-color:rgba(232,183,90,.6)}
+/* bottom bar: regions, timeline, layers */
+.region-nav button,.bottombar .region-nav button{background:transparent;color:var(--on-navy-2);border:1px solid transparent}
+.region-nav button:hover,.bottombar .region-nav button:hover{background:var(--navy-hover);color:#fff;border-color:transparent}
+.region-nav button.active,.bottombar .region-nav button.active{background:rgba(232,183,90,.16);color:#fff;border-color:rgba(232,183,90,.6);box-shadow:inset 0 -2px 0 var(--gold)}
+.tl-toggle,.tl-toggle small,.timeline-head small,#queueInfo{color:var(--on-navy-2)}
+.tl-toggle:hover{background:var(--navy-hover)}
+.timeline{background:rgba(255,255,255,.07)}
+.timeline .yr{color:var(--on-navy-3);border-left-color:rgba(255,255,255,.12)}
+.timeline .fill{background:rgba(73,191,195,.16)}
+.timeline .now{background:var(--gold);box-shadow:0 0 0 2px rgba(20,45,70,.6)}
+.layers small{color:var(--on-navy-3)}
+.layers button{background:transparent;border:1px solid rgba(255,255,255,.18);color:var(--on-navy-2)}
+.layers button:hover{border-color:rgba(232,183,90,.6);color:#fff}
+.layers button.active{background:rgba(232,183,90,.16);border-color:rgba(232,183,90,.6);color:#fff}
+/* action toolbars: warm-white tiles on the navy bar */
+.ab-group small{color:var(--on-navy-3)}
+.ct-sep{background:rgba(255,255,255,.14)}
+.act,.ctool{background:var(--panel);border:1px solid transparent;box-shadow:0 2px 0 rgba(0,0,0,.18)}
+.act .an,.ctool small{color:var(--navy)}
+.act .ac,.ctool em{color:var(--gold-ink)}
+.act:hover:not(.locked),.ctool:hover:not(:disabled){background:#fff;border-color:rgba(232,183,90,.7);transform:translateY(-2px);box-shadow:0 6px 14px rgba(0,0,0,.25)}
+.act:active:not(.locked),.ctool:active:not(:disabled){transform:translateY(0);box-shadow:0 1px 0 rgba(0,0,0,.2)}
+.act.sel,.ctool.on{background:var(--gold-soft);border-color:var(--gold);box-shadow:0 0 0 2px var(--gold),0 6px 14px rgba(0,0,0,.22)}
+.act.on{background:#E3F1E7;border-color:rgba(47,138,91,.6)}
+.act.dim{background:#DDD6C7}.act.dim .an{color:#5E6878}
+.act.locked,.ctool.locked{background:transparent;border:1px dashed rgba(255,255,255,.28);box-shadow:none}
+.act.locked .an,.act.locked .ac,.ctool.locked small,.ctool.locked em{color:var(--on-navy-2)}
+.ctool.poor{background:#F6E2D2}
+.dens button{background:rgba(255,255,255,.08);border-color:var(--navy-line);color:#fff}.dens button.on{background:var(--gold);color:var(--navy)}
+.action-bar,.ctools{scrollbar-color:rgba(255,255,255,.25) transparent}
+.build-badge{color:rgba(255,255,255,.6)}
+
+/* ---------- Key actions in gold; other buttons quiet ---------- */
+.primary,.end-turn{background:linear-gradient(180deg,#EEC573,#E3AE4C);color:var(--navy);font-weight:800;box-shadow:0 2px 0 rgba(138,100,32,.45)}
+.primary:hover:not(:disabled),.end-turn:hover:not(:disabled){background:linear-gradient(180deg,#F3CF86,#E8B75A);transform:translateY(-1px);box-shadow:0 6px 14px rgba(138,100,32,.3),0 2px 0 rgba(138,100,32,.45)}
+.primary:active:not(:disabled),.end-turn:active:not(:disabled){transform:translateY(1px);box-shadow:none}
+.primary:disabled{background:#CFC7B4;color:#6B6658;box-shadow:none}
+.secondary{background:var(--surface);color:var(--navy);border:1px solid var(--line-2)}
+.secondary:hover:not(:disabled){border-color:var(--gold);transform:translateY(-1px)}
+.secondary:active:not(:disabled){transform:translateY(0)}
+.icon-btn:active,.collapse-btn:active{transform:scale(.95)}
+.collapse-btn{background:var(--surface-2);color:var(--navy)}
+
+/* ---------- Warm-white information cards ---------- */
+.left-panel,.right-panel,.mcard,.decision,.plan-tray,.report,.results,.cpanel,.cmission,.menu-card,.chapter,.cause-pop,.drill{background:var(--paper)}
+.panel-head small,.eyebrow{color:var(--gold-ink)}
+.project-item,.pkg,.tile,.next-card,.mission-card,.challenge-card,details.dock-more{background:var(--surface)}
+.project-item.active,.tile.sel,.ch-tab.sel{background:var(--gold-soft);border-color:var(--gold);box-shadow:var(--sel-ring)}
+.chips button.active,.ovl button.on,.seg button.on,.lens .lens-tabs button.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.mcard,.cmission{border-inline-start:3px solid var(--gold)}
+.nc-num,.mc-num,.mc-n{background:var(--navy);color:var(--gold)}
+.cm-meter i,.bar i{background:var(--teal)}.bar.prog i{background:linear-gradient(90deg,var(--teal),var(--gold))}
+.cm-next dd{background:var(--gold-soft)}
+.message-ribbon{background:rgba(20,45,70,.9);border:1px solid rgba(255,255,255,.1);backdrop-filter:blur(6px)}
+.message-ribbon b{color:var(--gold-2)}.message-ribbon p{color:rgba(255,255,255,.9)}
+.pulse-dot{background:var(--gold);box-shadow:0 0 0 3px rgba(232,183,90,.22)}
+.cticker{background:rgba(20,45,70,.92)}.cticker.good{background:var(--teal)}
+.toast,.coach{background:var(--navy)}
+
+/* ---------- World labels: compact, readable, softly shadowed ---------- */
+.map-label.city{background:rgba(20,45,70,.92);box-shadow:0 2px 6px rgba(9,22,38,.3)}
+.map-label.city::after,.map-label.pal-sacred::after,.map-label.pal-coast::after,.map-label.pal-desert::after,.map-label.pal-green::after{border-top-color:rgba(20,45,70,.92)}
+.map-label.pal-sacred,.map-label.pal-coast,.map-label.pal-desert,.map-label.pal-green{background:rgba(20,45,70,.92)}
+.map-label.capital{background:var(--gold);color:var(--navy)}.map-label.capital::after{border-top-color:var(--gold)}
+.map-label.place{background:rgba(23,107,112,.93);box-shadow:0 2px 6px rgba(9,22,38,.28)}
+.map-label.cluster{background:var(--navy);box-shadow:0 2px 6px rgba(9,22,38,.3)}
+.map-label.region-name{background:rgba(247,243,233,.96);color:var(--navy);border:1px solid rgba(20,45,70,.14);box-shadow:0 3px 10px rgba(9,22,38,.22)}
+.map-label.region-name:hover{border-color:var(--gold);background:#fff}
+.map-label.region-heading{color:rgba(20,45,70,.5)}
+.map-label.proj-small,.map-label.dyn.node{background:rgba(255,253,248,.96);color:var(--navy);border:1px solid rgba(20,45,70,.14);box-shadow:0 2px 6px rgba(9,22,38,.18)}
+.map-label.project{background:#fff;color:var(--navy);border:1px solid var(--gold);box-shadow:0 4px 12px rgba(9,22,38,.22),var(--sel-ring)}
+.map-label.dyn.node.target{background:var(--gold);border-color:var(--gold);color:var(--navy)}
+.map-label.sea{color:rgba(240,252,255,.92);text-shadow:0 1px 3px rgba(8,50,80,.45)}
+.map-label.country{color:rgba(90,62,36,.55)}
+
+/* ---------- Completion: one brief gold ripple behind the confirmation caption ---------- */
+.moment.reveal .mo-cap{animation:vn-confirm 700ms var(--ease) both}
+.moment.reveal::after{content:"";position:absolute;left:50%;top:50%;width:120px;height:120px;margin:-60px 0 0 -60px;border-radius:50%;border:2px solid var(--gold);opacity:0;animation:vn-ripple 1100ms var(--ease) 1 both;pointer-events:none}
+@keyframes vn-ripple{0%{transform:scale(.4);opacity:.9}100%{transform:scale(4.2);opacity:0}}
+@keyframes vn-confirm{0%{transform:translateY(6px);opacity:0}100%{transform:none;opacity:1}}
+body.reduced .moment.reveal::after,body.reduced .moment.reveal .mo-cap{animation:none}
+@media (prefers-reduced-motion: reduce){.moment.reveal::after{display:none}.act:hover,.ctool:hover,.kpi:hover,.mchip:hover,.primary:hover,.secondary:hover{transform:none}}
+body.reduced .act:hover,body.reduced .ctool:hover,body.reduced .kpi:hover,body.reduced .mchip:hover,body.reduced .primary:hover{transform:none}
