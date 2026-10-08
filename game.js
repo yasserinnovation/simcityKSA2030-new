@@ -95,9 +95,11 @@
     const st = S();
     for (const d of KPI_DEF) {
       const el = $(`[data-kpi="${d.k}"]`); if (!el) continue;
-      const v = st.kpi[d.k].value, h = st.hist[d.k], prev = h[Math.max(0, h.length - 4)] ?? v, delta = v - prev;
+      const v = st.kpi[d.k].value, h = st.hist[d.k], prev = h[Math.max(0, h.length - 4)] ?? v, delta = v - prev, hasHist = h.length >= 2;
       el.querySelector('strong').textContent = fmt(v);
-      const tr = el.querySelector('.trend'); tr.textContent = Math.abs(delta) < .3 ? '▬' : delta > 0 ? '▲' : '▼'; tr.className = 'trend ' + (Math.abs(delta) < .3 ? 'flat' : delta > 0 ? 'up' : 'down');
+      // A change indicator (and sparkline) only once there is a real earlier month to compare with.
+      const tr = el.querySelector('.trend'); tr.textContent = !hasHist ? '' : Math.abs(delta) < .3 ? '▬' : delta > 0 ? '▲' : '▼'; tr.className = 'trend ' + (!hasHist ? 'none' : Math.abs(delta) < .3 ? 'flat' : delta > 0 ? 'up' : 'down');
+      el.querySelector('.spark').style.visibility = hasHist ? '' : 'hidden';
       const lo = Math.min(...h), hi = Math.max(...h), span = Math.max(1, hi - lo);
       el.querySelector('polyline').setAttribute('points', h.map((y, i) => `${(i / Math.max(1, h.length - 1) * 60).toFixed(1)},${(16 - (y - lo) / span * 14).toFixed(1)}`).join(' '));
       el.classList.toggle('warn', (d.k === 'budget' && v < 5) || (d.k === 'trust' && v < 40) || (d.k === 'resilience' && v < 35) || (d.k === 'expo' && v < 40));

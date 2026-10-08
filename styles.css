@@ -904,3 +904,140 @@ body.rtl details.cm-more>summary::before{content:"◂ "}body.rtl details.cm-more
 @media (max-width:900px){.cmission{top:auto}.cpanel{top:auto}.cticker{top:auto}}
 .cpanel{max-height:calc(100dvh - var(--ctop,60px) - 120px)}
 @media (max-width:900px){.cpanel{max-height:50vh}}
+/* =====================================================================
+   V9 — Premium refinement (visual only; no control, id or behaviour changes).
+   One shared palette: the same values are mirrored for the 3D world in engine.js (PALETTE), so the HUD and the map agree.
+     panels #FAF9F5 · text and primary actions #153F36 · selection/objective #C99B45 · navigation #203E5B
+     world: muted sand and light stone · water: calm teal
+   Selection is gold with a ring; warnings are terracotta with a stripe; errors are red — never the same cue.
+   ===================================================================== */
+:root{
+  --panel:#FAF9F5;--paper:rgba(250,249,245,.97);--paper-solid:#FAF9F5;
+  --ink:#153F36;--ink-2:#2D564B;--muted:#5E6E68;
+  --gold:#C99B45;--gold-ink:#7A5A1E;--gold-soft:#F4EDDF;--sel-ring:0 0 0 3px rgba(201,155,69,.28);
+  --navy:#203E5B;--navy-2:#2B4D70;
+  --sand:#E2D2B3;--stone:#ECE6D9;--water:#3F8A8A;--water-deep:#2E6F73;
+  --warn:#C8612B;--warn-soft:#FBEBDD;--orange:#C8612B;--red:#C0392B;--green:#2F8A5B;
+  --surface:#FFFFFF;--surface-2:#F3F1EA;--line:rgba(21,63,54,.11);--line-2:rgba(21,63,54,.19);
+  --r:14px;--r-card:12px;--r-sm:9px;
+  --shadow:0 6px 18px rgba(21,40,35,.08),0 1px 3px rgba(21,40,35,.06);
+  --shadow-lift:0 10px 26px rgba(21,40,35,.13),0 2px 6px rgba(21,40,35,.08);
+}
+html,body{background:#d9e4e0}
+#world{background:linear-gradient(#c9dcdc,#ebeee8)}
+
+/* Panels: one card language — 14px corners, hairline border, soft shadow, even padding */
+.glass{border-radius:var(--r);border:1px solid var(--line);box-shadow:var(--shadow)}
+.left-panel,.right-panel,.bottombar,.topbar,.ctop,.ctools,.mcard,.decision,.plan-tray,.action-bar,.report,.results,.cpanel,.cmission,.menu-card,.chapter,.mode-nav:not(.docked){border-radius:var(--r)}
+.kpi,.mchip,.ct-stat,.ct-dem,.act,.ctool,.project-item,.tile,.next-card,.mission-card,.challenge-card,.pkg,.tg,details.dock-more{border-radius:var(--r-card)}
+.panel-head{padding:12px 14px}
+.eyebrow,.panel-head small{font-size:11px;letter-spacing:.06em;font-weight:700;color:var(--gold-ink)}
+
+/* KPI cards: equal size, the value first; a change arrow only when there is history to compare */
+.kpi{height:50px;padding:5px 12px}
+.kpi strong{font-size:21px;font-variant-numeric:tabular-nums}
+.kpi .trend.none{display:none}
+.kpi .trend{font-size:10px;margin-inline-start:3px}.trend.up{color:var(--green)}.trend.down{color:var(--red)}.trend.flat{color:#9AA59F}
+.mmeasures{display:grid;grid-auto-flow:column;grid-auto-columns:104px;gap:6px}
+.mchip{width:104px;min-width:0;min-height:50px;border-radius:var(--r-card);padding:6px 11px}
+.mchip b{font-variant-numeric:tabular-nums}
+.ct-stat b,.cap-n,.pk{font-variant-numeric:tabular-nums}
+
+/* Selection (gold) vs warning (terracotta) vs error (red) */
+.project-item.active,.act.sel,.ctool.on,.tile.sel,.ch-tab.sel{border-color:var(--gold);background:var(--gold-soft);box-shadow:var(--sel-ring)}
+.h-waiting .health{background:var(--warn)}.h-blocked .health{background:var(--red)}
+.kpi.warn,.mchip.warn{border-color:rgba(192,57,43,.45);box-shadow:inset 0 -3px 0 rgba(192,57,43,.55)}
+.mchip.warn b,.kpi.warn strong{color:var(--red)}
+
+/* Navigation: one navy family, gold marks the current item */
+.region-nav button,.bottombar .region-nav button{background:var(--navy)}
+.region-nav button:hover,.bottombar .region-nav button:hover{background:var(--navy-2)}
+.region-nav button.active,.bottombar .region-nav button.active{background:var(--ink);border-color:var(--gold);box-shadow:inset 0 -2px 0 var(--gold)}
+.mn-row button.on,.chips button.active,.layers button.active,.ovl button.on,.seg button.on,.lens .lens-tabs button.on,.dens button.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.quality-btn[aria-pressed="true"]{background:var(--navy)!important}
+.mode-nav:not(.docked){box-shadow:var(--shadow)}
+
+/* Collapsed side panels keep a labelled tab, so it is obvious how to reopen them */
+.left-panel.collapsed .panel-head>div,.right-panel.collapsed .panel-head>div{display:block}
+.left-panel.collapsed .panel-head>div b,.right-panel.collapsed .panel-head>div b{display:none}
+.left-panel.collapsed .panel-head,.right-panel.collapsed .panel-head{padding:6px 6px 6px 12px;gap:10px}
+body.national-ar .left-panel.collapsed .panel-head,body.national-ar .right-panel.collapsed .panel-head{padding:6px 12px 6px 6px}
+.left-panel.collapsed .panel-head small,.right-panel.collapsed .panel-head small{margin:0;white-space:nowrap}
+.left-panel.collapsed .collapse-btn,.right-panel.collapsed .collapse-btn{background:var(--ink);color:#fff;border-color:var(--ink)}
+.collapse-btn{width:30px;height:30px;border-radius:var(--r-sm)}
+
+/* Mission action toolbar: equal tiles, concise labels, visible cost; clear available / selected / unavailable states */
+.action-bar{padding:8px 10px;gap:14px;scrollbar-width:thin;scrollbar-color:rgba(21,63,54,.22) transparent}
+.ab-group small{color:var(--muted);font-size:10.5px;letter-spacing:.05em;font-weight:700}
+.ab-row{gap:6px}
+.act{width:96px;min-width:96px;max-width:96px;min-height:80px;padding:7px 5px 6px;border:1px solid var(--line);background:var(--surface);align-content:start;gap:3px;grid-template-rows:26px auto 1fr}
+.act .ai{font-size:21px;line-height:26px;height:26px}
+.act .an{font-size:11px;font-weight:700;line-height:1.2;color:var(--ink);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.act .ac{font-size:10.5px;font-weight:700;color:var(--gold-ink);font-variant-numeric:tabular-nums;align-self:end;min-height:13px}
+.act:hover:not(.locked){border-color:var(--line-2);background:var(--surface-2);transform:translateY(-1px)}
+.act.sel{box-shadow:var(--sel-ring),inset 0 -3px 0 var(--gold)}
+.act.on{border-color:rgba(47,138,91,.55);background:#EEF5EF}.act.on .ac{color:var(--green)}
+.act.dim{opacity:1;background:var(--surface-2)}.act.dim .ai{opacity:.55}.act.dim .an{color:var(--muted)}.act.dim .ac{color:#9A9384}
+.act.locked{opacity:1;background:var(--surface-2);border-style:dashed;cursor:help}.act.locked .ai{opacity:.7}.act.locked .an,.act.locked .ac{color:var(--muted)}
+.plan-tray{border:1px solid var(--line)}
+.end-turn,.primary{background:var(--ink);color:#fff}
+
+/* City Builder bar and toolbar */
+#cExit{display:none}                       /* the mode switcher's Kingdom tab already leads back to the menu */
+.ctop .ct-btns{background:var(--surface-2);border-radius:11px;padding:3px;gap:2px}
+.ctop .ct-btns .icon-btn{border:0;background:transparent;min-width:34px;min-height:34px;font-size:15px}
+.ctop .ct-btns .icon-btn:hover{background:#fff}
+.ctools{scrollbar-width:thin;scrollbar-color:rgba(21,63,54,.22) transparent;padding:6px 8px}
+.ctool{width:74px;min-width:74px;min-height:70px;border-radius:var(--r-card)}
+.ctool small{font-size:11px;font-weight:700}
+.ctool em{font-size:10.5px}
+.ctool.on{box-shadow:var(--sel-ring),inset 0 -3px 0 var(--gold)}
+.ctool.poor{background:var(--warn-soft)}.ctool.poor em{color:var(--warn)}
+.ctool.locked{opacity:1;filter:none;background:var(--surface-2);border-style:dashed}.ctool.locked .ci{opacity:.7}.ctool.locked small,.ctool.locked em{color:var(--muted)}
+.ctool:disabled{opacity:.4;cursor:not-allowed}
+.cmission{border-inline-start:3px solid var(--gold)}
+
+/* Map labels: one readable size scale (never below 11px), calm colours, the objective in gold */
+.map-label{font-family:inherit}
+.map-label.proj-small{font-size:11px}
+.map-label.sea{font-family:inherit;font-style:normal;font-weight:600;font-size:15px;letter-spacing:.16em;color:rgba(236,246,246,.88);text-shadow:0 1px 2px rgba(12,40,50,.35)}
+body.rtl .map-label.sea{letter-spacing:0}
+.map-label.country{font-size:11px;color:rgba(80,68,50,.5)}
+.map-label.city,.map-label.place,.map-label.cluster{border-radius:8px}
+.map-label.place{background:rgba(32,62,91,.9)}
+.map-label.cluster{background:var(--navy)}
+.map-label.dyn.node{font-size:11px;font-weight:700;background:rgba(250,249,245,.95);color:var(--ink);border:1px solid var(--line-2);border-radius:8px}
+.map-label.dyn.node.target{background:var(--gold-soft);border-color:var(--gold);color:#3A2A0E;font-size:12px;box-shadow:0 2px 8px rgba(122,90,30,.22)}
+.map-label.dyn.node.good{background:#E6F2EA;border-color:rgba(47,138,91,.6)}
+.map-label.dyn.node.bad{background:#FBE7E3;border-color:rgba(192,57,43,.6)}
+.map-label.dyn.node.low{border-color:var(--warn)}
+.map-label.project{border-radius:9px;box-shadow:0 4px 12px rgba(21,40,35,.18),var(--sel-ring)}
+
+/* Build label: tucked into the bottom gutter so it never sits on a toolbar */
+.build-badge{inset-block-end:0;inset-inline-end:14px;font-size:9px;line-height:10px;font-weight:600;color:rgba(21,63,54,.42);letter-spacing:.02em;white-space:nowrap;max-width:calc(100vw - 28px);overflow:hidden;text-overflow:ellipsis}
+
+/* Motion: short, subtle; nothing moves for players who ask for reduced motion */
+.left-panel,.right-panel,.decision,.cpanel,.cmission,.plan-tray{transition:opacity 200ms var(--ease),transform 200ms var(--ease),width 200ms var(--ease)}
+@media (prefers-reduced-motion: reduce){.act:hover,.ctool:hover,.region-nav button:hover,.primary:hover{transform:none}}
+body.reduced .act:hover,body.reduced .ctool:hover{transform:none}
+
+/* Responsive guards: nothing clipped or pushed outside the viewport */
+@media (max-width:900px){
+  .mmeasures{grid-auto-columns:minmax(84px,1fr)}
+  .mchip{width:auto}
+  .act{width:86px;min-width:86px;max-width:86px}
+}
+@media (max-width:600px){
+  .ctool{width:64px;min-width:64px}
+  .act{width:78px;min-width:78px;max-width:78px;min-height:74px}.act .an{font-size:10.5px}
+  .build-badge{display:none}
+}
+/* Missions HUD on narrower screens: the floating mode switcher goes compact (name on the active mode only) so it fits between
+   the mission card and the measures; on phones the mission card starts below it instead of underneath it. */
+@media (max-width:1180px){
+  body:has(#mhud:not(.hidden)) .mode-nav .mn-row button:not(.on) .mn-t{display:none}
+  body:has(#mhud:not(.hidden)) .mode-nav .mn-save{max-width:230px}
+}
+@media (max-width:760px){
+  body:has(#mhud:not(.hidden)) .mcard{top:calc(env(safe-area-inset-top,0px) + 74px)}
+}

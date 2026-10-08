@@ -137,11 +137,11 @@
   /* ============================= ACTIONS ============================= */
   // target: corridor | road | node | none | project
   const ACTIONS = {
-    metro:  {cat:'transit', name:L('Metro extension','امتداد المترو'), target:'corridor', crews:2, icon:'Ⓜ',
+    metro:  {cat:'transit', name:L('Metro extension','امتداد المترو'), target:'corridor', crews:2, icon:'🚇',
              why:L('High capacity and fast, with no road lane lost, but it is the slowest and most expensive option to build.','سعة عالية وسرعة دون فقدان مسار طريق، لكنه الأبطأ والأغلى بناءً.')},
     brt:    {cat:'transit', name:L('Bus rapid transit','حافلات التردد السريع'), target:'corridor', crews:1, icon:'🚌',
              why:L('Quick and cheap to build, but it takes a car lane and carries fewer people than metro.','سريعة ورخيصة، لكنها تأخذ مسارًا من السيارات وتنقل عددًا أقل من المترو.')},
-    road:   {cat:'transit', name:L('Road widening','توسعة الطريق'), target:'road', crews:1, icon:'🛣',
+    road:   {cat:'transit', name:L('Road widening','توسعة الطريق'), target:'road', crews:1, icon:'🛣️',
              why:L('Adds car capacity fast, but new lanes attract new trips and push more cars into the central ring.','يضيف سعة للسيارات بسرعة، لكن المسارات الجديدة تجذب رحلات جديدة وتدفع مزيدًا من السيارات إلى الحلقة المركزية.')},
     freq:   {cat:'ops', name:L('Boost transit frequency','زيادة تردد النقل العام'), target:'none', crews:0, icon:'⏱', toggle:true,
              why:L('+40% capacity on every transit line and shorter waits, for 0.6 credits each turn it stays on.','زيادة 40٪ في سعة كل خط نقل وانتظار أقصر، بتكلفة 0.6 رصيد لكل جولة.')},
@@ -157,7 +157,7 @@
              why:L('Connects the renewable site to the city grid. Solar and wind are useless until they are connected.','يربط موقع الطاقة المتجددة بشبكة المدينة. الطاقة الشمسية والرياح بلا فائدة حتى يتم الربط.')},
     wind:   {cat:'energy', name:L('Wind farm','مزرعة رياح'), target:'none', crews:1, icon:'🌬', needs:'gridlink',
              why:L('Wind keeps blowing after sunset, so it helps the evening peak, but it costs more than solar and produces less at midday.','الرياح تستمر بعد الغروب فتساعد في ذروة المساء، لكنها أغلى من الشمسية وتنتج أقل وقت الظهيرة.')},
-    solar:  {cat:'energy', name:L('Solar farm','مزرعة شمسية'), target:'none', crews:1, icon:'☀', needs:'gridlink',
+    solar:  {cat:'energy', name:L('Solar farm','مزرعة شمسية'), target:'none', crews:1, icon:'☀️', needs:'gridlink',
              why:L('Clean daytime power. It helps little at the evening peak without storage.','طاقة نظيفة نهارًا، وتساعد قليلًا في ذروة المساء دون تخزين.')},
     peaker: {cat:'energy', name:L('Gas peaker plant','محطة ذروة غازية'), target:'none', crews:1, icon:'🏭',
              why:L('Reliable evening capacity, quickly and cheaply, but it adds emissions.','سعة مسائية موثوقة بسرعة وبتكلفة منخفضة، لكنها تزيد الانبعاثات.')},
@@ -206,7 +206,7 @@
              why:L('Protects about 85% of people outdoors in this district when the storm arrives. People come first.','يحمي نحو 85٪ من الموجودين في الخارج في هذا الحي عند وصول العاصفة. الناس أولًا.')},
     medic:  {cat:'response', name:L('Field medical team','فريق طبي ميداني'), target:'node', crews:0, icon:'⛑',
              why:L('Covers the remaining people in a district, and helps those already caught out.','يغطي بقية الناس في الحي، ويساعد من علقوا في الخارج.')},
-    reroute:{cat:'response', name:L('Reroute traffic','تحويل حركة المرور'), target:'road', crews:0, icon:'↪',
+    reroute:{cat:'response', name:L('Reroute traffic','تحويل حركة المرور'), target:'road', crews:0, icon:'↪️',
              why:L('Closes a road before the storm hits it. Vehicles move to other routes, so nobody is stranded.','يغلق طريقًا قبل وصول العاصفة إليه، فتنتقل المركبات إلى طرق أخرى ولا يعلق أحد.')},
     clear:  {cat:'response', name:L('Clearance crew','فريق إزالة الرمال'), target:'road', crews:0, icon:'🚜',
              why:L('Reopens a road once the storm has passed it. It does nothing while the storm is still overhead.','يعيد فتح الطريق بعد مرور العاصفة، ولا يفيد والعاصفة ما زالت فوقه.')},

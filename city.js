@@ -15,7 +15,7 @@
   const BUILD_MONTHS = [0,1,2,3];
   const FAC = {
     gas:      {name:L('Gas power plant','محطة كهرباء غازية'), cost:14, upkeep:.55, power:90, jobs:12, pollution:4, icon:'🏭'},
-    solar:    {name:L('Solar farm','مزرعة شمسية'), cost:10, upkeep:.2, solar:45, jobs:3, icon:'☀'},
+    solar:    {name:L('Solar farm','مزرعة شمسية'), cost:10, upkeep:.2, solar:45, jobs:3, icon:'☀️'},
     battery:  {name:L('Grid battery','بطارية الشبكة'), cost:6, upkeep:.15, storage:45, jobs:1, icon:'🔋'},
     pump:     {name:L('Water pumping station','محطة ضخ المياه'), cost:9, upkeep:.3, water:110, jobs:6, icon:'💧'},
     tower:    {name:L('Water tower','خزان مياه مرتفع'), cost:4, upkeep:.1, water:35, jobs:1, icon:'🗼'},

@@ -97,11 +97,14 @@
   document.addEventListener('click', e => { if (!e.target.closest('#causePop') && !e.target.closest('[data-m]')) $('#causePop').classList.add('hidden'); });
 
   const CATS = ['transit','district','energy','project','people','policy','offer','ops','response'];
+  // Place-dependent actions: the range of what the currently valid places actually cost (nothing when there is none, e.g. routes).
+  function costRange(id){ if (VM.ACTIONS[id].target === 'route') return null; const cs = validTargetsFor(id).map(x => VM.costOf(id, x)).filter(v => typeof v === 'number' && isFinite(v)); if (!cs.length) return null;
+    const lo = Math.min(...cs), hi = Math.max(...cs); return lo === hi ? fmt(lo, 1) : '⁦' + fmt(lo, 1) + '–' + fmt(hi, 1) + '⁩'; }   // isolated LTR: reads low–high in Arabic too
   function renderActions(){
     const m = M(), s = S();
     const html = CATS.map(cat => { const ids = m.actions.filter(id => VM.ACTIONS[id].cat === cat); if (!ids.length) return '';
       return `<div class="ab-group"><small>${esc(t(cat))}</small><div class="ab-row">${ids.map(id => { const a = VM.ACTIONS[id], c = VM.check(id, null);
-        const locked = c.locked, on = a.toggle && s.ops[id], cost = VM.ACTIONS[id].target === 'none' || !['metro','brt','road','advance','fasttrack','route','freight'].includes(id) ? VM.costOf(id, null) : null;
+        const locked = c.locked, on = a.toggle && s.ops[id], cost = VM.ACTIONS[id].target === 'none' || !['metro','brt','road','advance','fasttrack','route','freight'].includes(id) ? VM.costOf(id, null) : costRange(id);
         return `<button class="act ${ui.sel === id ? 'sel' : ''} ${locked ? 'locked' : ''} ${!c.ok && !locked ? 'dim' : ''} ${on ? 'on' : ''}" data-act="${id}" title="${esc(c.ok ? t(a.why) : t(c.why || a.why))}">
           <span class="ai">${locked ? '🔒' : a.icon}</span><span class="an">${esc(t(G.aname(id)))}</span><span class="ac">${locked ? esc(t(VM.UPGRADES[locked].name)) : on ? esc(t('on')) : cost != null ? cost + ' ◆' + (a.toggle ? '/' + (t('turn')) : '') : ''}</span></button>`; }).join('')}</div></div>`; }).join('');
     $('#actionBar').innerHTML = html;

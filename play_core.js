@@ -42,10 +42,15 @@
   /* ============================ LANGUAGE ============================= */
   G.lang = () => G.profile.lang || 'en';
   G.t = (k, vars) => { let s = typeof k === 'string' ? (I[G.lang()][k] ?? I.en[k] ?? k) : (k[G.lang()] || k.en); if (vars) for (const [a, b] of Object.entries(vars)) s = s.split('{' + a + '}').join(b); return s; };
+  // Arabic names that live with the layout data (districts such as Dhahran or Al Khobar, region names, corridor names).
+  let layoutArMap = null;
+  const layoutAr = () => { if (layoutArMap) return layoutArMap; layoutArMap = {}; const LY = window.VisionLayout, add = n => { if (n && n.en && n.ar) layoutArMap[n.en] = n.ar; };
+    if (LY) { Object.values(LY.places || {}).forEach(q => add(q.name)); Object.values(LY.REGION_VIEWS || {}).forEach(v => { add(v.name); add(v.heading && v.heading.text); }); (LY.planRoads || []).forEach(r => add(r.name)); (LY.CITY_ROADS || []).forEach(r => add(r.name)); }
+    return layoutArMap; };
   G.applyLang = () => {
     const ar = G.lang() === 'ar';
     document.documentElement.lang = ar ? 'ar' : 'en'; document.documentElement.dir = ar ? 'rtl' : 'ltr'; document.body.classList.toggle('rtl', ar);
-    W.relabel(base => ar ? (I.places[base] || I.places[base.toUpperCase()] || base) : base);
+    W.relabel(base => ar ? (I.places[base] || I.places[base.toUpperCase()] || layoutAr()[base] || base) : base);
     $$('[data-i18n]').forEach(el => { el.textContent = G.t(el.dataset.i18n); });
   };
   G.month = (m, y) => `${I.months[G.lang()][((m % 12) + 12) % 12]} ${y + Math.floor(m / 12)}`;
@@ -372,7 +377,7 @@
   /* ============================ SHARE CARD =========================== */
   G.share = (res, S) => {
     const m = VM.mission(res.mission), c = document.createElement('canvas'); c.width = 1200; c.height = 630; const x = c.getContext('2d');
-    const ar = G.lang() === 'ar', font = ar ? 'Tahoma, "Segoe UI", sans-serif' : '"Trebuchet MS", "Segoe UI", sans-serif';
+    const ar = G.lang() === 'ar', font = '"Tajawal", "IBM Plex Sans Arabic", "Segoe UI", Tahoma, sans-serif';   // the interface font, in both languages
     const g = x.createLinearGradient(0, 0, 1200, 630); g.addColorStop(0, '#fff6dc'); g.addColorStop(1, '#d9f0e4'); x.fillStyle = g; x.fillRect(0, 0, 1200, 630);
     x.fillStyle = '#1f3f63'; x.fillRect(0, 0, 1200, 84); x.fillStyle = '#ffe08a'; x.font = `bold 30px ${font}`; x.textAlign = ar ? 'right' : 'left';
     const X = v => ar ? 1200 - v : v;

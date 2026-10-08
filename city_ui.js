@@ -126,15 +126,15 @@
     const S = VC.state, m = S.m, d = VC.dateOf(), beyond = d.year > 2030;
     const bar = k => { const v = m.demand[k]; return `<button class="dem" data-dem="${k}" title="${esc(t('demandWhy'))}"><span>${k}</span><i class="${v >= 0 ? 'pos' : 'neg'}" style="--v:${Math.min(100, Math.abs(v))}%"></i></button>`; };
     { const nav = $('#modeNav'); if (nav && $('#cTop').contains(nav)) document.body.appendChild(nav); }
-    $('#cTop').innerHTML = `<div class="ct-title"><b>🏗 ${esc(t('cityTitle'))}</b><small>${beyond ? esc(t('beyond2030')) + ' · ' : ''}${month(S.month)}</small></div>
+    $('#cTop').innerHTML = `<div class="ct-title"><b>${esc(t('cityTitle'))}</b><small>${beyond ? esc(t('beyond2030')) + ' · ' : ''}${month(S.month)}</small></div>
       <div class="ct-speed">${[0,1,3].map(s => `<button class="${ui.speed === s ? 'on' : ''}" data-speed="${s}" aria-label="${s ? s + '×' : t('pause')}">${s ? s + '×' : 'Ⅱ'}</button>`).join('')}</div>
       <div class="ct-stat" title="${esc(t('creditsNote'))}"><small>${esc(t('budget'))}</small><b class="${S.budget < 0 ? 'neg' : ''}">◆ ${S.budget.toFixed(1)}</b><em class="${m.budget.net < 0 ? 'neg' : 'pos'}">${m.budget.net >= 0 ? '+' : ''}${m.budget.net}/${esc(t('mo'))}</em></div>
       <div class="ct-stat"><small>${esc(t('residents'))}</small><b>${m.pop.toLocaleString()}</b></div>
       <div class="ct-stat"><small>${esc(t('jobsLbl'))}</small><b>${m.jobs.toLocaleString()}</b></div>
       <div class="ct-stat"><small>${esc(t('commute'))}</small><b>${m.commute}′</b></div>
       <div class="ct-dem"><small>${esc(t('demand'))}</small>${bar('R')}${bar('C')}${bar('I')}</div>
-      <div class="ct-stat"><small>${esc(t('weather'))}</small><b>${S.weather && S.weather.type === 'dust' ? '🌪' : (S.month % 12 >= 5 && S.month % 12 <= 7) ? '🔥' : '☀'}</b></div>
-      <div class="ct-btns"><button class="icon-btn" data-panel="missions" title="${esc(t('cityMissions'))}">🏅</button><button class="icon-btn" data-panel="goals" title="${esc(t('goals'))}">🎯</button><button class="icon-btn" data-panel="budget" title="${esc(t('budget'))}">◆</button><button class="icon-btn" data-panel="overlays" title="${esc(t('overlays'))}">🗺</button><button class="icon-btn" id="cLens" title="Competitiveness">📊</button><button class="icon-btn" id="cKingdom" title="${esc(t('toKingdom'))}">🌍</button><button class="icon-btn" id="cExit" title="${esc(t('backMenu'))}">✕</button></div><div class="nav-slot" id="cNavSlot"></div>`;
+      <div class="ct-stat"><small>${esc(t('weather'))}</small><b>${S.weather && S.weather.type === 'dust' ? '🌪' : (S.month % 12 >= 5 && S.month % 12 <= 7) ? '🔥' : '☀️'}</b></div>
+      <div class="ct-btns"><button class="icon-btn" data-panel="missions" title="${esc(t('cityMissions'))}" aria-label="${esc(t('cityMissions'))}">🏅</button><button class="icon-btn" data-panel="goals" title="${esc(t('goals'))}" aria-label="${esc(t('goals'))}">📋</button><button class="icon-btn" data-panel="budget" title="${esc(t('budget'))}" aria-label="${esc(t('budget'))}">💰</button><button class="icon-btn" data-panel="overlays" title="${esc(t('overlays'))}" aria-label="${esc(t('overlays'))}">🗂️</button><button class="icon-btn" id="cLens" title="Competitiveness" aria-label="Competitiveness">📊</button><button class="icon-btn" id="cKingdom" title="${esc(t('toKingdom'))}" aria-label="${esc(t('toKingdom'))}">🌍</button><button class="icon-btn" id="cExit" title="${esc(t('backMenu'))}">✕</button></div><div class="nav-slot" id="cNavSlot"></div>`;
     G.renderNav && G.renderNav();
     document.documentElement.style.setProperty('--ctop', ($('#cTop').offsetHeight || 60) + 'px');   // panels sit under the real (possibly wrapped) bar
     $$('#cTop [data-speed]').forEach(b => b.onclick = () => { ui.speed = +b.dataset.speed; renderHUD(); });
@@ -146,9 +146,9 @@
     renderTools(); renderMissionCard();
   }
   const TOOLS = [
-    {id:'select', icon:'👆', grp:0}, {id:'road', icon:'🛣', cost:VC.COST.road, grp:1}, {id:'avenue', icon:'🛣️', cost:VC.COST.avenue, cap:'avenue', grp:1}, {id:'remove', icon:'🧹', grp:1},
-    {id:'rail', icon:'🛤', cost:VC.COST.rail, grp:1},
-    {id:'zoneR', icon:'🏠', dens:true, grp:2}, {id:'zoneC', icon:'🏬', dens:true, grp:2}, {id:'zoneI', icon:'🏭', dens:true, grp:2}, {id:'zoneT', icon:'🏨', dens:true, grp:2}, {id:'zoneM', icon:'🏘', dens:true, cap:'mixed', grp:2},
+    {id:'select', icon:'👆', grp:0}, {id:'road', icon:'🛣️', cost:VC.COST.road, grp:1}, {id:'avenue', icon:'🚦', cost:VC.COST.avenue, cap:'avenue', grp:1}, {id:'remove', icon:'🧹', grp:1},
+    {id:'rail', icon:'🚆', cost:VC.COST.rail, grp:1},
+    {id:'zoneR', icon:'🏠', cost:VC.COST.zone, dens:true, grp:2}, {id:'zoneC', icon:'🏬', cost:VC.COST.zone, dens:true, grp:2}, {id:'zoneI', icon:'🏭', cost:VC.COST.zone, dens:true, grp:2}, {id:'zoneT', icon:'🏨', cost:VC.COST.zone, dens:true, grp:2}, {id:'zoneM', icon:'🏘️', cost:VC.COST.zone, dens:true, cap:'mixed', grp:2},
     {id:'gas', fac:1, grp:3}, {id:'solar', fac:1, grp:3}, {id:'battery', fac:1, grp:3}, {id:'pump', fac:1, grp:3}, {id:'tower', fac:1, grp:3},
     {id:'school', fac:1, grp:4}, {id:'training', fac:1, grp:4}, {id:'clinic', fac:1, grp:4}, {id:'park', fac:1, grp:4}, {id:'emergency', fac:1, grp:4}, {id:'digital', fac:1, cap:'digital', grp:4}, {id:'terminal', fac:1, grp:4}, {id:'invest', fac:1, grp:4},
     {id:'route', icon:'🚌', grp:5}
@@ -158,7 +158,7 @@
     $('#cTools').innerHTML = TOOLS.map((tl, i) => { const f = VC.FAC[tl.id], locked = tl.cap && !S.caps.includes(tl.cap), name = f ? t(f.name) : t('tool_' + tl.id);
       const cost = f ? `◆${f.cost}` : tl.cost ? `◆${tl.cost}/▢` : '', poor = !!(f && S.budget < f.cost);
       const sep = i && TOOLS[i - 1].grp !== tl.grp ? '<span class="ct-sep" aria-hidden="true"></span>' : '';
-      return `${sep}<button class="ctool ${ui.tool === tl.id ? 'on' : ''} ${locked ? 'locked' : ''} ${poor ? 'poor' : ''}" data-tool="${tl.id}" aria-pressed="${ui.tool === tl.id}" ${locked ? 'aria-disabled="true"' : ''} title="${esc(name + (cost ? ' · ' + cost : '') + (locked ? ' · 🔒 ' + t(VC.CAPS[tl.cap].how) : ''))}"><span class="ci">${locked ? '🔒' : f ? f.icon : tl.icon}</span><small>${esc(name)}</small><em>${cost || '&nbsp;'}</em></button>`; }).join('')
+      return `${sep}<button class="ctool ${ui.tool === tl.id ? 'on' : ''} ${locked ? 'locked' : ''} ${poor ? 'poor' : ''}" data-tool="${tl.id}" aria-pressed="${ui.tool === tl.id}" ${locked ? 'aria-disabled="true"' : ''} title="${esc(name + (cost ? ' · ' + cost : '') + (locked ? ' · 🔒 ' + t(VC.CAPS[tl.cap].how) : ''))}"><span class="ci">${locked ? '🔒' : f ? f.icon : tl.icon}</span><small>${esc(name)}</small><em dir="ltr">${cost || '&nbsp;'}</em></button>`; }).join('')
       + (['zoneR','zoneC','zoneI','zoneT','zoneM'].includes(ui.tool) ? `<div class="dens">${[1,2,3].map(d => `<button class="${ui.density === d ? 'on' : ''} ${(d === 2 && !S.caps.includes('medium')) || (d === 3 && !S.caps.includes('high')) ? 'locked' : ''}" data-dens="${d}">${esc(t('dens' + d))}</button>`).join('')}</div>` : '')
       + `<button class="ctool" id="cUndo" ${VC.canUndo() ? '' : 'disabled'}><span>↶</span><small>${esc(t('undo'))}</small></button>`;
     $$('#cTools [data-tool]').forEach(b => b.onclick = () => selectTool(b.dataset.tool));

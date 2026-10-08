@@ -1592,6 +1592,7 @@
       const s = show && project([x,y,z]);
       if (!s || s[2]>1 || s[0]<-60 || s[1]<-30 || s[0]>innerWidth+60 || s[1]>innerHeight+30) { hideLabel(L); continue; }
       if (L.small) pri = 2 + .9 * (1 - Math.min(1, Math.hypot(s[0]-cx, s[1]-cy) / diag)) + (ESSENTIAL_LABELS.has(L.pid) ? 1 : 0);   // nearer the middle = more relevant; key districts first
+      if (L===projLabel) pri = 30;   // the selected (or hovered) object is placed before everything else
       cand.push({L, s, pri});
     }
     cand.sort((a,b) => b.pri - a.pri);
@@ -1605,7 +1606,9 @@
       measure(L); if (L===projLabel) { L.w=L.el.offsetWidth; L.h=L.el.offsetHeight; }
       const lift = L.el.classList.contains('city')||L===projLabel||L.cluster ? 18 : L.small ? 8 : 0;
       const at = w => ({x:Math.max(6, Math.min(innerWidth - w - 6, s[0]-w/2+(far>7?L.dx:0))), y:s[1]-L.h/2-lift+(far>7?L.dy:0), w, h:L.h});   // every label stays fully on screen
-      const free = r => !placed.some(q => hits(r, q)) && !obstacles.some(q => hits(r, q, 2, 2)) && !(L.pid && coversOther(r, L.pid));
+      // Decorative names (seas, countries, headings, corridors, the plan note) never sit over any landmark: they give way first.
+      const deco = L.decor ?? (L.decor = !!(L.heading || L.note || L.road || L.el.classList.contains('sea') || L.el.classList.contains('country')));
+      const free = r => !placed.some(q => hits(r, q)) && !obstacles.some(q => hits(r, q, 2, 2)) && !(L.pid && coversOther(r, L.pid)) && !(deco && coversOther(r, null));
       let r = at(L.small ? L.wF : L.w), short = false;
       if (!free(r) && L.small) { r = at(L.wS); short = true; }        // shorten before giving up
       if (!free(r) && L.pid) { const b = r, H = L.h + 5, Wd = b.w / 2 + 12;   // then nudge it round its marker: above and beside first, below (over its own model) last
