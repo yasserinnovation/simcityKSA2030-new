@@ -156,7 +156,7 @@
       float ao = N.y>0.8 ? 1.0 : mix(0.66,1.0,clamp((vWorld.y-uGround)/0.06,0.0,1.0));   // contact darkening grounds buildings
       vec3 sunCol=vec3(1.0,.91,.77);                                       // warm late-morning sun
       float cl=uGlow>0.3?1.0:cloudShade(vWorld.xz,uTime);
-      vec3 c=vColor*(hemi*(0.55+uGlow)*ao + sunCol*ndl*mix(0.26,1.0,sh)*0.86*cl);   // warm light, cool readable shadows
+      vec3 c=vColor*(hemi*(0.57+uGlow)*ao + sunCol*ndl*mix(0.36,1.0,sh)*0.83*cl);   // V11: warm light, softer readable shadows
       vec3 H=normalize(uSun+V); c+=sunCol*pow(max(dot(N,H),0.0),32.0)*0.07*sh;
       c+=vec3(1.0,.85,.6)*pow(1.0-max(dot(N,V),0.0),3.0)*0.06;           // warm rim light
       float l=dot(c,vec3(.299,.587,.114)); c=mix(vec3(l),c,1.07);           // lively, controlled saturation
@@ -183,13 +183,13 @@
       float w2=(sin((vWorld.x-vWorld.z)*29.0+t*2.1)*0.5+sin((vWorld.x+vWorld.z*1.3)*41.0-t*2.6)*0.35)*fade;
       vec3 N=normalize(vec3((w1+w2)*0.07,1.0,(w1-w2)*0.06));
       vec3 reef=vec3(.58,.89,.86), shallow=vec3(.29,.75,.77), mid=vec3(.15,.56,.69), deep=vec3(.09,.42,.60);   // V10: shallow #49BFC3 to deep #176C99
-      vec3 c=mix(reef,shallow,smoothstep(0.0,0.05,s)); c=mix(c,mid,smoothstep(0.05,0.22,s)); c=mix(c,deep,smoothstep(0.22,0.75,s));
+      vec3 c=mix(reef,shallow,smoothstep(0.0,0.12,s)); c=mix(c,mid,smoothstep(0.08,0.34,s)); c=mix(c,deep,smoothstep(0.30,0.95,s));   // V11: smooth shallows
       c*=0.96+0.06*w1*fade;
       float band=0.012+0.008*sin(t*1.6+vWorld.x*14.0+vWorld.z*9.0);
-      float foam=smoothstep(0.012,0.0,abs(s-band))+smoothstep(0.008,0.0,s)*0.6;
-      c=mix(c,vec3(.97,.98,.96),clamp(foam,0.0,1.0)*0.6);
+      float foam=smoothstep(0.014,0.0,abs(s-band))*0.6+smoothstep(0.02,0.0,s)*0.5;
+      c=mix(c,vec3(.97,.98,.96),clamp(foam,0.0,1.0)*0.38);   // V11: quieter shoreline
       vec3 V=normalize(uEye-vWorld); vec3 H=normalize(uSun+V);
-      float spec=pow(max(dot(N,H),0.0),90.0)*fade; c+=vec3(1.0,.95,.82)*spec*0.7*(1.0-uStorm);
+      float spec=pow(max(dot(N,H),0.0),90.0)*fade; c+=vec3(1.0,.95,.82)*spec*0.5*(1.0-uStorm);
       c*=mix(0.88,1.0,(cloudShade(vWorld.xz,t)-0.70)/0.30);
       float fres=pow(1.0-max(dot(N,V),0.0),4.0); c=mix(c,vec3(.74,.90,.96),fres*0.22);
       c=mix(c, c*vec3(.22,.30,.55)+vec3(.0,.02,.06), uNight);
@@ -449,11 +449,11 @@
     // Neighbouring land — warm but muted so the Kingdom reads first
     for (const n of neighbours) {
       for (const [a,b,c] of triangulate(n).tris) addTri([a[0],NEI,a[1]],[c[0],NEI,c[1]],[b[0],NEI,b[1]],[.85,.78,.66]);   // neighbours paler, so the Kingdom reads first
-      walls(n, NEI, SEA, [.93,.84,.64], [.66,.52,.38]);
+      walls(n, NEI, SEA, [.88,.81,.68], [.64,.53,.43]);
     }
     // Kingdom base
-    for (const [a,b,c] of triangulate(saudi).tris) addTri([a[0],G,a[1]],[c[0],G,c[1]],[b[0],G,b[1]],[.98,.80,.50]);
-    walls(saudi, G, SEA, [.99,.88,.62], [.80,.56,.34]);
+    for (const [a,b,c] of triangulate(saudi).tris) addTri([a[0],G,a[1]],[c[0],G,c[1]],[b[0],G,b[1]],[.86,.76,.60]);   // V11: sand, so the border cells don't step in yellow
+    walls(saudi, G, SEA, [.90,.80,.62], [.72,.55,.42]);
     // Colour-varied surface grid over the interior
     const xs=saudi.map(p=>p[0]), zs=saudi.map(p=>p[1]), step=.09;
     const minX=Math.min(...xs), maxX=Math.max(...xs), minZ=Math.min(...zs), maxZ=Math.max(...zs);
@@ -466,7 +466,7 @@
       for (const [a,b,d] of [[0,1,2],[0,2,3]]) for (const q of [a,b,d]) { mesh.p.push(...v[q]); mesh.c.push(...c[q]); mesh.n.push(0,1,0); }
     }
     // Golden national border
-    for (let i=0;i<saudi.length;i++){const a=saudi[i],b=saudi[(i+1)%saudi.length];addStrip(a,b,.011,G+.005,[1,.78,.26]);addDisc(a[0],G+.005,a[1],.011,[1,.78,.26],8);}
+    for (let i=0;i<saudi.length;i++){const a=saudi[i],b=saudi[(i+1)%saudi.length];addStrip(a,b,.0034,G+.005,[.86,.70,.44]);addDisc(a[0],G+.005,a[1],.0034,[.86,.70,.44],8);}   // V11: thin gold outline (#E8B75A family)
 
     // Hejaz & Sarawat mountains along the west
     const spine=[[42.95,17.2],[42.6,18.2],[41.9,19.2],[41.1,20.3],[40.5,21.2],[40.0,22.4],[39.6,23.6],[38.9,24.8],[38.1,25.9],[37.2,27.0],[36.2,28.1],[35.4,28.8]];
@@ -479,7 +479,7 @@
     // Dune fields: Rub' al Khali, Nafud, Dahna
     const inPlan=(x,z)=>Math.abs(x-LY.RIYADH_CORE.x)<1.02&&Math.abs(z-LY.RIYADH_CORE.z+.05)<1.02||LY.inReserved(x,z,.08);   // the Riyadh plan and City Builder district stay free of dunes
     const nearCity=(x,z)=>inPlan(x,z)||inAnyPlan(x,z)||D.cities.some(c=>Math.hypot(c.x-x,c.z-z)<(c.capital?.5:.3));
-    const dune=(x,z,rot)=>{if(!inSaudi(x,z)||nearCity(x,z))return;addMound(x,z,.09+rng()*.07,.05+rng()*.02,.009+rng()*.008,rot+(rng()-.5)*.3,shade(landColor(x,z),1.02+rng()*.03),8);};
+    const dune=(x,z,rot)=>{if(!inSaudi(x,z)||nearCity(x,z))return;addMound(x,z,.09+rng()*.07,.05+rng()*.02,.009+rng()*.008,rot+(rng()-.5)*.3,shade(landColor(x,z),.975+rng()*.025),8);};   // V11: low-contrast dunes
     const dunes=(lon0,lon1,lat0,lat1,n,rot)=>{for(let i=0;i<n;i++){const [x,z]=geo(lon0+rng()*(lon1-lon0),lat0+rng()*(lat1-lat0));dune(x,z,rot);}};
     dunes(47.5,55.0,18.8,22.2,110,.45); dunes(39.8,43.2,27.6,29.3,45,.1);
     const dahna=[[44.8,28.0],[46.0,26.5],[47.2,24.7],[47.8,22.8],[48.4,21.0]];
