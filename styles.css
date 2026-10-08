@@ -1189,3 +1189,42 @@ html,body{background:#9fd3d6}
 body.reduced .moment.reveal::after,body.reduced .moment.reveal .mo-cap{animation:none}
 @media (prefers-reduced-motion: reduce){.moment.reveal::after{display:none}.act:hover,.ctool:hover,.kpi:hover,.mchip:hover,.primary:hover,.secondary:hover{transform:none}}
 body.reduced .act:hover,body.reduced .ctool:hover,body.reduced .kpi:hover,body.reduced .mchip:hover,body.reduced .primary:hover{transform:none}
+
+/* ==========================================================================
+   V11 — miniature-world polish (stage A: interface, help, labels)
+   ========================================================================== */
+/* Map controls help: a compact "?" in a free corner of the map (placed by help.js), instructions on demand. */
+.map-help{position:fixed;z-index:30;width:34px;height:34px;pointer-events:none}
+.map-help[hidden]{display:none}
+.mh-btn{pointer-events:auto;width:34px;height:34px;border-radius:50%;border:1px solid rgba(255,255,255,.22);background:var(--navy);color:#fff;font-family:inherit;font-weight:800;font-size:16px;line-height:1;cursor:pointer;box-shadow:0 3px 10px rgba(20,45,70,.28);transition:transform .15s ease, background .15s ease, box-shadow .15s ease}
+.mh-btn:hover{background:#1d3d5c;transform:translateY(-1px);box-shadow:0 5px 14px rgba(20,45,70,.32)}
+.mh-btn:active{transform:translateY(0) scale(.95)}
+.mh-btn:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.map-help.open .mh-btn{background:var(--gold);color:var(--navy);border-color:var(--gold)}
+.mh-pop{pointer-events:auto;position:absolute;width:min(280px,calc(100vw - 32px));background:var(--panel);color:var(--ink);border:1px solid rgba(20,45,70,.12);border-radius:14px;box-shadow:0 10px 28px rgba(20,45,70,.22);padding:10px 12px 8px;font-size:12px}
+.map-help[data-up="1"] .mh-pop{bottom:42px}.map-help[data-up="0"] .mh-pop{top:42px}
+.map-help[data-side="right"] .mh-pop{right:0}.map-help[data-side="left"] .mh-pop{left:0}
+.mh-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px}
+.mh-head b{font-size:12.5px;font-weight:800;color:var(--navy)}
+.mh-close{border:0;background:transparent;color:var(--ink);opacity:.6;cursor:pointer;font-size:12px;width:24px;height:24px;border-radius:6px}
+.mh-close:hover{opacity:1;background:rgba(20,45,70,.06)}
+.mh-pop dl{margin:0;display:grid;gap:4px}
+.mh-pop dl>div{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:center}
+.mh-pop dt{margin:0}.mh-pop dd{margin:0;color:#3d5266;line-height:1.3}
+.mh-pop kbd{display:inline-block;font-family:inherit;font-weight:700;font-size:11px;line-height:1.2;color:var(--navy);background:#fff;border:1px solid rgba(20,45,70,.16);border-bottom-width:2px;border-radius:6px;padding:2px 6px;white-space:nowrap}
+html[dir="rtl"] .mh-pop,body.national-ar .mh-pop{direction:rtl;text-align:right}
+@media (prefers-reduced-motion: reduce){.mh-btn,.mh-btn:hover{transition:none;transform:none}}
+body.reduced .mh-btn:hover{transform:none}
+
+/* Project titles in the navigator: at most two lines; the selected card shows the full name. */
+.project-item .pi-main b{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+.project-item.active .pi-main b{display:block;-webkit-line-clamp:unset;overflow:visible}
+.project-item{align-items:center}
+.project-item .pi-meta{align-self:center;flex-shrink:0}
+
+/* KPI cards at smaller widths: two short lines for the label instead of a clipped one. */
+@media (max-width:1280px){
+  .kpi small{white-space:normal;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-height:1.08;font-size:10px}
+  .kpi strong{font-size:17px}
+  .kpi{padding:4px 8px}
+}

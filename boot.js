@@ -13,7 +13,7 @@
   window.VN_DEBUG = q.get('debug') === '1';
 
   const BEFORE = ['data.js', 'regions.js', 'layout.js', 'models.js'];
-  const AFTER = ['sim.js', 'saves.js', 'game.js', 'competitiveness.js', 'mission.js', 'i18n.js', 'play_core.js', 'play_mission.js', 'city.js', 'lens.js', 'city_ui.js', 'national_ar.js'];
+  const AFTER = ['sim.js', 'saves.js', 'game.js', 'competitiveness.js', 'mission.js', 'i18n.js', 'play_core.js', 'play_mission.js', 'city.js', 'lens.js', 'city_ui.js', 'national_ar.js', 'help.js'];
   const loadOne = src => new Promise((resolve, reject) => {
     const s = document.createElement('script'); s.src = src; s.async = false;
     s.onload = resolve; s.onerror = () => reject(new Error('Could not load ' + src));

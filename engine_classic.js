@@ -1459,7 +1459,7 @@
   }
   function project(p){const v=M4.transform(vp,p);if(v[3]<=0.01)return null;const nx=v[0]/v[3],ny=v[1]/v[3];return [(nx*.5+.5)*width/dpr,(-ny*.5+.5)*height/dpr,v[2]/v[3]];}
   // HUD controls that labels must never cover (re-measured a few times a second, not every frame).
-  const OBSTACLES = '#modeNav, .topbar, #navigator, #dock, #bottombar, #messageRibbon, .map-controls, #mcard, #mmeasures, #mMenuBtn, #decision, #planTray, #actionBar, #report, #results, .ctop, #cTools, #cPanel, #menuCard, #profileChip, #langBtn, #soundBtn, #pickChoices, #challengePanel, #challengeTop, #unitBar, #reviewCard, #coach, #banner, #chapter, .sheet:not(.hidden)';
+  const OBSTACLES = '#modeNav, #mapHelp, .topbar, #navigator, #dock, #bottombar, #messageRibbon, .map-controls, #mcard, #mmeasures, #mMenuBtn, #decision, #planTray, #actionBar, #report, #results, .ctop, #cTools, #cPanel, #menuCard, #profileChip, #langBtn, #soundBtn, #pickChoices, #challengePanel, #challengeTop, #unitBar, #reviewCard, #coach, #banner, #chapter, .sheet:not(.hidden)';
   let obstacles = [], obstaclesAt = 0;
   function refreshObstacles(){ obstacles = []; for (const el of document.querySelectorAll(OBSTACLES)) { if (!el.getClientRects().length) continue; const cs=getComputedStyle(el); if (cs.visibility==='hidden' || +cs.opacity===0) continue; const r=el.getBoundingClientRect(); if (r.width>2 && r.height>2) obstacles.push({x:r.left,y:r.top,w:r.width,h:r.height}); } }
   const hits = (r, q, px=4, py=2) => r.x < q.x+q.w+px && r.x+r.w+px > q.x && r.y < q.y+q.h+py && r.y+r.h+py > q.y;

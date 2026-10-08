@@ -286,7 +286,7 @@
   }
   function addLine(a,b,col){lineTarget.p.push(...a,...b);lineTarget.c.push(...col,...col);}
   // V9 palette for world-space cues (mirrors styles.css: --gold selection, white hover).
-  const PALETTE = {sel:[.91,.72,.35], selHi:[1,.88,.60], hover:[1,1,1]};   // gold #E8B75A (styles.css --gold)
+  const PALETTE = {sel:[.91,.72,.35], selHi:[1,.88,.60], hover:[1,1,1], key:[.08,.18,.27]};   // key: navy keyline (#142D46)   // gold #E8B75A (styles.css --gold)
   function addArc(cx,cy,cz,r,a0,a1,col,seg=8){for(let i=0;i<seg;i++){const a=a0+(a1-a0)*i/seg,b=a0+(a1-a0)*(i+1)/seg;addLine([cx+Math.cos(a)*r,cy,cz+Math.sin(a)*r],[cx+Math.cos(b)*r,cy,cz+Math.sin(b)*r],col);}}
   function addBrackets(cx,cy,cz,r,col){for(let k=0;k<4;k++){const m=Math.PI/4+k*Math.PI/2;addArc(cx,cy,cz,r,m-.26,m+.26,col);addArc(cx,cy+.001,cz,r+.003,m-.26,m+.26,col);}}
   function addRing(cx,cy,cz,r,col,seg=32){for(let i=0;i<seg;i++){const a=i/seg*Math.PI*2,b=(i+1)/seg*Math.PI*2;addLine([cx+Math.cos(a)*r,cy,cz+Math.sin(a)*r],[cx+Math.cos(b)*r,cy,cz+Math.sin(b)*r],col);}}
@@ -1068,7 +1068,7 @@
 
   // Each project's footprint is outlined on the ground in its colour, so its extent reads at every zoom.
   function ribbonEdges(p, off, y, col){ polyLine(p.ribbon.pts, y, col, p.ribbon.hw+off); polyLine(p.ribbon.pts, y, col, -(p.ribbon.hw+off)); }
-  function buildMarkerRings(){ for (const p of D.projects) { if (p.ribbon) ribbonEdges(p, 0, G+.008, shade(p.color,.9)); else addRing(p.x,G+.008,p.z,p.foot,shade(p.color,.9),28); } }
+  function buildMarkerRings(){ for (const p of D.projects) { const c=mix(shade(p.color,.9),[.96,.92,.84],.4); if (p.ribbon) ribbonEdges(p, 0, G+.008, c); else addRing(p.x,G+.008,p.z,p.foot,c,40); } }   // V11: softened footprint outlines
 
   buildTerrain(); buildNetworks(); buildLandmarks(); buildCities(); buildMarkerRings();
 
@@ -1107,8 +1107,9 @@
   const tierCount = st => Math.max(0, Math.min(6, st.done ?? (st.stage||1)));
   // Marker stalks: short on the Riyadh plan so they never stand in front of the landmark they label.
   const lowStalk = id => !!(id && LY.projects[id] && LY.projects[id].illustrative);
-  const stalkH = (k, id) => lowStalk(id) ? .02 + k*.004 : .08 + k*.014;
-  const beaconTop = (st, id) => { const k=tierCount(st); return G + k*.012 + stalkH(k, id); };
+  const stalkH = (k, id) => lowStalk(id) ? .016 + k*.003 : .05 + k*.008;   // V11: shorter stalks, so markers sit below the skyline
+  const TIER = .008;                                                              // V11: thinner progress tiers
+  const beaconTop = (st, id) => { const k=tierCount(st); return G + k*TIER + stalkH(k, id); };
   const stageMesh = Geo(1), stageLines = {p:[], c:[]};
   let stageDirty = true;
   function buildStageMesh(){
@@ -1117,13 +1118,13 @@
     for (const p of D.projects) {
       const st=projectState[p.id], k=tierCount(st), d=st.doneKeys||[], [px,pz]=p.pad, f=p.foot;   // progress lives on the marker pad at the footprint's south edge
       if (d.includes('site') || st.active==='site') addDisc(px,G+.004,pz,.034,st.active==='site'?[.72,.52,.34]:[.80,.66,.48],18);   // graded site pad
-      for (let i=0;i<k;i++) addCylinder(px,G+i*.012,pz,.026-i*.003,.012,shade(p.color,.8+i*.06),12);  // one tier per completed package
-      addCylinder(px,G+k*.012,pz,.005,stalkH(k,p.id),[.97,.95,.88],6);
+      for (let i=0;i<k;i++) addCylinder(px,G+i*TIER,pz,.016-i*.0016,TIER,shade(p.color,.8+i*.06),12);  // one tier per completed package (V11: compact pedestal)
+      addCylinder(px,G+k*TIER,pz,.0032,stalkH(k,p.id),[.97,.95,.88],6);
       if (d.includes('materials') && !d.includes('build')) for (let i=0;i<4;i++) addBox(px+.03+(i%2)*.014,G,pz-.01+Math.floor(i/2)*.014,.011,.01,.011,i%2?[.62,.64,.68]:[.86,.72,.46]);  // stockpiled materials
       if (st.active==='build') { const h=.04+.14*(st.progress||0); addBox(p.x+f*.45,G,p.z-f*.1,.04,h,.04,[.86,.84,.78]); addCrane(p.x+f*.6,p.z-f*.45,.4,[.98,.72,.2]);
         for (let y=.02;y<h;y+=.02) addBox(p.x+f*.45,G+y,p.z-f*.1,.046,.002,.046,[.95,.62,.2]); }                     // rising structure with scaffold bands
       if (st.active==='utility' || d.includes('utility')) for (let i=0;i<3;i++) { addCylinder(p.x-f*.75+i*.03,G,p.z+f*.35,.003,.06,[.55,.5,.45],5); }  // utility connection poles
-      if (k>=6) { addCylinder(px,G+k*.012,pz,.022,.006,[1,.82,.3],16); }                                               // operational: gold cap
+      if (k>=6) { addCylinder(px,G+k*TIER,pz,.014,.004,[1,.82,.3],16); }                                               // operational: gold cap
     }
     target=mesh; lineTarget=lines; stageDirty=true;
   }
@@ -1475,12 +1476,14 @@
       const st=projectState[pr.id], sel=selectedId===pr.id, hov=hoverId===pr.id, tiers=tierCount(st);
       if (!beaconsOn && !sel) continue;
       if (clustered && pr.cl && !sel && !hov) continue;
-      const top=beaconTop(st,pr.id), pulse=Math.sin(t*.003+pr.x*3)*.01;
+      // V11 hierarchy: warnings, active work and the selection keep a prominent head; other projects a compact one.
+      const warn=st.health==='blocked'||st.health==='waiting', key=sel||hov||warn||!!st.active;
+      const top=beaconTop(st,pr.id), pulse=key?Math.sin(t*.003+pr.x*3)*.006:0;
       const col = st.health==='blocked'?[.95,.35,.28]:st.health==='waiting'?[1,.72,.2]:st.done>=6?[1,.86,.3]:pr.color;
-      push(pr.pad[0],top+.02+pulse+(sel?.03:0),pr.pad[1],sel?[1,.95,.55]:col,sel?15:hov?13:10);
-      if (st.active) for (let i=0;i<3;i++){const a=t*.0024+i/3*6.283,r=.035;push(pr.pad[0]+Math.cos(a)*r,G+.02+i*.01,pr.pad[1]+Math.sin(a)*r,pr.color,3.5);}
+      push(pr.pad[0],top+.016+pulse+(sel?.02:0),pr.pad[1],sel?[1,.92,.62]:col,sel?13:hov?11.5:key?9:6);
+      if (st.active) for (let i=0;i<3;i++){const a=t*.0024+i/3*6.283,r=.026;push(pr.pad[0]+Math.cos(a)*r,G+.016+i*.008,pr.pad[1]+Math.sin(a)*r,pr.color,2.6);}
     }
-    if (clustered && beaconsOn) for (const cl of clusters) { const pulse=Math.sin(t*.003+cl.x)*.012; push(cl.x,G+.34+pulse,cl.z,[1,.82,.3],19); push(cl.x,G+.34+pulse,cl.z,[1,1,.9],9); }
+    if (clustered && beaconsOn) for (const cl of clusters) { const pulse=Math.sin(t*.003+cl.x)*.012; push(cl.x,G+.34+pulse,cl.z,[.91,.72,.35],14); push(cl.x,G+.34+pulse,cl.z,[1,.97,.88],6); }   // V11: compact cluster beacons
     roadPaths.forEach((path,r)=>{const L=roadL[r],n=Math.max(4,Math.round(L[L.length-1]*6));for(let i=0;i<n;i++){const dir=i%2,q=((t*.00003*(1+r%3*.3))/L[L.length-1]*3+i/n)%1,[x,z]=along(path,L,dir?q:1-q);push(x,G+.02,z,dir?[1,.92,.45]:[1,.98,.9],3.2);}});
     for (const w of wakes) push(w[0],SEA+.004,w[1],[1,1,1],w[2]);
     const mk=C('Makkah'); for(let i=0;i<48;i++){const a=i*.82+t*.00015,r=.035+(i%5)*.008;push(mk.x+Math.cos(a)*r,G+.012,mk.z+Math.sin(a)*r,[.99,.99,.96],2.2);}
@@ -1568,7 +1571,7 @@
   }
   function project(p){const v=M4.transform(vp,p);if(v[3]<=0.01)return null;const nx=v[0]/v[3],ny=v[1]/v[3];return [(nx*.5+.5)*width/dpr,(-ny*.5+.5)*height/dpr,v[2]/v[3]];}
   // HUD controls that labels must never cover (re-measured a few times a second, not every frame).
-  const OBSTACLES = '#modeNav, .topbar, #navigator, #dock, #bottombar, #messageRibbon, .map-controls, #mcard, #mmeasures, #mMenuBtn, #decision, #planTray, #actionBar, #report, #results, .ctop, #cTools, #cPanel, #menuCard, #profileChip, #langBtn, #soundBtn, #pickChoices, #challengePanel, #challengeTop, #unitBar, #reviewCard, #coach, #banner, #chapter, .sheet:not(.hidden)';
+  const OBSTACLES = '#modeNav, #mapHelp, .topbar, #navigator, #dock, #bottombar, #messageRibbon, .map-controls, #mcard, #mmeasures, #mMenuBtn, #decision, #planTray, #actionBar, #report, #results, .ctop, #cTools, #cPanel, #menuCard, #profileChip, #langBtn, #soundBtn, #pickChoices, #challengePanel, #challengeTop, #unitBar, #reviewCard, #coach, #banner, #chapter, .sheet:not(.hidden)';
   let obstacles = [], obstaclesAt = 0;
   function refreshObstacles(){ obstacles = []; for (const el of document.querySelectorAll(OBSTACLES)) { if (!el.getClientRects().length) continue; const cs=getComputedStyle(el); if (cs.visibility==='hidden' || +cs.opacity===0) continue; const r=el.getBoundingClientRect(); if (r.width>2 && r.height>2) obstacles.push({x:r.left,y:r.top,w:r.width,h:r.height}); } }
   const hits = (r, q, px=4, py=2) => r.x < q.x+q.w+px && r.x+r.w+px > q.x && r.y < q.y+q.h+py && r.y+r.h+py > q.y;
@@ -1693,7 +1696,7 @@
     dynLines.p.length=dynLines.c.length=0; lineTarget=dynLines;
     for (const b of bursts) { const age=t-b.t0; if (age<1300) { const q=age/1300, e=1-(1-q)*(1-q); addRing(b.x,G+.02,b.z,.04+e*.32,PALETTE.sel,56); if (q<.6) addRing(b.x,G+.021,b.z,.03+e*.2,PALETTE.selHi,48); } }   // V10: one brief gold ripple per completion
     if (selectable || selectedId) { const sp=selectedId&&P(selectedId), hp=hoverId&&hoverId!==selectedId&&P(hoverId);
-      if (sp) { if (sp.ribbon) { ribbonEdges(sp,.006,G+.014,PALETTE.sel); ribbonEdges(sp,.009,G+.015,PALETTE.sel); } else { addRing(sp.x,G+.014,sp.z,sp.foot+.006,PALETTE.sel,48); addBrackets(sp.x,G+.016,sp.z,sp.foot+.018,PALETTE.selHi); } }
+      if (sp) { if (sp.ribbon) { ribbonEdges(sp,.006,G+.014,PALETTE.sel); ribbonEdges(sp,.009,G+.015,PALETTE.sel); } else { addRing(sp.x,G+.014,sp.z,sp.foot+.006,PALETTE.sel,48); addRing(sp.x,G+.0135,sp.z,sp.foot+.0095,PALETTE.key,48); addBrackets(sp.x,G+.016,sp.z,sp.foot+.018,PALETTE.selHi); } }
       if (hp) { if (hp.ribbon) ribbonEdges(hp,.006,G+.014,[1,1,1]); else addRing(hp.x,G+.014,hp.z,hp.foot+.006,[1,1,1],40); }
       if (hoverId===CORE_ID) { const c=LY.RIYADH_CORE; addRing(c.x,G+.014,c.z,c.r+.006,[1,1,1],40); }
       if (hoverId && LY.places && LY.places[hoverId]) { const q=LY.places[hoverId]; addRing(q.x,G+.014,q.z,q.r+.006,[1,1,1],40); } }
