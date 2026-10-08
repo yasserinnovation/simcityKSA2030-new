@@ -123,7 +123,7 @@
     float cloudShade(vec2 p, float tm){ float n=sin(p.x*.8+tm*.035)*sin(p.y*1.05-tm*.025)+.6*sin(p.x*.43-p.y*.57+tm*.02); return 1.0-.30*smoothstep(.55,1.15,n); }
     vec3 applyAtmos(vec3 c, float w){
       float f=clamp((w-uDist*.95)/(uDist*1.7),0.,1.);
-      vec3 sky=mix(mix(vec3(.64,.86,.96),vec3(.10,.14,.30),uNight),uTint,uStorm*.75);
+      vec3 sky=mix(mix(vec3(.68,.85,.92),vec3(.10,.14,.30),uNight),uTint,uStorm*.75);
       c=mix(c,sky,f*.6); c=mix(c,uTint*.9,uStorm*.34); return c; }`;
   const INST_ATTR = 'attribute mat4 instanceMatrix; attribute vec3 instanceColor; attribute float aTintK;';
   const WPOS = inst => inst ? '(instanceMatrix*vec4(position,1.0)).xyz' : 'position';
@@ -152,14 +152,14 @@
     void main(){
       vec3 N=normalize(vNormal); vec3 V=normalize(uEye-vWorld); if(dot(N,V)<0.0) N=-N;
       float ndl=max(dot(N,uSun),0.0); float sh=mix(1.0, shadowAt(ndl), 1.0-uStorm*.6);
-      vec3 hemi=mix(vec3(.62,.55,.48), vec3(.74,.80,.88), N.y*0.5+0.5);
-      float ao = N.y>0.8 ? 1.0 : mix(0.70,1.0,clamp((vWorld.y-uGround)/0.06,0.0,1.0));
-      vec3 sunCol=vec3(1.0,.96,.88);
+      vec3 hemi=mix(vec3(.66,.60,.53), vec3(.76,.81,.86), N.y*0.5+0.5);
+      float ao = N.y>0.8 ? 1.0 : mix(0.76,1.0,clamp((vWorld.y-uGround)/0.06,0.0,1.0));
+      vec3 sunCol=vec3(1.0,.97,.91);
       float cl=uGlow>0.3?1.0:cloudShade(vWorld.xz,uTime);
-      vec3 c=vColor*(hemi*(0.62+uGlow)*ao + sunCol*ndl*mix(0.55,1.0,sh)*0.64*cl);   // shadows lifted: soft ambient shade, not black
-      vec3 H=normalize(uSun+V); c+=sunCol*pow(max(dot(N,H),0.0),40.0)*0.10*sh;
-      c+=vec3(1.0,.85,.6)*pow(1.0-max(dot(N,V),0.0),3.0)*0.08;           // warm rim light
-      float l=dot(c,vec3(.299,.587,.114)); c=mix(vec3(l),c,1.02);           // natural saturation
+      vec3 c=vColor*(hemi*(0.66+uGlow)*ao + sunCol*ndl*mix(0.68,1.0,sh)*0.58*cl);   // V9: softer daylight — same overall brightness, shadows lifted further
+      vec3 H=normalize(uSun+V); c+=sunCol*pow(max(dot(N,H),0.0),28.0)*0.06*sh;   // broader, fainter highlight (rougher surfaces)
+      c+=vec3(1.0,.85,.6)*pow(1.0-max(dot(N,V),0.0),3.0)*0.06;           // warm rim light
+      float l=dot(c,vec3(.299,.587,.114)); c=mix(vec3(l),c,0.97);           // muted, natural saturation
       c=mix(c, c*vec3(.26,.32,.58)+vec3(.012,.018,.05)+vColor*uGlow*.6, uNight);   // dusk to night
       gl_FragColor=vec4(applyAtmos(c,vW),1.0);
     }`;
@@ -182,16 +182,16 @@
       float w1=sin(vWorld.x*11.0+t*1.2)*sin(vWorld.z*9.0-t*0.9);
       float w2=(sin((vWorld.x-vWorld.z)*29.0+t*2.1)*0.5+sin((vWorld.x+vWorld.z*1.3)*41.0-t*2.6)*0.35)*fade;
       vec3 N=normalize(vec3((w1+w2)*0.07,1.0,(w1-w2)*0.06));
-      vec3 reef=vec3(.62,.86,.80), shallow=vec3(.38,.74,.76), mid=vec3(.24,.55,.68), deep=vec3(.17,.40,.56);
+      vec3 reef=vec3(.64,.84,.78), shallow=vec3(.42,.72,.70), mid=vec3(.28,.56,.58), deep=vec3(.20,.43,.48);   // V9: calm teal
       vec3 c=mix(reef,shallow,smoothstep(0.0,0.05,s)); c=mix(c,mid,smoothstep(0.05,0.22,s)); c=mix(c,deep,smoothstep(0.22,0.75,s));
       c*=0.96+0.06*w1*fade;
       float band=0.012+0.008*sin(t*1.6+vWorld.x*14.0+vWorld.z*9.0);
       float foam=smoothstep(0.012,0.0,abs(s-band))+smoothstep(0.008,0.0,s)*0.6;
-      c=mix(c,vec3(.96,.97,.95),clamp(foam,0.0,1.0)*0.55);
+      c=mix(c,vec3(.96,.97,.95),clamp(foam,0.0,1.0)*0.45);
       vec3 V=normalize(uEye-vWorld); vec3 H=normalize(uSun+V);
-      float spec=pow(max(dot(N,H),0.0),90.0)*fade; c+=vec3(1.0,.97,.88)*spec*0.8*(1.0-uStorm);
+      float spec=pow(max(dot(N,H),0.0),90.0)*fade; c+=vec3(1.0,.97,.88)*spec*0.55*(1.0-uStorm);
       c*=mix(0.88,1.0,(cloudShade(vWorld.xz,t)-0.70)/0.30);
-      float fres=pow(1.0-max(dot(N,V),0.0),4.0); c=mix(c,vec3(.75,.90,1.0),fres*0.25);
+      float fres=pow(1.0-max(dot(N,V),0.0),4.0); c=mix(c,vec3(.78,.90,.92),fres*0.2);
       c=mix(c, c*vec3(.22,.30,.55)+vec3(.0,.02,.06), uNight);
       gl_FragColor=vec4(applyAtmos(c,vW),1.0);
     }`;
@@ -285,6 +285,10 @@
     addTri(a,b,r1,col);addTri(d0,r2,c,col);addQuad(a,r1,r2,d0,col);addQuad(b,c,r2,r1,col);
   }
   function addLine(a,b,col){lineTarget.p.push(...a,...b);lineTarget.c.push(...col,...col);}
+  // V9 palette for world-space cues (mirrors styles.css: --gold selection, white hover).
+  const PALETTE = {sel:[.88,.69,.32], selHi:[1,.90,.58], hover:[1,1,1]};
+  function addArc(cx,cy,cz,r,a0,a1,col,seg=8){for(let i=0;i<seg;i++){const a=a0+(a1-a0)*i/seg,b=a0+(a1-a0)*(i+1)/seg;addLine([cx+Math.cos(a)*r,cy,cz+Math.sin(a)*r],[cx+Math.cos(b)*r,cy,cz+Math.sin(b)*r],col);}}
+  function addBrackets(cx,cy,cz,r,col){for(let k=0;k<4;k++){const m=Math.PI/4+k*Math.PI/2;addArc(cx,cy,cz,r,m-.26,m+.26,col);addArc(cx,cy+.001,cz,r+.003,m-.26,m+.26,col);}}
   function addRing(cx,cy,cz,r,col,seg=32){for(let i=0;i<seg;i++){const a=i/seg*Math.PI*2,b=(i+1)/seg*Math.PI*2;addLine([cx+Math.cos(a)*r,cy,cz+Math.sin(a)*r],[cx+Math.cos(b)*r,cy,cz+Math.sin(b)*r],col);}}
   function addStrip(a,b,w,y,col){
     const dx=b[0]-a[0],dz=b[1]-a[1],l=Math.hypot(dx,dz)||1,nx=-dz/l*w,nz=dx/l*w,up=[0,1,0];
@@ -419,7 +423,7 @@
   ];
   function landColor(x, z) {
     const [lon, lat] = ungeo(x, z);
-    let c = [.90,.80,.64];
+    let c = [.89,.81,.67];   // V9: muted sand (styles.css --sand)
     for (const [bl, bt, rl, rt, col, w] of blobs) {
       const d = ((lon-bl)/rl)**2 + ((lat-bt)/rt)**2;
       if (d < 6) c = mix(c, col, w*Math.exp(-d));
@@ -1452,7 +1456,8 @@
     }});
     railPaths.forEach((path,r)=>{const L=railL[r];for(let k=0;k<2;k++){const q0=((t*.00005)/L[L.length-1]*4+k*.5+r*.17)%1;
       for(let c=0;c<4;c++){const q=Math.max(.001,q0-c*.0065*(3/L[L.length-1])),[x,z,rot]=heading(path,L,q,true); inst(r===0?'car0':'car1', x, 0, z, rot, 1);}}});
-    flights.forEach(([a,b],i)=>{const q=((t*.00002*(1+i*.13))+i*.21)%1, f=i%2?q:1-q, A=i%2?a:b, B=i%2?b:a;
+    if (camera.dist >= DETAIL_DIST) flights.forEach(([a,b],i)=>{   // V9: decorative flights only in the overview — in close views they crossed downtown towers and labels
+      const q=((t*.00002*(1+i*.13))+i*.21)%1, f=i%2?q:1-q, A=i%2?a:b, B=i%2?b:a;
       const x=A.x+(B.x-A.x)*f, z=A.z+(B.z-A.z)*f, y=G+.12+Math.sin(Math.PI*f)*.45, rot=Math.atan2(B.z-A.z,B.x-A.x); inst('plane', x, y, z, rot, 1);});
     for (const cv of convoyList) inst('convoy', cv.x, 0, cv.z, cv.rot, 1, cv.color||[.95,.62,.18]);
     const bladeCol=[.97,.97,.96];
@@ -1673,7 +1678,7 @@
       renderPass('depth'); renderer.render(scene3, cam3);
     }
     // 2) Scene: sky clear, sea, meshes, lines, points
-    const sky=[(.60+storm*.18)*(1-night)+.07*night,(.84-storm*.28)*(1-night)+.10*night,(.95-storm*.45)*(1-night)+.22*night];
+    const sky=[(.64+storm*.14)*(1-night)+.07*night,(.83-storm*.27)*(1-night)+.10*night,(.91-storm*.41)*(1-night)+.22*night];
     renderer.setRenderTarget(null); renderer.setClearColor(clearCol.setRGB(sky[0],sky[1],sky[2]), 1); renderer.clear();
     POINT_MAT.uniforms.uScale.value=dpr;
     buildDynLines(t); syncLines(dynLinesObj, dynLines);
@@ -1686,7 +1691,7 @@
   function buildDynLines(t){
     dynLines.p.length=dynLines.c.length=0; lineTarget=dynLines;
     if (selectable || selectedId) { const sp=selectedId&&P(selectedId), hp=hoverId&&hoverId!==selectedId&&P(hoverId);
-      if (sp) { if (sp.ribbon) { ribbonEdges(sp,.006,G+.014,[1,.86,.3]); ribbonEdges(sp,.012,G+.016,[1,.95,.6]); } else { addRing(sp.x,G+.014,sp.z,sp.foot+.006,[1,.86,.3],40); addRing(sp.x,G+.016,sp.z,sp.foot+.012,[1,.95,.6],40); } }
+      if (sp) { if (sp.ribbon) { ribbonEdges(sp,.006,G+.014,PALETTE.sel); ribbonEdges(sp,.009,G+.015,PALETTE.sel); } else { addRing(sp.x,G+.014,sp.z,sp.foot+.006,PALETTE.sel,48); addBrackets(sp.x,G+.016,sp.z,sp.foot+.018,PALETTE.selHi); } }
       if (hp) { if (hp.ribbon) ribbonEdges(hp,.006,G+.014,[1,1,1]); else addRing(hp.x,G+.014,hp.z,hp.foot+.006,[1,1,1],40); }
       if (hoverId===CORE_ID) { const c=LY.RIYADH_CORE; addRing(c.x,G+.014,c.z,c.r+.006,[1,1,1],40); }
       if (hoverId && LY.places && LY.places[hoverId]) { const q=LY.places[hoverId]; addRing(q.x,G+.014,q.z,q.r+.006,[1,1,1],40); } }

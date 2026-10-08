@@ -1,4 +1,4 @@
-# Vision Nexus 2030 — The Kingdom in Motion (build V7 — City Missions)
+# Vision Nexus 2030 — The Kingdom in Motion (build V9 — visual refinement)
 
 The build label is shown in the bottom corner of the screen. If you see a "Strategic Actions" panel, "Path to 2030" or a calendar past 2030, you are running an older copy of the files.
 
@@ -16,6 +16,16 @@ The 3D world is drawn by **three.js** (vendored in `vendor/three`). The upgrade 
 - **Phase 1 — renderer swap with parity (done):** `engine.js` now renders through three.js with the original shaders and geometry; the `VisionWorld` API is unchanged. Repeated props and vehicles use InstancedMesh. Picking and City Builder tools behave exactly as before. See `docs/phase1/NOTES.md`.
 - The original renderer stays available as `engine_classic.js` (`index.html?renderer=classic`).
 - Third-party files and licences: `ASSETS_CREDITS.md`.
+
+## Visual refinement (build V9)
+A styling pass on the three.js build. Rules, missions, calculations, data, saves, controls, maps and building models are unchanged. Before/after screenshots (same camera, state and seeded randomness, 1440×900, High quality) are in `docs/style-before/`, `docs/style-after/` and side by side in `docs/style-compare/`.
+- **Interface:** one palette shared by the HUD and the 3D cues (panels `#FAF9F5`, text and primary actions `#153F36`, selection and objectives `#C99B45`, navigation `#203E5B`), 12–14px card corners, one Arabic-compatible font (Tajawal). Equal KPI and measure cards; a change arrow appears only once there is an earlier month to compare with. Collapsed side panels keep a labelled tab to reopen them. Mission and City Builder tools show their real cost (a range when it depends on the place chosen) and distinct available / selected / unavailable / locked states. Selection is gold, warnings terracotta, errors red.
+- **Labels:** the selected object's label is placed first; sea, country and road names give way to landmarks; nothing is smaller than 11px. Riyadh and Eastern Province district names now appear in Arabic in mission mode.
+- **World:** softer daylight (more sky fill, lifted shadows, broader and fainter highlights, slightly muted colour), muted sand, and calm teal water with gentler glints. Night mode is unchanged in readability. No extra render passes, SSAO or HDRI.
+- **Selection:** a gold outline on the footprint with four corner brackets (ribbons get a gold edge). No building glow and no scene dimming.
+- **Decluttering:** decorative flights are drawn only in the Kingdom overview (in close views they crossed downtown towers and labels), and tall palms or trees are not placed where their crown would cover a road or the wadi from the default camera.
+- **Performance:** measured with a 5-second frame count per quality level (1440×900, Intel integrated GPU via Direct3D 11, vsync off), two alternating runs per build. V8 → V9, Kingdom view: High 31.9–32.0 → 30.3–32.2 fps, Medium 43.9–45.2 → 42.6–44.9, Reduced 43.3–43.4 → 41.8–44.6. Riyadh close-up: High 32.8–33.6 → 32.1–33.4, Medium 42.2–43.4 → 42.1–42.2, Reduced 42.7–43.7 → 41.8–43.1. The differences are within run-to-run variation; no regression was measured.
+- **Possible future work (not done here):** authored models replacing procedural ones, proportion and bevel passes, converting the remaining merged props to InstancedMesh, ambient occlusion and contact shadows, a custom icon set in place of emoji, and a City Builder toolbar that fits 1440px without scrolling.
 
 ## Play first
 **Mission 1 — Connect for the Opening.** Choose **Bus rapid transit**, tap *City Centre ↔ Expo 2030 site*, then **Add to plan**. Add *City Centre ↔ King Salman Airport* the same way, then press **End turn**. You will see the transformation moment. Finish the mission to see the victory moment.

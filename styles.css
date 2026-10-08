@@ -938,8 +938,8 @@ html,body{background:#d9e4e0}
 .kpi strong{font-size:21px;font-variant-numeric:tabular-nums}
 .kpi .trend.none{display:none}
 .kpi .trend{font-size:10px;margin-inline-start:3px}.trend.up{color:var(--green)}.trend.down{color:var(--red)}.trend.flat{color:#9AA59F}
-.mmeasures{display:grid;grid-auto-flow:column;grid-auto-columns:104px;gap:6px}
-.mchip{width:104px;min-width:0;min-height:50px;border-radius:var(--r-card);padding:6px 11px}
+.mmeasures{display:grid;grid-auto-flow:column;grid-auto-columns:92px;gap:6px}
+.mchip{width:92px;min-width:0;min-height:50px;border-radius:var(--r-card);padding:6px 10px}
 .mchip b{font-variant-numeric:tabular-nums}
 .ct-stat b,.cap-n,.pk{font-variant-numeric:tabular-nums}
 

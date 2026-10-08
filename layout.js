@@ -180,6 +180,7 @@
     for (const c of cores) if (Math.hypot(x - c.x, z - c.z) < c.r + margin * .5) return false;
     for (const p of Object.values(places)) if (Math.hypot(x - p.x, z - p.z) < p.r + margin) return false;
     if (polyDist(x, z, METRO_ROUTE) < .02 + margin * .5 || polyDist(x, z, WADI) < .03) return false;
+    if (tall && (roadDist(x, z - .035) < roadClear || polyDist(x, z - .035, WADI) < .02)) return false;   // V9: its crown would cover a road or the wadi on screen (camera looks north)
     return roadDist(x, z) >= roadClear;
   }
   const insideCore = (name, x, z) => { const c = cores.find(c => c.name === name); return !!c && Math.hypot(x - c.x, z - c.z) < c.r; };
