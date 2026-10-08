@@ -120,11 +120,11 @@
   const PREC = hp && hp.precision > 0 ? 'precision highp float;' : 'precision mediump float;';
   const FOG = `
     uniform vec3 uTint; uniform float uNight;
-    float cloudShade(vec2 p, float tm){ float n=sin(p.x*.8+tm*.035)*sin(p.y*1.05-tm*.025)+.6*sin(p.x*.43-p.y*.57+tm*.02); return 1.0-.30*smoothstep(.55,1.15,n); }
+    float cloudShade(vec2 p, float tm){ float n=sin(p.x*.8+tm*.035)*sin(p.y*1.05-tm*.025)+.6*sin(p.x*.43-p.y*.57+tm*.02); return 1.0-.14*smoothstep(.55,1.15,n); }
     vec3 applyAtmos(vec3 c, float w){
       float f=clamp((w-uDist*.95)/(uDist*1.7),0.,1.);
-      vec3 sky=mix(mix(vec3(.68,.85,.92),vec3(.10,.14,.30),uNight),uTint,uStorm*.75);
-      c=mix(c,sky,f*.6); c=mix(c,uTint*.9,uStorm*.34); return c; }`;
+      vec3 sky=mix(mix(vec3(.66,.84,.95),vec3(.10,.14,.30),uNight),uTint,uStorm*.75);
+      c=mix(c,sky,f*.5); c=mix(c,uTint*.9,uStorm*.34); return c; }`;
   const INST_ATTR = 'attribute mat4 instanceMatrix; attribute vec3 instanceColor; attribute float aTintK;';
   const WPOS = inst => inst ? '(instanceMatrix*vec4(position,1.0)).xyz' : 'position';
   // Lit, shadow-receiving mesh shader: sun + sky/ground hemisphere + soft PCF shadows + contact darkening.
@@ -152,14 +152,14 @@
     void main(){
       vec3 N=normalize(vNormal); vec3 V=normalize(uEye-vWorld); if(dot(N,V)<0.0) N=-N;
       float ndl=max(dot(N,uSun),0.0); float sh=mix(1.0, shadowAt(ndl), 1.0-uStorm*.6);
-      vec3 hemi=mix(vec3(.66,.60,.53), vec3(.76,.81,.86), N.y*0.5+0.5);
-      float ao = N.y>0.8 ? 1.0 : mix(0.76,1.0,clamp((vWorld.y-uGround)/0.06,0.0,1.0));
-      vec3 sunCol=vec3(1.0,.97,.91);
+      vec3 hemi=mix(vec3(.80,.68,.54), vec3(.80,.88,1.0), N.y*0.5+0.5);   // V10: warm ground bounce, cool sky fill
+      float ao = N.y>0.8 ? 1.0 : mix(0.66,1.0,clamp((vWorld.y-uGround)/0.06,0.0,1.0));   // contact darkening grounds buildings
+      vec3 sunCol=vec3(1.0,.91,.77);                                       // warm late-morning sun
       float cl=uGlow>0.3?1.0:cloudShade(vWorld.xz,uTime);
-      vec3 c=vColor*(hemi*(0.66+uGlow)*ao + sunCol*ndl*mix(0.68,1.0,sh)*0.58*cl);   // V9: softer daylight — same overall brightness, shadows lifted further
-      vec3 H=normalize(uSun+V); c+=sunCol*pow(max(dot(N,H),0.0),28.0)*0.06*sh;   // broader, fainter highlight (rougher surfaces)
+      vec3 c=vColor*(hemi*(0.55+uGlow)*ao + sunCol*ndl*mix(0.26,1.0,sh)*0.86*cl);   // warm light, cool readable shadows
+      vec3 H=normalize(uSun+V); c+=sunCol*pow(max(dot(N,H),0.0),32.0)*0.07*sh;
       c+=vec3(1.0,.85,.6)*pow(1.0-max(dot(N,V),0.0),3.0)*0.06;           // warm rim light
-      float l=dot(c,vec3(.299,.587,.114)); c=mix(vec3(l),c,0.97);           // muted, natural saturation
+      float l=dot(c,vec3(.299,.587,.114)); c=mix(vec3(l),c,1.07);           // lively, controlled saturation
       c=mix(c, c*vec3(.26,.32,.58)+vec3(.012,.018,.05)+vColor*uGlow*.6, uNight);   // dusk to night
       gl_FragColor=vec4(applyAtmos(c,vW),1.0);
     }`;
@@ -182,16 +182,16 @@
       float w1=sin(vWorld.x*11.0+t*1.2)*sin(vWorld.z*9.0-t*0.9);
       float w2=(sin((vWorld.x-vWorld.z)*29.0+t*2.1)*0.5+sin((vWorld.x+vWorld.z*1.3)*41.0-t*2.6)*0.35)*fade;
       vec3 N=normalize(vec3((w1+w2)*0.07,1.0,(w1-w2)*0.06));
-      vec3 reef=vec3(.64,.84,.78), shallow=vec3(.42,.72,.70), mid=vec3(.28,.56,.58), deep=vec3(.20,.43,.48);   // V9: calm teal
+      vec3 reef=vec3(.58,.89,.86), shallow=vec3(.29,.75,.77), mid=vec3(.15,.56,.69), deep=vec3(.09,.42,.60);   // V10: shallow #49BFC3 to deep #176C99
       vec3 c=mix(reef,shallow,smoothstep(0.0,0.05,s)); c=mix(c,mid,smoothstep(0.05,0.22,s)); c=mix(c,deep,smoothstep(0.22,0.75,s));
       c*=0.96+0.06*w1*fade;
       float band=0.012+0.008*sin(t*1.6+vWorld.x*14.0+vWorld.z*9.0);
       float foam=smoothstep(0.012,0.0,abs(s-band))+smoothstep(0.008,0.0,s)*0.6;
-      c=mix(c,vec3(.96,.97,.95),clamp(foam,0.0,1.0)*0.45);
+      c=mix(c,vec3(.97,.98,.96),clamp(foam,0.0,1.0)*0.6);
       vec3 V=normalize(uEye-vWorld); vec3 H=normalize(uSun+V);
-      float spec=pow(max(dot(N,H),0.0),90.0)*fade; c+=vec3(1.0,.97,.88)*spec*0.55*(1.0-uStorm);
+      float spec=pow(max(dot(N,H),0.0),90.0)*fade; c+=vec3(1.0,.95,.82)*spec*0.7*(1.0-uStorm);
       c*=mix(0.88,1.0,(cloudShade(vWorld.xz,t)-0.70)/0.30);
-      float fres=pow(1.0-max(dot(N,V),0.0),4.0); c=mix(c,vec3(.78,.90,.92),fres*0.2);
+      float fres=pow(1.0-max(dot(N,V),0.0),4.0); c=mix(c,vec3(.74,.90,.96),fres*0.22);
       c=mix(c, c*vec3(.22,.30,.55)+vec3(.0,.02,.06), uNight);
       gl_FragColor=vec4(applyAtmos(c,vW),1.0);
     }`;
@@ -286,7 +286,7 @@
   }
   function addLine(a,b,col){lineTarget.p.push(...a,...b);lineTarget.c.push(...col,...col);}
   // V9 palette for world-space cues (mirrors styles.css: --gold selection, white hover).
-  const PALETTE = {sel:[.88,.69,.32], selHi:[1,.90,.58], hover:[1,1,1]};
+  const PALETTE = {sel:[.91,.72,.35], selHi:[1,.88,.60], hover:[1,1,1]};   // gold #E8B75A (styles.css --gold)
   function addArc(cx,cy,cz,r,a0,a1,col,seg=8){for(let i=0;i<seg;i++){const a=a0+(a1-a0)*i/seg,b=a0+(a1-a0)*(i+1)/seg;addLine([cx+Math.cos(a)*r,cy,cz+Math.sin(a)*r],[cx+Math.cos(b)*r,cy,cz+Math.sin(b)*r],col);}}
   function addBrackets(cx,cy,cz,r,col){for(let k=0;k<4;k++){const m=Math.PI/4+k*Math.PI/2;addArc(cx,cy,cz,r,m-.26,m+.26,col);addArc(cx,cy+.001,cz,r+.003,m-.26,m+.26,col);}}
   function addRing(cx,cy,cz,r,col,seg=32){for(let i=0;i<seg;i++){const a=i/seg*Math.PI*2,b=(i+1)/seg*Math.PI*2;addLine([cx+Math.cos(a)*r,cy,cz+Math.sin(a)*r],[cx+Math.cos(b)*r,cy,cz+Math.sin(b)*r],col);}}
@@ -415,20 +415,21 @@
     [51.0,20.3,4.6,2.3,[.93,.73,.52],.85],              // Rub' al Khali
     [41.3,28.4,2.3,1.0,[.88,.68,.50],.8],             // An Nafud
     [45.8,26.0,.55,1.4,[.89,.71,.53],.7],[47.0,23.8,.55,1.3,[.89,.71,.53],.7],[47.9,21.9,.55,.9,[.89,.71,.53],.6], // Ad Dahna
-    [38.1,26.3,1.1,1.5,[.72,.56,.43],.75],[39.6,23.4,1.0,1.6,[.73,.57,.44],.7],[40.6,21.0,.9,1.1,[.71,.56,.44],.7], // Hejaz
-    [36.2,28.2,1.0,.9,[.74,.58,.46],.7],
-    [42.6,18.7,1.0,1.3,[.46,.70,.30],.9],[42.9,17.3,.5,.6,[.66,.70,.42],.7],       // Aseer, Jazan plain
+    [38.1,26.3,1.1,1.5,[.78,.55,.40],.75],[39.6,23.4,1.0,1.6,[.79,.56,.41],.7],[40.6,21.0,.9,1.1,[.77,.55,.41],.7], // Hejaz: terracotta (#B97852 family)
+    [36.2,28.2,1.0,.9,[.86,.81,.72],.75],                                        // Northwest: pale stone
+    [42.6,18.7,1.0,1.3,[.40,.57,.34],.9],[42.9,17.3,.5,.6,[.58,.66,.40],.7],       // Aseer: rich greens (#62865A), Jazan plain
     [40.0,25.5,.6,.9,[.46,.38,.33],.55],[40.0,22.9,.35,.8,[.50,.41,.34],.5],       // Harrat lava fields
-    [49.9,25.6,.55,1.4,[.93,.86,.68],.6]                                         // Eastern coastal flats
+    [49.9,25.6,.55,1.4,[.88,.86,.77],.65],                                       // Eastern coastal flats: cooler, paler
+    [46.7,24.7,.9,.8,[.91,.74,.52],.35]                                          // Riyadh: warm desert
   ];
   function landColor(x, z) {
     const [lon, lat] = ungeo(x, z);
-    let c = [.89,.81,.67];   // V9: muted sand (styles.css --sand)
+    let c = [.863,.765,.596];   // V10: sand #DCC398 (styles.css --sand)
     for (const [bl, bt, rl, rt, col, w] of blobs) {
       const d = ((lon-bl)/rl)**2 + ((lat-bt)/rt)**2;
       if (d < 6) c = mix(c, col, w*Math.exp(-d));
     }
-    const n = Math.sin(x*7.1+z*3.3)*Math.sin(z*6.2-x*2.1)*.035 + Math.sin(x*21+z*17)*.012;
+    const n = Math.sin(x*7.1+z*3.3)*Math.sin(z*6.2-x*2.1)*.045 + Math.sin(x*21+z*17)*.018 + Math.sin(x*3.1-z*4.3)*.02;   // subtle tonal variation
     return shade(c, 1+n);
   }
 
@@ -447,7 +448,7 @@
   function buildTerrain(){
     // Neighbouring land — warm but muted so the Kingdom reads first
     for (const n of neighbours) {
-      for (const [a,b,c] of triangulate(n).tris) addTri([a[0],NEI,a[1]],[c[0],NEI,c[1]],[b[0],NEI,b[1]],[.84,.72,.56]);
+      for (const [a,b,c] of triangulate(n).tris) addTri([a[0],NEI,a[1]],[c[0],NEI,c[1]],[b[0],NEI,b[1]],[.85,.78,.66]);   // neighbours paler, so the Kingdom reads first
       walls(n, NEI, SEA, [.93,.84,.64], [.66,.52,.38]);
     }
     // Kingdom base
@@ -1510,7 +1511,7 @@
     if (night>.28) { const k=Math.min(1,(night-.28)/.3); for (const c of cityLights) push(c[0],G+.012,c[1],[c[2],c[3],c[4]],c[5]*k); for (const c of missionLights) push(c[0],G+.02,c[1],[1,.86,.52],(c[2]||4)*k); }
     // Celebration bursts
     for (let bi=bursts.length-1; bi>=0; bi--) { const b=bursts[bi], age=t-b.t0; if (age>2400) { bursts.splice(bi,1); continue; }
-      const pal=[[1,.84,.3],[.35,.85,.5],[1,1,1],[.98,.55,.2],[.45,.7,1]];
+      const pal=[[1,.84,.4],[.91,.72,.35],[1,1,1],[1,.93,.7],[.29,.75,.77]];
       for (let i=0;i<60;i++) { const a=i*2.399, sp=.00012+(i%7)*.000018, r=age*sp, vy=.00022+(i%5)*.00004; const y=G+.08+vy*age-2.2e-10*age*age; if (y<G) continue; push(b.x+Math.cos(a)*r,y,b.z+Math.sin(a)*r,pal[i%5],4.5*(1-age/2600)+1); } }
     fillDyn(pointsObj.geometry, dp.length/3, {position:[dp,3], color:[dc,3], aSize:[ds,1]});
     return dp.length/3;
@@ -1678,7 +1679,7 @@
       renderPass('depth'); renderer.render(scene3, cam3);
     }
     // 2) Scene: sky clear, sea, meshes, lines, points
-    const sky=[(.64+storm*.14)*(1-night)+.07*night,(.83-storm*.27)*(1-night)+.10*night,(.91-storm*.41)*(1-night)+.22*night];
+    const sky=[(.60+storm*.18)*(1-night)+.07*night,(.82-storm*.26)*(1-night)+.10*night,(.94-storm*.44)*(1-night)+.22*night];
     renderer.setRenderTarget(null); renderer.setClearColor(clearCol.setRGB(sky[0],sky[1],sky[2]), 1); renderer.clear();
     POINT_MAT.uniforms.uScale.value=dpr;
     buildDynLines(t); syncLines(dynLinesObj, dynLines);
@@ -1690,6 +1691,7 @@
   }
   function buildDynLines(t){
     dynLines.p.length=dynLines.c.length=0; lineTarget=dynLines;
+    for (const b of bursts) { const age=t-b.t0; if (age<1300) { const q=age/1300, e=1-(1-q)*(1-q); addRing(b.x,G+.02,b.z,.04+e*.32,PALETTE.sel,56); if (q<.6) addRing(b.x,G+.021,b.z,.03+e*.2,PALETTE.selHi,48); } }   // V10: one brief gold ripple per completion
     if (selectable || selectedId) { const sp=selectedId&&P(selectedId), hp=hoverId&&hoverId!==selectedId&&P(hoverId);
       if (sp) { if (sp.ribbon) { ribbonEdges(sp,.006,G+.014,PALETTE.sel); ribbonEdges(sp,.009,G+.015,PALETTE.sel); } else { addRing(sp.x,G+.014,sp.z,sp.foot+.006,PALETTE.sel,48); addBrackets(sp.x,G+.016,sp.z,sp.foot+.018,PALETTE.selHi); } }
       if (hp) { if (hp.ribbon) ribbonEdges(hp,.006,G+.014,[1,1,1]); else addRing(hp.x,G+.014,hp.z,hp.foot+.006,[1,1,1],40); }

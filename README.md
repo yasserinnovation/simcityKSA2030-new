@@ -1,4 +1,4 @@
-# Vision Nexus 2030 — The Kingdom in Motion (build V9 — visual refinement)
+# Vision Nexus 2030 — The Kingdom in Motion (build V10 — navy & gold)
 
 The build label is shown in the bottom corner of the screen. If you see a "Strategic Actions" panel, "Path to 2030" or a calendar past 2030, you are running an older copy of the files.
 
@@ -16,6 +16,18 @@ The 3D world is drawn by **three.js** (vendored in `vendor/three`). The upgrade 
 - **Phase 1 — renderer swap with parity (done):** `engine.js` now renders through three.js with the original shaders and geometry; the `VisionWorld` API is unchanged. Repeated props and vehicles use InstancedMesh. Picking and City Builder tools behave exactly as before. See `docs/phase1/NOTES.md`.
 - The original renderer stays available as `engine_classic.js` (`index.html?renderer=classic`).
 - Third-party files and licences: `ASSETS_CREDITS.md`.
+
+## Navy & gold art direction (build V10)
+
+One palette for the interface and the world: navy `#142D46`, teal `#176B70`, gold `#E8B75A`, panels `#F7F3E9`, sand `#DCC398`, terracotta `#B97852`, vegetation `#62865A`, shallow water `#49BFC3`, deep water `#176C99`.
+
+- **Interface:** compact navy bars (top bar, bottom bar, mission and City Builder toolbars, mode switcher) with white text and translucent KPI tiles; warm-white information cards; gold only for the selected item, the objective and the key action (End turn, Start); hover lift and pressed states; softly shadowed map labels. Tajawal / IBM Plex Sans Arabic as before.
+- **World (three.js renderer):** warm sun with cool sky fill, so lit sand is golden and shadows are cool and readable; stronger contact darkening grounds buildings; controlled saturation; fainter cloud shadows; sea from shallow teal to deep blue with brighter foam and glints; neighbouring countries paler so the Kingdom reads first.
+- **Regional tones** (same places, same geometry): terracotta Hejaz, pale-stone northwest, cooler eastern coastal flats, richer Aseer greens, warm Riyadh desert.
+- **Completion:** the existing completion burst now leads with gold and draws one expanding gold ring on the ground; the confirmation caption gets a one-shot gold ripple. Both run only from the real completion events and are off with reduced motion.
+- Screenshots: `docs/style-v10/`, side by side with V9 in `docs/style-compare-v10/`.
+- Measured frame rate (Intel integrated GPU, D3D11, 1440×900, vsync off, two alternating runs per build, V9 → V10): Kingdom High 87.0–87.2 → 86.2–86.4; Kingdom Medium 130.6–133.2 → 120.9–125.1; Kingdom Reduced 118.5–124.6 → 116.5–119.5; Riyadh High 86.5–102.6 → 84.3–109.7; Riyadh Medium 134.7–145.9 → 130.5–143.1; Riyadh Reduced 129.7–130.9 → 136.2–137.0.
+- Not done (needs new models or textures): authored building models, ground textures, window emissive maps, a custom icon set in place of emoji. The classic renderer (`?renderer=classic`) keeps its own lighting.
 
 ## Visual refinement (build V9)
 A styling pass on the three.js build. Rules, missions, calculations, data, saves, controls, maps and building models are unchanged. Before/after screenshots (same camera, state and seeded randomness, 1440×900, High quality) are in `docs/style-before/`, `docs/style-after/` and side by side in `docs/style-compare/`.
