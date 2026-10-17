@@ -6,7 +6,7 @@
     "start": "node tools/serve.js 8123",
     "test": "node tests/missions.test.js && node tests/city.test.js && node tests/competitiveness.test.js && node tests/layout.test.js && node tests/regions.test.js && node tests/saves.test.js && node tests/challenge.test.js && node tests/tutorial.test.js",
     "test:render": "node tests/render.smoke.js",
-    "test:tutorial": "node tests/browser/tutorial.pw.js"
+    "test:tutorial": "node tests/browser/tutorial.pw.js && node tests/browser/city-consequences.pw.js"
   },
   "devDependencies": {
     "playwright-core": "1.64.0"

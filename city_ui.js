@@ -98,14 +98,15 @@
     const stopTiles = new Set(S.routes.flatMap(r => r.stops));
     const tiles = S.tiles.map((tl, u) => ({k:tl.k, zone:tl.zone, st:tl.st, lv:tl.lv, style:tl.seedN, art:tl.art, avenue:tl.avenue, bridge:tl.bridge, rail:tl.rail, fac:tl.fac, inactive:tl.inactive || (tl.fac === 'terminal' && !tl.railLinked), opened:tl.fac === 'invest' && S.invest && S.invest.opened, stop:stopTiles.has(u), mix:tl.mix,
       nopow:needsPower(tl), pow:!!tl.pow, occ:tl.occ || 0, park:!!(tl.cov && tl.cov.park)}));
-    const ov = ui.overlay ? S.tiles.map((tl, u) => OVERLAYS[ui.overlay].f(tl, u, m)) : null;
+    const ovKey = ui.overlay || (ui.flash && performance.now() < ui.flash.until ? ui.flash.ov : null);
+    const ov = ovKey ? S.tiles.map((tl, u) => OVERLAYS[ovKey].f(tl, u, m)) : null;
     const preview = [];
     if (ui.pending && ui.pending.p.tiles) for (const [i, j] of ui.pending.p.tiles) preview.push({i, j, ok:ui.pending.p.ok && !(ui.pending.p.bad || []).some(b => b[0] === i && b[1] === j)});
     for (const s of ui.stops) preview.push({i:s % N, j:(s / N) | 0, ok:true});
     if (ui.hint && !ui.pending) for (const [i, j] of ui.hint) preview.push({i, j, ok:true, hint:true});   // a suggested placement (tutorial), drawn in gold
     const routes = S.routes.map(r => ({path:r.path, color:r.crowded ? [1,.45,.3] : [1,.85,.2]}));
-    if (ui.overlay === 'power' || ui.overlay === 'water') {   // show the utility network actually carrying supply along the roads
-      const col = ui.overlay === 'power' ? [1,.86,.2] : [.35,.7,1], key = ui.overlay === 'power' ? 'pow' : 'wat';
+    if (ovKey === 'power' || ovKey === 'water') {   // show the utility network actually carrying supply along the roads
+      const col = ovKey === 'power' ? [1,.86,.2] : [.35,.7,1], key = ovKey === 'power' ? 'pow' : 'wat';
       const supplied = new Set(); S.tiles.forEach((tl, u) => { if (tl[key] && m.access[u] >= 0) supplied.add(m.comp[m.access[u]]); });
       for (let u = 0; u < N * N; u++) { if (S.tiles[u].k !== 'r' || !supplied.has(m.comp[u])) continue; const i = u % N; if (i + 1 < N && S.tiles[u + 1].k === 'r') routes.push({path:[u, u + 1], color:col}); if (u + N < N * N && S.tiles[u + N].k === 'r') routes.push({path:[u, u + N], color:col}); } }
     if (ui.tool === 'route' && ui.stops.length > 1) { const p = VC.routePreview(ui.stops, ui.freq); if (p.path) routes.push({path:p.path, color:[.4,1,.6]}); }
@@ -125,12 +126,15 @@
     // Night lights follow the simulation: windows glow only in occupied buildings that have power, and street lamps only
     // on streets beside a powered parcel. An unpowered neighbourhood stays dark.
     const lit = (i, j) => i >= 0 && j >= 0 && i < N && j < N && S.tiles[j * N + i].pow && S.tiles[j * N + i].k !== 'r';
+    ui.litU = [];   // parcels with lit windows (inspectable by tests)
     for (let u = 0; u < N * N; u++) { const tl = S.tiles[u], i = u % N, j = (u / N) | 0;
-      if (tl.k === 'z' && tl.st === 3 && tl.pow && tl.occ > .1) { const c = center(u); lights.push([c[0], c[1], 3 + tl.lv * 1.6 + tl.occ * 2]); }
+      if (tl.k === 'z' && tl.st === 3 && tl.pow && tl.occ > .1) { const c = center(u); lights.push([c[0], c[1], 3 + tl.lv * 1.6 + tl.occ * 2]); ui.litU.push(u); }
       if (tl.k === 'f' && tl.pow && !tl.inactive && tl.fac !== 'solar' && tl.fac !== 'park') { const c = center(u); lights.push([c[0], c[1], 2.6]); }
       if (tl.k === 'r' && !tl.art && (i + j) % 2 === 0 && (lit(i - 1, j) || lit(i + 1, j) || lit(i, j - 1) || lit(i, j + 1))) { const c = center(u); lights.push([c[0] + grid.ts * .38, c[1] + grid.ts * .38, 1.3]); } }
     // services come alive with the people they serve
     for (let u = 0; u < N * N; u++) { const tl = S.tiles[u]; if (tl.k !== 'f' || !tl.load || tl.inactive) continue; const c = center(u), day = ui.dayT > .28 && ui.dayT < .75; const n = Math.round(Math.min(8, tl.load * 8) * (day ? 1 : .3)); for (let q = 0; q < n; q++) ents.push({x:c[0] + Math.cos(q * 2.3) * grid.ts * .45, z:c[1] + Math.sin(q * 2.3) * grid.ts * .45, y:W.ground + .016, color:[[1,.9,.75],[.8,.9,1],[1,.8,.6]][q % 3], size:2.2}); }
+    const now = performance.now(); ui.fresh = (ui.fresh || []).filter(f => now - f.at < 3200);
+    for (const f of ui.fresh) { const c = center(f.u), k = 1 - (now - f.at) / 3200; for (let q = 0; q < 5; q++) ents.push({x:c[0] + Math.cos(q * 1.26) * grid.ts * .3, z:c[1] + Math.sin(q * 1.26) * grid.ts * .3, y:W.ground + .02 + q * .004, color:[1, .86, .4], size:3.2 * k + 1, pulse:true}); }   // just completed
     W.setOverlay(ov); W.setEntities(ents); W.setMissionLights(lights);
     const labs = [];
     let pw = 0; for (let u = 0; u < N * N && pw < 8; u++) if (needsPower(S.tiles[u])) { const c = center(u); labs.push({id:'cp' + u, text:'⚡', x:c[0], z:c[1], y:W.ground + .02, cls:'city-lab nopow'}); pw++; }   // parcels waiting only for power
@@ -223,8 +227,19 @@
     $('#cOk').onclick = confirmPending; $('#cNo').onclick = cancelPending; $('#cQuick').onchange = e => { ui.quick = e.target.checked; };
   }
   function confirmPending(){ const P = ui.pending; if (!P) return; const r = VC.apply(P.tool, P.a, P.b, {density:ui.density});
-    if (!r.ok) { G.sfx('warn'); say(t(r.why || 'cannotBuild'), 'warn'); } else { G.sfx('commit'); const c = center(VC.idx(P.a[0], P.a[1])); if (VC.FAC[P.tool] && !G.profile.reduced) W.burst(c[0], c[1]); }
+    if (!r.ok) { G.sfx('warn'); say(t(r.why || 'cannotBuild'), 'warn'); } else { G.sfx('commit'); const c = center(VC.idx(P.a[0], P.a[1])); if (VC.FAC[P.tool] && !G.profile.reduced) W.burst(c[0], c[1]); if (VC.FAC[P.tool]) explainFacility(P.tool, VC.idx(P.a[0], P.a[1])); }
     ui.pending = null; $('#cConfirm').classList.add('hidden'); render(); renderHUD(); refreshPanel(); save(); }
+  // What a new facility actually does now, from the simulation (coverage, capacity in use, supply), shown briefly on the map.
+  const SERVE_OV = {edu:'education', health:'health', park:'environment'};
+  function flash(ov, ms = 6000){ if (ui.overlay) return; ui.flash = {ov, until:performance.now() + ms}; clearTimeout(flash.t); flash.t = setTimeout(() => { if (ui.active) render(); }, ms + 60); }
+  function explainFacility(tool, u){
+    const S = VC.state, m = S.m, f = VC.FAC[tool], tl = S.tiles[u];
+    if (f.serve) { const n = S.tiles.filter(x => x.k === 'z' && x.cov && x.cov[f.serve]).length;
+      if (SERVE_OV[f.serve]) flash(SERVE_OV[f.serve]);
+      say(n ? t('flashServe', {icon:f.icon, name:t(f.name), n, p:Math.round((tl.load || 0) * 100)}) : t('flashServeNone', {icon:f.icon, name:t(f.name), r:f.reach, how:t(f.walk ? 'flashWalk' : 'flashRoad')}), n ? 'good' : 'info'); return; }
+    if (f.power || f.solar || f.storage) { flash('power'); say(t('flashPower', {u:m.power.used.toFixed(0), s:m.power.supply.toFixed(0), n:S.tiles.filter(x => x.k === 'z' && x.needs && x.needs.some(q => q.k === 'road' && q.ok) && !x.pow).length}), 'info'); return; }
+    if (f.water) { flash('water'); say(t('flashWater', {u:m.water.used.toFixed(0), s:m.water.supply.toFixed(0), n:S.tiles.filter(x => x.k === 'z' && x.needs && x.needs.some(q => q.k === 'road' && q.ok) && !x.wat).length}), 'info'); }
+  }
   function cancelPending(){ ui.pending = null; $('#cConfirm').classList.add('hidden'); render(); }
   function addStop(tt){ const u = VC.idx(tt[0], tt[1]); if (VC.state.tiles[u].k !== 'r') { G.sfx('warn'); say(t('stopOnRoad'), 'warn'); return; } ui.stops.push(u); routePanel(); render(); }
   function routePanel(){
@@ -234,7 +249,7 @@
       <div class="row-btns"><button class="primary sm" id="cRouteOk" ${p.ok ? '' : 'disabled'}>${esc(t('finishRoute'))}</button><button class="secondary sm" id="cRouteUndo" ${ui.stops.length ? '' : 'disabled'}>${esc(t('removeLastStop'))}</button><button class="link" id="cRouteNo">${esc(t('cancel'))}</button></div>`;
     el.classList.remove('hidden');
     $('#cFreq').onchange = e => { ui.freq = +e.target.value; routePanel(); };
-    $('#cRouteOk').onclick = () => { const r = VC.addRoute(ui.stops, ui.freq); if (!r.ok) { say(t(r.why), 'warn'); return; } G.sfx('commit'); say(t('routeCreated'), 'good'); ui.stops = []; el.classList.add('hidden'); render(); renderHUD(); save(); };
+    $('#cRouteOk').onclick = () => { const r = VC.addRoute(ui.stops, ui.freq); if (!r.ok) { say(t(r.why), 'warn'); return; } G.sfx('commit'); say(t('routeCreated'), 'good'); ui.newRoute = VC.state.nextRoute - 1; ui.stops = []; el.classList.add('hidden'); render(); renderHUD(); save(); };
     $('#cRouteUndo').onclick = () => { ui.stops.pop(); routePanel(); render(); };
     $('#cRouteNo').onclick = () => { ui.stops = []; el.classList.add('hidden'); render(); };
   }
@@ -377,10 +392,11 @@
   }
   function handleEvents(ev){
     if (ui.session && ui.session.events) ev = ui.session.events(ev);   // an isolated session (the tutorial) holds back unrelated challenges and weather
-    let pause = false;
+    let pause = false, flashed = false;
     for (const e of ev) {
       if (e.type === 'milestone') { say('🏅 ' + t(e.text), 'good'); G.sfx('medal'); if (!G.profile.reduced) { const c = [grid.x0 + N * grid.ts / 2, grid.z0 + N * grid.ts / 2]; W.burst(c[0], c[1]); } }
-      if (e.type === 'challenge') { say('🎯 ' + t(e.text) + ' — ' + t(e.hint), 'challenge'); G.sfx('warn'); }
+      if (e.type === 'challenge') { const ov = {corridor:'traffic', school:'education', power:'power', water:'water', jobs:'access'}[e.id]; if (ov && !flashed) { flash(ov, 9000); flashed = true; } /* the first challenge of the month keeps the map */ say('🎯 ' + t(e.text) + ' — ' + t(e.hint) + (ov ? ' ' + t('challengeArea') : ''), 'challenge'); G.sfx('warn'); }
+      if (e.type === 'built') { (ui.fresh = ui.fresh || []).push({u:e.u, at:performance.now()}); if (ui.fresh.length > 12) ui.fresh.shift(); }
       if (e.type === 'challengeDone') { G.profile.points += e.reward; G.saveProfile(); say('✅ ' + t(e.text) + ' · ✦ +' + e.reward, 'good'); G.sfx('complete'); }
       if (e.type === 'warn') say(t(e.text), 'warn');
       if (e.type === 'weather' && e.text) say((e.w === 'dust' ? '🌪 ' : '🔥 ') + t(e.text), 'challenge');
@@ -388,6 +404,7 @@
       if (e.pause) pause = true;
     }
     if (pause) { ui.speed = 0; say(($('#cTicker').textContent || '') + ' · ' + t('autoPaused'), 'challenge'); }
+    if (ui.newRoute) { const r = VC.state.routes.find(x => x.id === ui.newRoute); ui.newRoute = null; if (r && !pause) say(t('routeOpened', {id:r.id, r:r.riders || 0}), r.riders ? 'good' : 'info'); }   // the route's first simulated month
     if (VC.dateOf().year > 2030 && !ui.beyondShown) { ui.beyondShown = true; say(t('beyondEntered'), 'info'); }
   }
   addEventListener('keydown', e => {
