@@ -1,14 +1,15 @@
-# Vision Nexus 2030 — The Kingdom in Motion (build V11 — miniature world)
+# Vision Nexus 2030 — The Kingdom in Motion (build V19 — country overview)
 
 The build label is shown in the bottom corner of the screen. If you see a "Strategic Actions" panel, "Path to 2030" or a calendar past 2030, you are running an older copy of the files.
 
 An unofficial Saudi strategy game in the browser (WebGL, no install, no build step).
 ## How to launch (works offline)
 The game runs from a tiny local web server, because browsers block the ES modules, models and textures of the three.js renderer on `file://` pages. Nothing is downloaded from the internet: three.js and the fonts are in `vendor/`.
-- **Windows:** double-click `Launch_Prototype.bat`. It starts `python -m http.server 8000` (or `node tools/serve.js` if Python is missing) and opens http://localhost:8000.
+- **Windows:** double-click `Launch_Prototype.bat`. It starts `python -m http.server 8123` (or `node tools/serve.js` if Python is missing) and opens http://127.0.0.1:8123.
+- **Why port 8123 on 127.0.0.1:** Docker Desktop and WSL also listen on port 8000, and browsers send `localhost` to IPv6 `::1`, where they answer with an empty page (`ERR_EMPTY_RESPONSE`). Always use http://127.0.0.1:8123.
 - **macOS / Linux:** run `./launch.sh` (same fallbacks).
-- **Any system with Node:** `npm start`, then open http://localhost:8000.
-- **Renderers:** http://localhost:8000/index.html uses the three.js renderer; add `?renderer=classic` for the original hand-written WebGL renderer (kept for comparison). Opening `index.html` directly from disk still works and uses the classic renderer. Add `?debug=1` for the frame-time counter.
+- **Any system with Node:** `npm start`, then open http://127.0.0.1:8123.
+- **Renderers:** http://127.0.0.1:8123/index.html uses the three.js renderer; add `?renderer=classic` for the original hand-written WebGL renderer (kept for comparison). Opening `index.html` directly from disk still works and uses the classic renderer. Add `?debug=1` for the frame-time counter.
 - **Tests:** `npm test` (game logic, headless) and `npm install && npm run test:render` (Playwright smoke test against your installed Chrome or Edge).
 
 ## Renderer upgrade (build V8)
@@ -16,6 +17,161 @@ The 3D world is drawn by **three.js** (vendored in `vendor/three`). The upgrade 
 - **Phase 1 — renderer swap with parity (done):** `engine.js` now renders through three.js with the original shaders and geometry; the `VisionWorld` API is unchanged. Repeated props and vehicles use InstancedMesh. Picking and City Builder tools behave exactly as before. See `docs/phase1/NOTES.md`.
 - The original renderer stays available as `engine_classic.js` (`index.html?renderer=classic`).
 - Third-party files and licences: `ASSETS_CREDITS.md`.
+
+## Riyadh as a working miniature city (build V15)
+
+V14 left several Riyadh sites reading as empty circles, grids or generic blocks. The causes:
+- **Stage gating:** New Murabba, Expo, Qiddiya, the airport terminal and Sports Boulevard start a new game at the design stage, so V14 drew nothing there.
+- **Too little inside each site:** there was little to see even when complete.
+- **Scale:** trees and palms were two to three times too large next to the buildings, and the skyline dwarfed everything.
+- **Zoom:** players could not get close enough to see small things. The closest zoom was 1.6.
+
+No asset failed to load: every model asked for exists, which the new `__visionStats.missingModels` confirms. The new site kits are in `riyadh.js`. The engine passes it its own geometry helpers, and without that file the V14 builders run. Positions, footprints, roads, routes, parcels, IDs, labels, pick targets, costs and stages are unchanged. Every layout is seeded.
+
+- **Construction stages.** Stages come from `sim.js`: design, site, materials, build, utility, test.
+  - **Preparation (new):** hoarding in the project colour, site cabins and survey pegs.
+  - **Foundations:** slabs in the building's outline.
+  - **Structure:** an open frame cut at the progress height, with a crane.
+  - **Exterior:** the finished buildings.
+  - **Finished detail:** aircraft, ride trains, banners, ground services, kiosks, people and facade lights.
+
+  Hoarding stays up until the exterior is built. Progress is never changed to make a view look better.
+- **Completed-state preview.** `index.html?preview=complete`, or `VisionWorld.debug.previewComplete(true)`, draws every Riyadh landmark as operational, with an on-screen badge.
+  - It is visual only: project state, markers, the simulation and saves are untouched.
+  - Checked in every capture run: the simulation state is byte-identical before and after.
+- **Detail by distance and quality.**
+  - **Architecture:** kept on every quality setting.
+  - **Close-view life** (ground services, kiosks, benches, cars): High and Medium, below camera distance 3.2.
+  - **People and runway edge lights:** High only.
+  - **Animation:** coaster trains and road traffic run on High and Medium, with half the traffic on Medium. The airside service train runs on High only. Turbine blades rest on Reduced.
+  - **Zoom:** the closest zoom is now 0.25 (was 1.6), so the sites can be inspected.
+- **Airport** (inside the existing footprint; runways and taxiways unchanged):
+  - **Terminal:** a glass hall under seven flowing roof shells with skylight bands, on branching tree columns.
+  - **Airside:** five gates with jet bridges and a remote stand. The apron has marked stands, red envelope lines, a service road and holding points.
+  - **Aircraft:** a recognisable airliner model (fuselage, swept wings, two engines, tailplane, fin, gear) in a neutral finish. Four are at gates, one at the remote stand, one taxiing and one lined up on the runway.
+  - **Ground services:**
+    - gate 1 has a full turnaround: pushback tug, power unit, two belt loaders, a baggage tug with three carts, a catering truck and a van;
+    - the remaining stands have lighter sets;
+    - there are stair trucks and an apron bus at the remote stand, and an equipment yard;
+    - a baggage train and van run along the service road.
+  - **Landside:** a drop-off canopy, a two-lane forecourt with crossings, taxis and an airport bus, two car parks (the marker pad stays clear) and an access road to King Salman Road.
+  - **Support buildings:** the Metro terminus with a bridge into the hall, a hangar, cargo shed, fire station with tenders, and the control tower.
+- **Qiddiya** (a stylized theme-park concept; no ride names, logos or official layout):
+  - **Main coaster:** a closed, continuous track with a lift hill, drop, camelbacks and station; trains run on it.
+  - **Other rides:** a log flume with trestles and a splash pool, a drop tower, a carousel and an observation wheel.
+  - **Entrance:** three portals and four ticket booths facing Qiddiya Road.
+  - **Around the park:** a central plaza with a fountain, queue rails under shade sails, kiosks with parasols and tables, toilets, first aid and shops, a back-of-house yard, landscaped walks and a perimeter fence.
+- **Skyline:**
+  - The Kingdom Centre is lowered from 0.42 to 0.25 and Al Faisaliah from 0.325 to 0.21, so the shadow is shorter. Other towers step down with them, mixing warm stone with glass.
+  - Downtown gains paved forecourts, entrance canopies, a planted median and street trees.
+- **New Murabba:** pergola walks, dark portal canopies, corner planters, cafés and seating. Facade light lines and lit portals glow at night (a new `landmarkLit` layer).
+- **ROSHN:**
+  - Streets and spaces: a ring street with pavements and lamps, and a central green with a playground, community centre and small mosque.
+  - Homes: townhouse terraces with back gardens, walled villas (gardens, some pools, roof terraces) and two apartment courts.
+  - Details: parked cars and a substation.
+- **Expo:**
+  - Centre: a geodesic globe under a ring canopy.
+  - Pavilions: five distinct ones (sails, twisting tower, domes, lattice garden cube, wave hall).
+  - Grounds: six avenues, two with pergolas; a north and a west gate with booths; service buildings; trees and lawns.
+  - Once open: ten neutral banners.
+- **Diriyah (heritage, always drawn):**
+  - an enclosure wall with corner towers, paved lanes and the palace plaza;
+  - palms toward the wadi;
+  - timber doors on every Najdi building.
+- **Parks, boulevard, Metro, energy, roads:**
+  - **King Salman Park:** flower gardens, pergolas, a playground, benches, lamps and parasols.
+  - **Green Riyadh:** reed clumps, a feathered edge into the sand and shade pavilions with seating.
+  - **Sports Boulevard:** shaded seating pergolas, fitness stations, benches and lamps.
+  - **Metro:** station forecourts with entrance pavilions and a bus and taxi bay. Trains stay blue and silver.
+  - **Renewables:** solar rows on posts, inverters, a fenced substation, gravel tracks, a perimeter fence and lower turbines.
+  - **Roads:** lane dashes on the named roads, and traffic in both directions.
+  - **Scale:** Riyadh's trees and palms are scaled down, and small trees use a light 75-triangle model.
+- **Verified:**
+  - **Tests:** `npm test` passes 283 of 283, and the render smoke test passes.
+  - **Regional selection:** 396 of 400, identical to V14 (200 of 200 at 1440 px in English and Arabic). The same four 390 px label checks fail in other regions, and that set varies between runs.
+  - **Riyadh selection:** every project resolves 8 of 8 sample clicks to itself at game start, during construction and when complete, the same as V14. The Kingdom Centre still selects central Riyadh.
+  - **Saves:** a saved campaign reloads and redraws its stage.
+  - **Errors and other regions:** no console errors in any run. Other regions match V14 pixel for pixel within animation noise.
+- **Measured.** Matched cameras, 1440×900, complete state, on a machine also running another Chrome session. Absolute times are therefore high and noisy, about ±2 ms. The before and after runs were made back to back.
+
+  | Quality | Avg frame time, before → after (overview / airport close / Qiddiya close) | Draw calls (far / near) | Rendered triangles (far / near) |
+  |---|---|---|---|
+  | High | 38.0 → 37.2 / 34.9 → 35.6 / 37.9 → 37.3 ms | 34 → 39 / 66 | 730k → 756k / 786k |
+  | Medium | 25.4 → 25.2 / 24.4 → 24.8 / 24.4 → 24.6 ms | 34 → 39 / 60 | 730k → 756k / 775k |
+  | Reduced | 22.3 → 22.8 / 20.9 → 22.6 / 21.1 → 21.0 ms | 34 → 39 / 39 | 582k → 609k / 609k |
+
+  Boot time is unchanged (≈9.5 s on this machine during the runs). The static scene grew from 581.8k to 598.8k triangles. Close-view props are 14.9k triangles and people are 8k.
+- **Screenshots:** `docs/riyadh-v15/before` and `docs/riyadh-v15/after` use identical cameras, light and quality, and `stats_*.json` holds the numbers. They cover:
+  - the full view (also on Medium and Reduced, and labelled in English and Arabic in the after set);
+  - the close view of every site;
+  - the closest zoom on the airport gates, Qiddiya rides, ROSHN homes and the Expo plaza;
+  - game start and mid-construction against the completed preview;
+  - Murabba at night.
+- **Remaining gaps:**
+  - **Small items:** people and baggage carts are only a few pixels, even at the closest zoom.
+  - **Reference features not built:** the stadium, and the reference's exact coaster and pavilion forms.
+  - **Labels:** project labels on the map stay English in Arabic mode, as before.
+  - **Unused models:** the V14 models for Qiddiya, Expo, the parked aircraft and the solar unit are now fallbacks only.
+
+## Riyadh architecture (build V14)
+
+Riyadh's scene is upgraded toward the illustrated target (`newriyadh.jpg`, outside the repository). The images are treated as artistic references, not plans. Positions, footprints, roads, routes, parcels, IDs, labels and selection targets are unchanged. Everything is in `engine.js` (procedural geometry, no new asset files).
+
+- **Construction stages are now truthful.** Each project's new-build architecture is recorded once (`sig()`) and drawn by a new `landmark` layer from the project's real state. The package order comes from `sim.js`: design, site, materials, build, utility, test.
+  - Before site preparation, the project shows nothing.
+  - Once the site is prepared, foundation slabs appear in the building's own outline.
+  - During main construction, an open concrete frame is cut at the progress height (with a crane).
+  - Once built, the finished exterior appears.
+  - Once operational, finishing details are added: aircraft at the gates and Expo flags.
+  
+  Context stays visible at every stage: ground, plazas, runways, the Metro guideway, At-Turaif, park landscape and Green Riyadh. Costs, progress, completion and stage numbering are untouched. Each landmark triangle carries its project's pick id, so a click selects the project exactly as before. Before and after, every Riyadh project resolves 8/9 sample clicks to itself in all states.
+- **A: skyline, Diriyah, New Murabba.**
+  - The Kingdom Centre is an elliptical lofted shaft with a parabolic opening, a skybridge, light floor bands and a stone podium.
+  - Al Faisaliah is a tapered square tower with corner fins, the golden sphere and a spire.
+  - Downtown towers read as floors and sit on podiums.
+  - The Mukaab has a Najdi triangular relief, entrance portals, a crenellated parapet and an eight-point star crown (artistic). It sits in a square with pools, walks and palms.
+  - At-Turaif is a clay plateau of courtyard compounds with merlons, slot windows, Salwa Palace and watchtowers. New Najdi-style cultural buildings are staged.
+- **B: ROSHN, Sports Boulevard, King Salman Park, Green Riyadh.**
+  - ROSHN has terraced homes around planted courtyards, a street grid and a community centre on the central green.
+  - The boulevard has a planted verge with a promenade, a red cycle path with dashes, tree clusters with gaps, courts and pavilions.
+  - The park has lawn variation, a stone-and-shallows lake edge and graded clumps around open lawn.
+  - Green Riyadh's river gets shallow-water banks.
+- **C: airport, Expo, Qiddiya, Metro.**
+  - The runway alignment is unchanged. Runways gain edge lines, touchdown bars, yellow taxi lines and stands.
+  - The new terminal is a glass hall under a modular barrel-vault roof, with supports, jet bridges, forecourt and parking.
+  - Expo gets radiating walks, gardens between the pavilions and a flag ring once open.
+  - Qiddiya gets a landscaped palm ring, an observation wheel and a water-park corner (decorative only).
+  - The Metro becomes an elevated guideway on the exact route, with piers (none in a roadway), rails and stops aligned to the track. Two trains run continuously in opposite directions once the line is built. They are decorative and not connected to the simulation.
+- **D: roads and markers.**
+  - Major Riyadh roads gain white edge lines that break at junctions.
+  - Marker pedestals are 22% slimmer. Tier heights are unchanged, so heads and labels still line up.
+  - Utility poles now show only while that package is active, instead of permanently after it.
+- **Determinism:** Riyadh now draws its decoration from its own random stream. The shared stream is advanced by the same 301 draws as before. A hash of all 583 prop instances outside Riyadh is identical before and after.
+- **Measured:** matched views, complete state, 1440×900; frame times are vsync-bound.
+
+  | Quality | Avg frame time | Draw calls | Rendered triangles |
+  |---|---|---|---|
+  | High | 14.90 → 15.08 ms | 30 → 34 | 724.7k → 730.0k |
+  | Medium | 7.95 → 8.07 ms | | |
+  | Reduced | 6.38 → 6.54 ms | | |
+
+  Boot time is unchanged (≈5 s). The landmark layer holds ≈20k triangles when everything is complete. The procedural Mukaab replaces a 16k-triangle model.
+- **Screenshots:** `docs/riyadh-v14/before` and `docs/riyadh-v14/after` use identical cameras, states and quality:
+  - full Riyadh view (also labelled, and on Medium and Reduced)
+  - skyline, Murabba and ROSHN, airport and Expo, Diriyah and Qiddiya, park and Green Riyadh, Metro, Sports Boulevard
+  - game-start state, and construction in progress
+- **Not done:** reference features beyond the current kit, namely the stadium, geodesic dome and detailed coaster. The baked models `RUH_KingdomCentre`, `RUH_Mukaab`, `RUH_Diriyah_AtTuraif`, `RUH_ROSHN_Cluster`, `RUH_Airport_Terminal` and `RUH_MetroTrain` stay in `models.js` but are no longer used.
+
+## Sand dunes (build V13)
+
+The flat oval dune patches are replaced by procedural dune fields (`dunes.js`, built by `buildDunes()` in `engine.js`). Each field is one smooth height field on a world-aligned lattice: crescent chains, long sinuous ridges joined through saddles, and low rolling sand. Every dune has a long, gentle windward slope, a rounded brink and a shorter, steeper slip face. Each field has one prevailing wind. Bases sink a hair below the ground and meet it with zero slope, so there are no rims, seams or z-fighting. Colours run from the local ground tone at the foot to warm slopes (#D6AF76), sunlit crests (#EFD6A5) and shaded lee faces (#BC9564), all tinted toward the region's sand.
+
+- **Fields:** the Rub' al Khali (east and south-east) has broad groups with long ridges. The Ad Dahna belt (central, outside the Riyadh plan) has low, sparse dunes, and An Nafud (north) has small, spaced dunes. Flat sand is left between groups.
+- **Clear ground:** dunes keep clear of roads, rails, project footprints, places, regional plans, mission and challenge sites, rock formations, groves, farms, lava fields and every prop. A browser check of all raised-sand vertices found no violations, with the nearest road 0.086 and the nearest rail 0.095 away. Dunes are not part of the pick pass, so selection and placement are unchanged. They cast no shadows.
+- **Detail levels:** High and Medium use a 0.0065 lattice (≈128k triangles). Reduced uses a 0.018 lattice of the same shape (≈18k).
+- **Determinism:** each field has its own seed. The old loops still draw from the shared scenery stream, so every other prop stays where it was.
+- **Cost:** about 1.7–2 s of extra boot time on the test machine. Frame time is vsync-bound and within noise on all three qualities.
+- **Not done:** fine sand ripples. They would need a dune-specific shader branch or a texture.
 
 ## Miniature-world polish (build V11)
 
@@ -230,3 +386,8 @@ The other regions (West, NEOM, East, South and Beyond 2030) remain a visible pro
 - The national simulation's fixed labels, projects, packages, statuses and common messages are in Arabic (`national_ar.js`, mirrored layout). Some long generated sentences, such as project descriptions and rare log lines, stay in English.
 - Sound effects are simple synthesised tones.
 - Testing was done in a headless browser; real-device performance and touch feel still need a hands-on pass.
+
+
+## Country overview V19
+
+Country-only procedural landscape, continuous dunes, connected western highlands, concentrated groves, existing destination silhouettes and routes, responsive navy/gold overview UI. City detail scenes, project IDs and save state are preserved. See [review](docs/country-v19/review.html) and [verification, changed files and remaining gaps](docs/country-v19/NOTES.md). Local preview: http://127.0.0.1:8016/index.html?style=country-v19. The reference remains an artistic direction; this is a stylized three.js implementation with simplified geography, without photorealistic GI or volumetric clouds. Observed performance is recorded without guarantees.

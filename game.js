@@ -62,7 +62,7 @@
     $('#hud').classList.remove('hidden'); $('#mandateOverlay').classList.add('hidden'); $('#reviewCard').classList.add('hidden'); if ($('#natConfirm')) $('#natConfirm').remove();
     if (window.VNP && VNP.renderNav) VNP.renderNav('national');
     W.setSelectable(true);   // projects on the map are clickable only in the National Simulation
-    if (innerWidth < 760) for (const id of ['navigator','dock']) { $('#' + id).classList.add('collapsed'); const b = $(`[data-collapse="${id}"]`); if (b) b.setAttribute('aria-expanded', 'false'); }   // phones: start with the map visible
+    for (const id of ['navigator','dock']) { $('#' + id).classList.add('collapsed'); const b = $(`[data-collapse="${id}"]`); if (b) b.setAttribute('aria-expanded', 'false'); }   // national planning starts with the country visible; existing buttons reopen panels
     ['#challengePanel','#challengeTop','#unitBar'].forEach(s => $(s).classList.add('hidden')); ['#navigator','#bottombar'].forEach(s => $(s).classList.remove('hidden'));
     W.onGroundClick(null); W.setHazard(null); W.setEntities([]); W.setDynamicLabels([]);
     const st = S(); st.slot = SV.slotOf(st); $('#modeTag').textContent = `${SIM.DIFFICULTY[st.difficulty].label.toUpperCase()} · ${slotLabel(st.slot).toUpperCase()}`;

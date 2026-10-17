@@ -1,0 +1,20 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Vision Nexus 2030 · Visual slice review</title>
+<style>
+body{margin:0;background:#15252a;color:#edf0e8;font:16px/1.5 system-ui}main{max-width:1400px;margin:auto;padding:24px}h1{font-size:24px;margin:0}p{color:#becac5}select,input{font:inherit}select{padding:8px;margin:0 12px 16px 0}label{display:inline-block;margin:0 14px 10px 0}.compare{position:relative;aspect-ratio:1440/900;background:#293c42;overflow:hidden;border:1px solid #789085}.compare img{position:absolute;width:100%;height:100%;object-fit:contain}.compare .old{clip-path:inset(0 50% 0 0)}.divider{position:absolute;left:50%;top:0;bottom:0;width:2px;background:#fff}.tag{position:absolute;top:12px;padding:4px 10px;background:#15252acc;border-radius:4px}.left{left:12px}.right{right:12px}input{width:100%;margin:14px 0}a{color:#9de0d0}.links{display:flex;gap:24px;flex-wrap:wrap}
+</style><main><h1>Vision Nexus 2030 · Airport and Qiddiya</h1>
+<p>Drag to compare. Left: pre-pass baseline. Right: final slice. Both use fixed daylight, decorative time, 1440 × 900 and the same camera.</p>
+<label>Compare <select id="baseline"><option value="before">Original slice</option><option value="unculled">Same visuals, culling disabled</option></select></label>
+<label>View <select id="view"><option value="airport">Airport</option><option value="qiddiya">Qiddiya</option><option value="overview">Riyadh overview</option></select></label>
+<label>State <select id="state"><option value="complete-preview">Completed preview</option><option value="normal">Normal starting state</option></select></label>
+<label>Quality <select id="quality"><option value="high">High</option><option value="medium">Medium</option><option value="low">Reduced</option></select></label>
+<div class="compare"><img id="new" alt="Final visual slice"><img id="old" class="old" alt="Pre-pass baseline"><div class="divider"></div><span class="tag left">Before</span><span class="tag right">After</span></div>
+<input id="slider" type="range" min="0" max="100" value="50" aria-label="Before and after comparison">
+<div class="links"><a href="REPORT.md">Verification and performance report</a><a href="after/results.json">Final measurements</a><a href="../../index.html?preview=complete">Play completed-state preview</a><a href="../../index.html">Play normal game</a></div>
+<p>The completed preview changes only visuals. Construction fixtures and exact baseline sources are in the before/after folders. Models remain procedural; textured GLB/HDR production requires further work.</p>
+</main><script>
+const view=document.querySelector('#view'),state=document.querySelector('#state'),quality=document.querySelector('#quality'),baseline=document.querySelector('#baseline');
+function update(){const restricted=state.value==='normal'||view.value==='overview';quality.disabled=restricted;if(restricted)quality.value='high';const file=`${view.value}-${state.value}-${quality.value}.png`;document.querySelector('#old').src=baseline.value+'/'+file;document.querySelector('#new').src='after/'+file;}
+for(const el of [view,state,quality,baseline])el.onchange=update;
+document.querySelector('#slider').oninput=e=>{document.querySelector('#old').style.clipPath=`inset(0 ${100-e.target.value}% 0 0)`;document.querySelector('.divider').style.left=e.target.value+'%';};update();
+</script></html>

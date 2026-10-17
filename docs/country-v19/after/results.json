@@ -1,0 +1,352 @@
+{
+  "phase": "after",
+  "errors": [],
+  "performanceRuns": {
+    "high": {
+      "samples": 100,
+      "meanMs": 24.031999999880792,
+      "fps": 41.61118508675767,
+      "p95Ms": 39.099999994039536,
+      "frame": {
+        "fps": 41.30605822187242,
+        "ms": 24.20952380952388,
+        "quality": "high",
+        "renderer": "three",
+        "calls": 78,
+        "triangles": 453871
+      }
+    },
+    "medium": {
+      "samples": 100,
+      "meanMs": 20.154000000059604,
+      "fps": 49.61794184762541,
+      "p95Ms": 37.5,
+      "frame": {
+        "fps": 50.71191730056592,
+        "ms": 19.719230769230656,
+        "quality": "medium",
+        "renderer": "three",
+        "calls": 78,
+        "triangles": 434899
+      }
+    },
+    "low": {
+      "samples": 100,
+      "meanMs": 19.8320000000298,
+      "fps": 50.42355788616868,
+      "p95Ms": 33.29999999701977,
+      "frame": {
+        "fps": 47.60960126958882,
+        "ms": 21.004166666666908,
+        "quality": "low",
+        "renderer": "three",
+        "calls": 78,
+        "triangles": 430299
+      }
+    }
+  },
+  "cityHashes": {
+    "riyadh": "c2132ea1b9e7be81f45cd5bb1d3b573d2e071dccad1ee3f4fa3add35b35f8095",
+    "west": "fdd934ca66d39f9d658792e4d00194585561df7078050fd4c4fd7a02a3326440",
+    "east": "d1badb803fe7f20f218aefa2aa9666f5347115cfeaeeafa87f09f00194f03fe5",
+    "south": "b7e2c39b5616667931d0382c19a10bf033e20f7616494e88fb4365f59104b998",
+    "northwest": "9fe90675c12cdd0042bd7cd1121fca39777804ae61806dea20f6ee8fd6d2f13b"
+  },
+  "overlaps": [],
+  "picking": {
+    "neom": {
+      "pixels": 6,
+      "hits": [
+        {
+          "select": "neom"
+        },
+        {
+          "select": "neom"
+        },
+        {
+          "select": "neom"
+        },
+        {
+          "select": "neom"
+        },
+        {
+          "select": "neom"
+        },
+        {
+          "select": "neom"
+        }
+      ]
+    },
+    "oxagon": {
+      "pixels": 6,
+      "hits": [
+        {
+          "select": "oxagon"
+        },
+        {
+          "select": "oxagon"
+        },
+        {
+          "select": "oxagon"
+        },
+        {
+          "select": "oxagon"
+        },
+        {
+          "select": "oxagon"
+        },
+        {
+          "select": "oxagon"
+        }
+      ]
+    },
+    "alula": {
+      "pixels": 6,
+      "hits": [
+        {
+          "select": "alula"
+        },
+        {
+          "select": "alula"
+        },
+        {
+          "select": "alula"
+        },
+        {
+          "select": "alula"
+        },
+        {
+          "select": "alula"
+        },
+        {
+          "select": "alula"
+        }
+      ]
+    },
+    "eastern": {
+      "pixels": 6,
+      "hits": [
+        {
+          "select": "eastern"
+        },
+        {
+          "select": "eastern"
+        },
+        {
+          "select": "eastern"
+        },
+        {
+          "select": "eastern"
+        },
+        {
+          "select": "eastern"
+        },
+        {
+          "select": "eastern"
+        }
+      ]
+    },
+    "ksip": {
+      "pixels": 6,
+      "hits": [
+        {
+          "select": "ksip"
+        },
+        {
+          "select": "ksip"
+        },
+        {
+          "select": "ksip"
+        },
+        {
+          "select": "ksip"
+        },
+        {
+          "select": "ksip"
+        },
+        {
+          "select": "ksip"
+        }
+      ]
+    },
+    "expo": {
+      "pixels": 6,
+      "hits": [
+        {
+          "select": "expo"
+        },
+        {
+          "select": "expo"
+        },
+        {
+          "select": "expo"
+        },
+        {
+          "select": "expo"
+        },
+        {
+          "select": "expo"
+        },
+        {
+          "select": "expo"
+        }
+      ]
+    },
+    "place:makkah": {
+      "pixels": 6,
+      "hits": [
+        {
+          "select": "place:makkah"
+        },
+        {
+          "select": "place:makkah"
+        },
+        {
+          "select": "place:makkah"
+        },
+        {
+          "select": "place:makkah"
+        },
+        {
+          "select": "place:makkah"
+        },
+        {
+          "select": "place:makkah"
+        }
+      ]
+    },
+    "place:abha": {
+      "pixels": 6,
+      "hits": [
+        {
+          "select": "place:abha"
+        },
+        {
+          "select": "place:abha"
+        },
+        {
+          "select": "place:abha"
+        },
+        {
+          "select": "place:abha"
+        },
+        {
+          "select": "place:abha"
+        },
+        {
+          "select": "place:abha"
+        }
+      ]
+    }
+  },
+  "transitions": {
+    "kingdom": {
+      "dist": 14.87863084123604,
+      "az": 0.1518482438044261,
+      "el": 1.0182749724492022,
+      "target": [
+        0.03001168274807595,
+        -0.0013307355391868141,
+        0.28369964536736975
+      ],
+      "selectable": true,
+      "hoverId": null,
+      "selectedId": null,
+      "detail": false
+    },
+    "west": {
+      "dist": 3.7840019233316813,
+      "az": 0.002470052255797933,
+      "el": 1.0199748131395645,
+      "target": [
+        -2.3210473233293154,
+        -0.000019429863764477322,
+        0.5947915551967808
+      ],
+      "selectable": true,
+      "hoverId": null,
+      "selectedId": null,
+      "detail": true
+    },
+    "south": {
+      "dist": 2.9108720442143303,
+      "az": 0.00003037834718224415,
+      "el": 1.019999690235221,
+      "target": [
+        -1.0656321862351397,
+        -2.3896140081875387e-7,
+        3.088943305282833
+      ],
+      "selectable": true,
+      "hoverId": null,
+      "selectedId": null,
+      "detail": true
+    },
+    "east": {
+      "dist": 2.5557603548769996,
+      "az": 4.849088843315882e-7,
+      "el": 1.0199999950554357,
+      "target": [
+        2.0297884139385842,
+        -3.814378233752721e-9,
+        -0.9740924876649207
+      ],
+      "selectable": true,
+      "hoverId": null,
+      "selectedId": null,
+      "detail": true
+    },
+    "northwest": {
+      "dist": 3.6871324758818775,
+      "az": 5.453033191799405e-9,
+      "el": 1.019999999944396,
+      "target": [
+        -3.951967224997239,
+        -4.289451438573242e-11,
+        -1.5929613695478801
+      ],
+      "selectable": true,
+      "hoverId": null,
+      "selectedId": null,
+      "detail": true
+    },
+    "riyadh": {
+      "dist": 3.355003876587774,
+      "az": 8.093644805182295e-11,
+      "el": 1.0199999999991747,
+      "target": [
+        0.6358484800633715,
+        -6.366602793670869e-13,
+        -0.33396809543616984
+      ],
+      "selectable": true,
+      "hoverId": null,
+      "selectedId": null,
+      "detail": true
+    }
+  },
+  "storageUnchanged": true,
+  "projectStatesUnchanged": true,
+  "overview": {
+    "version": 19,
+    "clusters": 11,
+    "groveTrees": 143,
+    "duneGroups": 0,
+    "boats": 8,
+    "roadSegments": 15,
+    "terrainTriangles": 25092,
+    "palette": {
+      "sand": 14926737,
+      "crest": 16047021,
+      "sandstone": 12027490,
+      "highland": 7702105,
+      "shallow": 7853519,
+      "deep": 1525349,
+      "road": 6780020,
+      "settlement": 15325624,
+      "navy": 1520716,
+      "gold": 15186788
+    },
+    "quality": "high"
+  }
+}

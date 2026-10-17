@@ -1,7 +1,7 @@
 // Browser check — every regional landmark is selectable from its region's default view, by its model and by its label.
 // A Playwright page function (no npm dependency in this project): run it with any runner that passes a `page`, e.g. the
 // Playwright MCP tool `browser_run_code_unsafe` with filename "tests/browser/regional-selection.pw.js", against the game
-// served at http://127.0.0.1:8000 (Launch_Prototype.bat). It returns {pass, fail, failures, summary}.
+// served at http://127.0.0.1:8123 (Launch_Prototype.bat). It returns {pass, fail, failures, summary}.
 //
 // For English and Arabic at 1440×900 and 390×844, and each of the four regional plans:
 //   • the region button opens the same default view the check uses (regionView = focusRegion without the camera flight);
@@ -12,7 +12,7 @@
 //     on top there — its own label may overlap its model, but no other label or panel may.
 // It runs in a separate browser context (fresh storage), so the player's saves are never touched.
 async (page) => {
-  const URL = 'http://127.0.0.1:8000/index.html';
+  const URL = 'http://127.0.0.1:8123/index.html';
   const TARGETS = {
     east:['eastern', 'green', 'place:qatif', 'place:dammam', 'place:dhahran', 'place:khobar', 'place:hofuf'],
     west:['madinah', 'ceer', 'lucid', 'jeddahcentral', 'masar', 'hajj', 'haramain', 'place:madinah', 'place:jeddah', 'place:makkah', 'place:taif'],

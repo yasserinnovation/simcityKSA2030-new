@@ -1,0 +1,82 @@
+{
+ "quality": "high",
+ "state": "build",
+ "lang": "none",
+ "bootMs": 6772,
+ "stats": {
+  "triangles": 611309,
+  "detailTriangles": 145640,
+  "rockTriangles": 54884,
+  "rockTrianglesReduced": 17134,
+  "duneTriangles": 128064,
+  "duneTrianglesReduced": 18011,
+  "water": 106500,
+  "lines": 1359,
+  "instances": 752,
+  "renderer": "three"
+ },
+ "views": {
+  "full": {
+   "avg": 14.7,
+   "p95": 16.9,
+   "calls": 30,
+   "tris": 723438
+  },
+  "skyline": {
+   "avg": 15.05,
+   "p95": 16.9,
+   "calls": 30,
+   "tris": 723438
+  },
+  "murabba_roshn": {
+   "avg": 14.7,
+   "p95": 16.9,
+   "calls": 30,
+   "tris": 723438
+  },
+  "airport_expo": {
+   "avg": 14.49,
+   "p95": 16.9,
+   "calls": 30,
+   "tris": 723438
+  },
+  "diriyah_qiddiya": {
+   "avg": 14.74,
+   "p95": 16.9,
+   "calls": 30,
+   "tris": 723438
+  },
+  "park_green": {
+   "avg": 15.12,
+   "p95": 16.9,
+   "calls": 30,
+   "tris": 723438
+  },
+  "metro": {
+   "avg": 14.67,
+   "p95": 16.9,
+   "calls": 30,
+   "tris": 723438
+  },
+  "sports": {
+   "avg": 14.81,
+   "p95": 16.9,
+   "calls": 30,
+   "tris": 723438
+  }
+ },
+ "picks": {
+  "newmurabba": "visible",
+  "roshn": "visible",
+  "ksip": "visible",
+  "expo": "visible",
+  "diriyah": "visible",
+  "sports": "visible",
+  "park": "visible",
+  "greenriyadh": "visible",
+  "metro": "visible",
+  "qiddiya": "visible",
+  "renewables": "visible"
+ },
+ "errors": []
+}

@@ -1228,3 +1228,36 @@ body.reduced .mh-btn:hover{transform:none}
   .kpi strong{font-size:17px}
   .kpi{padding:4px 8px}
 }
+:root{--clay-teal:#54c9c2;--clay-peach:#f3b28c}
+/* V17: playful miniature-country chrome; layout and RTL sizing stay inherited. */
+.topbar,.bottombar,.ctop{background:linear-gradient(120deg,#173e55,#216373)!important;border-color:rgba(151,234,218,.32)!important;box-shadow:0 8px 24px rgba(21,59,70,.2)}
+.panel{background:rgba(255,249,236,.97);border-color:rgba(74,157,158,.25);box-shadow:0 12px 32px rgba(32,86,91,.20)}
+.panel-head{background:linear-gradient(125deg,rgba(174,229,217,.32),rgba(255,211,177,.24))}
+.project-item{border-radius:15px;transition:transform .18s ease,box-shadow .18s ease}
+.project-item:hover{transform:translateY(-2px);box-shadow:0 5px 12px rgba(28,94,100,.12)}
+.project-item.active{background:linear-gradient(125deg,#fff0d0,#d8f2e9)!important;border-color:#58b9b3!important}
+.kpi{background:linear-gradient(135deg,rgba(130,214,207,.15),rgba(30,74,103,.55))!important;border-radius:14px}
+button{transition:background .18s ease,box-shadow .18s ease,transform .18s ease}
+button:focus-visible{outline:3px solid #6fd7cd;outline-offset:3px}
+@media(prefers-reduced-motion:reduce){.project-item,button{transition:none}.project-item:hover{transform:none}}
+
+/* V19 country composition. Close city scenes retain their existing styles. */
+body.country-overview{--country-navy:#17344c;--country-gold:#e7bb64;--country-cream:#f5ead2}
+body.country-overview .topbar{background:linear-gradient(135deg,#132e43,#203e54)!important;border-color:rgba(231,187,100,.22)!important}
+body.country-overview .bottombar{background:linear-gradient(135deg,#132e43,#203e54)!important;border:1px solid rgba(231,187,100,.30)!important;box-shadow:0 7px 22px rgba(14,30,45,.25);gap:12px}
+body.country-overview .bottombar .region-nav{gap:6px;flex-shrink:0}
+body.country-overview .bottombar .region-nav button{background:#203d54;border:1px solid rgba(208,219,228,.25);color:var(--country-cream);padding:8px 11px;min-height:38px;font-size:11px;box-shadow:0 3px 7px rgba(9,23,35,.18);border-radius:10px}
+body.country-overview .bottombar .region-nav button.active{background:#34444d;color:#ffe1a0;border-color:var(--country-gold);box-shadow:inset 0 0 0 1px rgba(231,187,100,.30),0 0 9px rgba(231,187,100,.17)}
+body.country-overview .bottombar .region-nav button:hover{background:#2d4c63;border-color:#dfbd79;transform:translateY(-1px)}
+body.country-overview .bottombar .region-nav button:active{transform:translateY(1px)}
+body.country-overview button:focus-visible{outline:2px solid var(--country-gold);outline-offset:3px}
+body.country-overview .map-label.city,body.country-overview .map-label.region-name{background:rgba(23,52,76,.95);color:#f8efd9;border:1px solid rgba(231,187,100,.52);border-radius:7px;font-size:11px;font-weight:650;padding:4px 9px;box-shadow:0 3px 8px rgba(16,35,48,.20)}
+body.country-overview .map-label.city::after{border-top-color:#17344c}
+body.country-overview .map-label.region-name:hover,body.country-overview .map-label.city:hover{background:#284a60;border-color:#efd295;color:#fff3d6}
+body.country-overview .map-label.country{color:#c7c7be;opacity:.65!important;font-size:10px;letter-spacing:.13em;text-shadow:0 1px 3px rgba(25,35,45,.5)}
+body.country-overview .map-label.sea{color:#bbdde4;text-shadow:0 1px 4px rgba(13,48,71,.5);font-style:italic;font-size:16px}
+body.country-overview .map-label.hot{outline:2px solid #e7bb64;outline-offset:2px}
+@media(max-width:1100px){body.country-overview .bottombar .region-nav button{padding:7px 8px;gap:4px}body.country-overview .bottombar .region-nav button span{display:inline;font-size:10px}}
+@media(max-width:700px){body.country-overview .bottombar{padding:7px;gap:6px}body.country-overview .bottombar .region-nav{width:100%;overflow-x:auto;max-width:100%;gap:4px;scrollbar-width:thin}body.country-overview .bottombar .region-nav button{flex:0 0 auto;padding:7px 8px;min-height:38px}body.country-overview .bottombar .region-nav button svg{width:18px;height:18px}body.country-overview .map-label.city,body.country-overview .map-label.region-name{font-size:10px;padding:3px 6px}}
+@media(prefers-reduced-motion:reduce){body.country-overview .bottombar .region-nav button{transition:none}body.country-overview .bottombar .region-nav button:hover{transform:none}}
+@media(max-width:700px){body.country-overview .bottombar .region-nav{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));overflow:visible}body.country-overview .bottombar .region-nav button{min-width:0;flex-direction:column;justify-content:center;gap:2px;padding:5px 2px}body.country-overview .bottombar .region-nav button span{font-size:9px;display:block}body.country-overview .bottombar .region-nav button svg{width:17px;height:17px}}

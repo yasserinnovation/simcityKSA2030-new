@@ -1,0 +1,180 @@
+{
+  "errors": [],
+  "picking": {
+    "neom": {
+      "pixels": 6,
+      "hits": [
+        {
+          "select": "neom"
+        },
+        {
+          "select": "neom"
+        },
+        {
+          "select": "neom"
+        },
+        {
+          "select": "neom"
+        },
+        {
+          "select": "neom"
+        },
+        {
+          "select": "neom"
+        }
+      ]
+    },
+    "oxagon": {
+      "pixels": 6,
+      "hits": [
+        {
+          "select": "oxagon"
+        },
+        {
+          "select": "oxagon"
+        },
+        {
+          "select": "oxagon"
+        },
+        {
+          "select": "oxagon"
+        },
+        {
+          "select": "oxagon"
+        },
+        {
+          "select": "oxagon"
+        }
+      ]
+    },
+    "trojena": {
+      "pixels": 6,
+      "hits": [
+        {
+          "select": "trojena"
+        },
+        {
+          "select": "trojena"
+        },
+        {
+          "select": "trojena"
+        },
+        {
+          "select": "trojena"
+        },
+        {
+          "select": "trojena"
+        },
+        {
+          "select": "trojena"
+        }
+      ]
+    },
+    "hydrogen": {
+      "pixels": 6,
+      "hits": [
+        {
+          "select": "hydrogen"
+        },
+        {
+          "select": "hydrogen"
+        },
+        {
+          "select": "hydrogen"
+        },
+        {
+          "select": "hydrogen"
+        },
+        {
+          "select": "hydrogen"
+        },
+        {
+          "select": "hydrogen"
+        }
+      ]
+    },
+    "sindalah": {
+      "pixels": 6,
+      "hits": [
+        {
+          "select": "sindalah"
+        },
+        {
+          "select": "sindalah"
+        },
+        {
+          "select": "sindalah"
+        },
+        {
+          "select": "sindalah"
+        },
+        {
+          "select": "sindalah"
+        },
+        {
+          "select": "sindalah"
+        }
+      ]
+    },
+    "alula": {
+      "pixels": 6,
+      "hits": [
+        {
+          "select": "alula"
+        },
+        {
+          "select": "alula"
+        },
+        {
+          "select": "alula"
+        },
+        {
+          "select": "alula"
+        },
+        {
+          "select": "alula"
+        },
+        {
+          "select": "alula"
+        }
+      ]
+    },
+    "place:tabuk": {
+      "pixels": 6,
+      "hits": [
+        {
+          "select": "place:tabuk"
+        },
+        {
+          "select": "place:tabuk"
+        },
+        {
+          "select": "place:tabuk"
+        },
+        {
+          "select": "place:tabuk"
+        },
+        {
+          "select": "place:tabuk"
+        },
+        {
+          "select": "place:tabuk"
+        }
+      ]
+    }
+  },
+  "pickingPassed": true,
+  "storageUnchanged": true,
+  "projectStatesUnchanged": true,
+  "cosmetics": {
+    "plots": 199,
+    "westPlots": 54,
+    "southPlots": 66,
+    "eastPlots": 71,
+    "clouds": 12,
+    "highlandMist": 3,
+    "pumpjacks": 3,
+    "airships": 3,
+    "fountain": "King Fahd’s Fountain"
+  }
+}

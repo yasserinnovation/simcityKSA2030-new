@@ -1,0 +1,61 @@
+{
+ "quality": "low",
+ "state": "complete",
+ "lang": "none",
+ "bootMs": 9193,
+ "stats": {
+  "triangles": 581790,
+  "detailTriangles": 149288,
+  "rockTriangles": 54884,
+  "rockTrianglesReduced": 17134,
+  "duneTriangles": 128064,
+  "duneTrianglesReduced": 18011,
+  "landmarkTriangles": 20050,
+  "landmarkTrianglesFull": 20050,
+  "water": 106500,
+  "lines": 1351,
+  "instances": 750,
+  "renderer": "three"
+ },
+ "views": {
+  "full": {
+   "avg": 22.3,
+   "p95": 33,
+   "calls": 34,
+   "tris": 582172,
+   "q": "low",
+   "cw": 936,
+   "dist": 3.35
+  },
+  "airport_close": {
+   "avg": 20.9,
+   "p95": 29.5,
+   "calls": 34,
+   "tris": 582112,
+   "q": "low",
+   "cw": 936,
+   "dist": 0.45
+  },
+  "qiddiya_close": {
+   "avg": 21.11,
+   "p95": 29.4,
+   "calls": 34,
+   "tris": 582172,
+   "q": "low",
+   "cw": 936,
+   "dist": 0.45
+  },
+  "skyline": {
+   "avg": 21.74,
+   "p95": 33.2,
+   "calls": 34,
+   "tris": 582172,
+   "q": "low",
+   "cw": 936,
+   "dist": 1.6
+  }
+ },
+ "picks": {},
+ "simUnchanged": true,
+ "errors": []
+}

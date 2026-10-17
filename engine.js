@@ -40,6 +40,7 @@
   { const [x, z] = LY.R(.03, -.06); Object.assign(D.regions.riyadh, {x, z, az:0, el:1.02, dist:3.35, fitWidth:true}); }
   // Every regional plan is framed north-up the same way (regions.js cameras).
   for (const [k, v] of Object.entries(LY.REGION_VIEWS || {})) if (D.regions[k]) Object.assign(D.regions[k], {x:v.camera.x, z:v.camera.z, az:0, el:1.02, dist:v.camera.dist, fitWidth:true, phoneFit:v.camera.phoneFit || 1.5});
+  Object.assign(D.regions.kingdom,{el:1.02,az:.15,dist:14.4,nationalFit:true});
   const P = id => D.projects.find(p => p.id === id);
   const C = name => cityByName[name];
   const pt = w => typeof w === 'string' ? [C(w).x, C(w).z] : geo(w[0], w[1]);
@@ -76,7 +77,9 @@
     }
   };
   function mulberry32(a){return()=>{let t=a+=0x6D2B79F5;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296;};}
-  const rng = mulberry32(2030);
+  let rngNow = mulberry32(2030); const rng = () => rngNow();   // the shared scenery stream
+  // V14: run fn on a stream of its own, leaving the shared scenery stream exactly where it was.
+  const withRng = (seed, fn) => { const keep = rngNow; rngNow = mulberry32(seed); try { fn(); } finally { rngNow = keep; } };
   function pip(x, z, poly) {
     let c = false;
     for (let i=0, j=poly.length-1; i<poly.length; j=i++) {
@@ -129,15 +132,15 @@
   const WPOS = inst => inst ? '(instanceMatrix*vec4(position,1.0)).xyz' : 'position';
   // Lit, shadow-receiving mesh shader: sun + sky/ground hemisphere + soft PCF shadows + contact darkening.
   const MESH_VS = inst => `precision highp float;
-    attribute vec3 position; attribute vec3 color; attribute vec3 normal; ${inst ? INST_ATTR : ''}
+    attribute vec3 position; attribute vec3 color; attribute vec3 normal; attribute float aRoughness; ${inst ? INST_ATTR : ''}
     uniform mat4 uVP; uniform mat4 uLightVP; uniform vec3 uOffset;
-    varying vec3 vColor; varying vec3 vNormal; varying vec3 vWorld; varying vec4 vLight; varying float vW;
+    varying vec3 vColor; varying vec3 vNormal; varying vec3 vWorld; varying vec4 vLight; varying float vW; varying float vRoughness;
     void main(){ vec3 w=${WPOS(inst)}+uOffset; vWorld=w; vec4 p=uVP*vec4(w,1.0); gl_Position=p; vW=p.w;
-      vColor=${inst ? 'color+aTintK*instanceColor' : 'color'}; vNormal=${inst ? 'mat3(instanceMatrix)*normal' : 'normal'}; vLight=uLightVP*vec4(w,1.0); }`;
+      vColor=${inst ? 'color+aTintK*instanceColor' : 'color'}; vRoughness=aRoughness; vNormal=${inst ? 'mat3(instanceMatrix)*normal' : 'normal'}; vLight=uLightVP*vec4(w,1.0); }`;
   const MESH_FS = PREC + `
     uniform sampler2D uShadow; uniform vec3 uSun; uniform vec3 uEye; uniform float uStorm; uniform float uDist;
     uniform float uShadowOn; uniform float uTexel; uniform float uGlow; uniform float uGround; uniform float uTime;
-    varying vec3 vColor; varying vec3 vNormal; varying vec3 vWorld; varying vec4 vLight; varying float vW;
+    varying vec3 vColor; varying vec3 vNormal; varying vec3 vWorld; varying vec4 vLight; varying float vW; varying float vRoughness;
     ` + FOG + `
     float unpack(vec4 c){ return dot(c, vec4(1.0, 1.0/255.0, 1.0/65025.0, 1.0/16581375.0)); }
     float shadowAt(float ndl){
@@ -154,12 +157,29 @@
       float ndl=max(dot(N,uSun),0.0); float sh=mix(1.0, shadowAt(ndl), 1.0-uStorm*.6);
       vec3 hemi=mix(vec3(.80,.68,.54), vec3(.80,.88,1.0), N.y*0.5+0.5);   // V10: warm ground bounce, cool sky fill
       float ao = N.y>0.8 ? 1.0 : mix(0.66,1.0,clamp((vWorld.y-uGround)/0.06,0.0,1.0));   // contact darkening grounds buildings
-      vec3 sunCol=vec3(1.0,.91,.77);                                       // warm late-morning sun
+      vec3 sunCol=vec3(1.0,.86,.65);                                       // warm golden-hour palette
       float cl=uGlow>0.3?1.0:cloudShade(vWorld.xz,uTime);
       vec3 c=vColor*(hemi*(0.57+uGlow)*ao + sunCol*ndl*mix(0.36,1.0,sh)*0.83*cl);   // V11: warm light, softer readable shadows
-      vec3 H=normalize(uSun+V); c+=sunCol*pow(max(dot(N,H),0.0),32.0)*0.07*sh;
-      c+=vec3(1.0,.85,.6)*pow(1.0-max(dot(N,V),0.0),3.0)*0.06;           // warm rim light
-      float l=dot(c,vec3(.299,.587,.114)); c=mix(vec3(l),c,1.07);           // lively, controlled saturation
+      // Dielectric GGX response replaces the same shiny highlight on every surface.
+      // Authored palette materials define roughness; unnamed terrain/foliage defaults to matte.
+      c*=.96;
+      if(vRoughness<.70){ // matte terrain and foliage avoid expensive glossy lighting work
+      vec3 H=normalize(uSun+V); float nv=max(dot(N,V),.001), nh=max(dot(N,H),0.0), vh=max(dot(V,H),0.0);
+      float rough=clamp(vRoughness,.22,.95), a2=pow(rough,4.0);
+      float denom=nh*nh*(a2-1.0)+1.0, D=a2/(3.14159*denom*denom);
+      float k=(rough+1.0)*(rough+1.0)/8.0;
+      float geom=(nv/(nv*(1.0-k)+k))*(ndl/(ndl*(1.0-k)+k));
+      float fres=.04+.96*pow(1.0-vh,5.0);
+      c+=sunCol*min(.20,D*geom*fres/(4.0*nv*max(ndl,.001)))*ndl*sh;
+      c+=hemi*.04*pow(1.0-nv,5.0)*(1.0-rough); // restrained sky reflection, no extra render pass
+      }
+      // Warm clay terrain and pastel miniature surfaces on every quality tier.
+      if(abs(vWorld.y-uGround)<.003 && N.y>.8){c=mix(c,vec3(.96,.73,.43),.30);}
+      if(abs(vWorld.y-(uGround-.03))<.002 && N.y>.8){c=mix(c,vec3(.45,.46,.48),.58);}
+      if(vWorld.y>uGround+.003 && N.y>.6 && vColor.r>vColor.b*1.30 && vColor.g>vColor.b*1.12){float rip=sin(vWorld.x*430.0+vWorld.z*210.0+sin(vWorld.z*17.0)*3.0);c*=1.0+.035*rip*clamp(2.0-uDist*.12,0.0,1.0);}
+      float l=dot(c,vec3(.299,.587,.114)); c=mix(vec3(l),c,1.16);
+      vec3 highlight=max(c-vec3(.78),vec3(0.0));
+      c=min(c,vec3(.78))+highlight/(vec3(1.0)+highlight/.22); // soft exposure shoulder preserves pale roof detail
       c=mix(c, c*vec3(.26,.32,.58)+vec3(.012,.018,.05)+vColor*uGlow*.6, uNight);   // dusk to night
       gl_FragColor=vec4(applyAtmos(c,vW),1.0);
     }`;
@@ -182,12 +202,20 @@
       float w1=sin(vWorld.x*11.0+t*1.2)*sin(vWorld.z*9.0-t*0.9);
       float w2=(sin((vWorld.x-vWorld.z)*29.0+t*2.1)*0.5+sin((vWorld.x+vWorld.z*1.3)*41.0-t*2.6)*0.35)*fade;
       vec3 N=normalize(vec3((w1+w2)*0.07,1.0,(w1-w2)*0.06));
-      vec3 reef=vec3(.58,.89,.86), shallow=vec3(.29,.75,.77), mid=vec3(.15,.56,.69), deep=vec3(.09,.42,.60);   // V10: shallow #49BFC3 to deep #176C99
+      vec3 reef=vec3(.51,.88,.79), shallow=vec3(.12,.72,.73), mid=vec3(.035,.39,.56), deep=vec3(.015,.16,.30);
       vec3 c=mix(reef,shallow,smoothstep(0.0,0.12,s)); c=mix(c,mid,smoothstep(0.08,0.34,s)); c=mix(c,deep,smoothstep(0.30,0.95,s));   // V11: smooth shallows
       c*=0.96+0.06*w1*fade;
+      float coral=sin(vWorld.x*87.0+sin(vWorld.z*43.0)*2.8)*sin(vWorld.z*91.0+sin(vWorld.x*37.0)*2.4);
+      float patch=smoothstep(.1,.65,coral)*(1.0-smoothstep(.05,.22,s))*smoothstep(.015,.04,s);
+      c=mix(c,vec3(.40,.64,.43),patch*.36);
       float band=0.012+0.008*sin(t*1.6+vWorld.x*14.0+vWorld.z*9.0);
       float foam=smoothstep(0.014,0.0,abs(s-band))*0.6+smoothstep(0.02,0.0,s)*0.5;
-      c=mix(c,vec3(.97,.98,.96),clamp(foam,0.0,1.0)*0.38);   // V11: quieter shoreline
+      float national=smoothstep(6.0,7.0,uDist);
+      float exposure=.25+.75*smoothstep(-.2,.5,sin(vWorld.z*2.7+vWorld.x*1.5));
+      c=mix(c,vec3(.97,.98,.96),clamp(foam,0.0,1.0)*mix(.58,.20*exposure,national));
+      vec3 calmReef=vec3(.44,.79,.76),calmShallow=vec3(.16,.59,.64),calmDeep=vec3(.075,.28,.40);
+      vec3 calm=mix(calmReef,calmShallow,smoothstep(0.0,.16,s));calm=mix(calm,calmDeep,smoothstep(.12,.85,s));
+      c=mix(c,calm*(.98+.02*w1*fade),national*.82);
       vec3 V=normalize(uEye-vWorld); vec3 H=normalize(uSun+V);
       float spec=pow(max(dot(N,H),0.0),90.0)*fade; c+=vec3(1.0,.95,.82)*spec*0.5*(1.0-uStorm);
       c*=mix(0.88,1.0,(cloudShade(vWorld.xz,t)-0.70)/0.30);
@@ -211,7 +239,31 @@
   // inst: repeated props (trees, palms, ghaf, houses, turbines, vehicles) recorded as instances → InstancedMesh.
   const Geo = (inst) => ({p:[], c:[], n:[], inst:inst ? {} : null});
   const mesh = Geo(1), detailMesh = Geo(1), cloudGeo = Geo(), lines = {p:[], c:[]};
+  // V12: decorative mountains live in their own layers: full detail (High, Medium) and a light version (Reduced).
+  const rockHi = Geo(), rockLo = Geo();
+  // V13: decorative sand dunes (dunes.js), same two levels of detail; sceneryKeep = [x, z, r] spots dunes keep clear of.
+  const duneHi = Geo(), duneLo = Geo(), sceneryKeep = [];
+  // V14: Riyadh's new-build architecture, recorded per project and drawn by stage (see buildSigMesh).
+  const SIG = {}, sigMesh = Geo(1), sigIds = [];
+  // V15 parts: full (architecture, staged), fin (operational extras: aircraft, flags, ride cars), prep (hoarding and site
+  // cabins while the site is prepared and built), props (close-view life: ground services, kiosks, benches; High and
+  // Medium) and tiny (people, edge lights; High only). props/tiny are drawn in their own layers, near the camera only.
+  const propMesh = Geo(1), propIds = [], tinyMesh = Geo(1), tinyIds = [], litMesh = Geo(1), litIds = [];   // lit: facade light lines (glow at night)
+  function sig(id, fn, part = 'full'){ const s = SIG[id] = SIG[id] || {full:Geo(1), fin:Geo(1)}, prev = target; target = s[part] = s[part] || Geo(1); fn(); target = prev; }
+  // Formation mix per landscape (rocks.js kinds with weights), sandstone layering, greenery and snow.
+  const ROCK_STYLE = {
+    neom:   {kinds:[['ridge', .72], ['outcrop', .14], ['mesa', .14]], strata:.45, aspect:[1.5, 2.1]},   // NEOM / Tabuk: rugged sandstone ridges
+    alula:  {kinds:[['mesa', .42], ['butte', .22], ['ridge', .36]], strata:1, aspect:[1.2, 1.8]},       // AlUla corridor: terracotta cliffs, mesas
+    hejaz:  {kinds:[['ridge', .88], ['mesa', .12]], strata:.3, aspect:[1.5, 2.2]},                      // Makkah-Taif: irregular rocky ridges
+    aseer:  {kinds:[['ridge', 1]], strata:.15, veg:1, aspect:[1.4, 2], wk:1.35, hk:.85},                                 // Aseer: darker groups, green lower slopes
+    rock:   {kinds:[['ridge', .8], ['outcrop', .2]], strata:.35, aspect:[1.4, 2]},
+    desert: {kinds:[['outcrop', .5], ['mesa', .3], ['butte', .2]], strata:.7, aspect:[1.1, 1.5], hk:.8}, // interior: small, low outcrops
+    peak:   {kinds:[['peak', 1]], strata:.2, snow:1, aspect:[1.1, 1.3], wk:1.3, hk:.85},                                // Trojena: snow-tipped peaks
+    far:    {kinds:[['ridge', 1]], strata:.2, aspect:[1.6, 2.3], lod:'lo'}                                        // neighbouring countries
+  };
   const DETAIL_DIST = 7.2;   // decorative detail appears as the camera approaches a region; the Kingdom overview stays clean
+  const PROPS_DIST = 3.2;    // V15: small props round the Riyadh landmarks appear from the project focus view (2.3) inward
+  const MIN_DIST = .25;      // V15: closest zoom (was 1.6), so the Riyadh sites can be inspected up close
   let target = mesh, lineTarget = lines;
   const norm3 = v => { const l=Math.hypot(v[0],v[1],v[2])||1; return [v[0]/l,v[1]/l,v[2]/l]; };
   function pushV(v,col,n){ target.p.push(v[0],v[1],v[2]); target.c.push(col[0],col[1],col[2]); target.n.push(n[0],n[1],n[2]); }
@@ -303,8 +355,8 @@
   /* ------------------------------ props ------------------------------ */
   const s = .75; // global prop scale
   const TREE_GREENS=[[.36,.74,.24],[.30,.66,.22],[.48,.80,.26],[.26,.60,.28]];
-  // Instances: [x, y, z, yaw, scale, r, g, b] per prototype key, in the current target layer.
-  function inst(key, x, y, z, rot, k, col){ (target.inst[key] = target.inst[key] || []).push(x, y, z, rot, k, col ? col[0] : 0, col ? col[1] : 0, col ? col[2] : 0); }
+  // Instances: [x, y, z, yaw, scale, r, g, b, pitch] per prototype key, in the current target layer.
+  function inst(key, x, y, z, rot, k, col, pitch=0){ (target.inst[key] = target.inst[key] || []).push(x, y, z, rot, k, col ? col[0] : 0, col ? col[1] : 0, col ? col[2] : 0, pitch); }
   function addTree(x,z,k=1,col){ // chunky round "toy" tree
     const q=k*s, c=col||TREE_GREENS[Math.floor(rng()*TREE_GREENS.length)];
     if (target.inst) return inst('tree', x, G, z, 0, q, c);
@@ -371,10 +423,42 @@
     addBox(x,G+H,z,.012*k,.02*k,.012*k,[.30,.52,.72]);
     addLine([x+.09*k,G+H,z],[x+.09*k,G+H*.45,z],[.3,.3,.3]);
   }
+  /* --------------------------- V14 architecture kit --------------------------- */
+  // Rings of points (equal counts, counter-clockwise from above) lofted into flat-shaded side faces; colOf(ring, seg).
+  function loft(rings, colOf){ for (let r=0;r<rings.length-1;r++){ const A=rings[r], B=rings[r+1], n=A.length; for (let i=0;i<n;i++){ const j=(i+1)%n; addQuad(A[i],A[j],B[j],B[i],colOf(r,i)); } } }
+  function capFan(ring, col){ const n=ring.length, c=ring.reduce((a,p)=>[a[0]+p[0]/n,a[1]+p[1]/n,a[2]+p[2]/n],[0,0,0]); for (let i=0;i<n;i++) addTri(c,ring[(i+1)%n],ring[i],col); }
+  const ellRing = (x,y,z,a,b,n,rot=0) => Array.from({length:n}, (_, i) => { const t=i/n*6.283, u=Math.cos(t)*a, v=Math.sin(t)*b; return [x+u*Math.cos(rot)-v*Math.sin(rot), y, z+u*Math.sin(rot)+v*Math.cos(rot)]; });
+  // A slanted square rod between two 3D points (structural members, fins, masts).
+  function addRod(a,b,t,col){ const d=[b[0]-a[0],b[1]-a[1],b[2]-a[2]], L=Math.hypot(...d)||1, u=d.map(v=>v/L), r=Math.abs(u[1])<.9?[0,1,0]:[1,0,0];
+    let p=norm3([u[1]*r[2]-u[2]*r[1],u[2]*r[0]-u[0]*r[2],u[0]*r[1]-u[1]*r[0]]); const q=[u[1]*p[2]-u[2]*p[1],u[2]*p[0]-u[0]*p[2],u[0]*p[1]-u[1]*p[0]];
+    const off=(P,s1,s2)=>[P[0]+(p[0]*s1+q[0]*s2)*t/2,P[1]+(p[1]*s1+q[1]*s2)*t/2,P[2]+(p[2]*s1+q[2]*s2)*t/2], sq=[[1,1],[-1,1],[-1,-1],[1,-1]];
+    for (let i=0;i<4;i++){ const [s1,s2]=sq[i], [t1,t2]=sq[(i+1)%4]; addQuad(off(a,s1,s2),off(a,t1,t2),off(b,t1,t2),off(b,s1,s2),col); } }
+  // Najdi earthen building: matte clay walls, a parapet of small triangular merlons, narrow window slots on the two
+  // camera-facing sides (south, east) and an optional stepped upper storey.
+  function najdi(x,z,w,d,h,col,o={}){
+    const rot=o.rot||0, cs=Math.cos(rot), sn=Math.sin(rot), at=(dx,dz)=>[x+dx*cs-dz*sn, z+dx*sn+dz*cs], trim=shade(col,1.07), slot=[.30,.22,.16], Y=o.y??G;
+    addBox(x,Y,z,w,h,d,col,rot);
+    if (o.upper) { const [ux,uz]=at(-w*.18,-d*.18); addBox(ux,Y+h,uz,w*.5,h*.45,d*.5,shade(col,1.03),rot); }
+    const m=o.merlon||.0026, top=Y+h;
+    for (const [ax,az,bx,bz] of [[-w/2,-d/2,w/2,-d/2],[w/2,-d/2,w/2,d/2],[w/2,d/2,-w/2,d/2],[-w/2,d/2,-w/2,-d/2]]) {
+      const L=Math.hypot(bx-ax,bz-az), n=Math.max(2,Math.floor(L/(m*1.6)));
+      for (let i=0;i<n;i++){ const t0=(i+.15)/n, t1=(i+.85)/n, tm=(i+.5)/n, P=t=>at(ax+(bx-ax)*t, az+(bz-az)*t), A=P(t0), B=P(t1), Cm=P(tm);
+        addTri([A[0],top,A[1]],[B[0],top,B[1]],[Cm[0],top+m,Cm[1]],trim); } }
+    if (!o.noDoor) { const [dx2,dz2]=at(w*.18, d/2+.0004); addBox(dx2,Y,dz2,Math.min(.0022,w*.16),Math.min(.0046,h*.42),.0008,[.42,.30,.20],rot); }   // V15: a timber door on the south face
+    if (!o.noSlots) for (const [fx,fz,len] of [[0,1,w],[1,0,d]]) { const n=Math.max(1,Math.floor(len/.0075));   // south (+z) and east (+x) faces
+      for (let i=0;i<n;i++){ const t=(i+.5)/n-.5, [sx,sz]=fz ? at(t*len, d/2+.0004) : at(w/2+.0004, t*len); addBox(sx,Y+h*.45,sz,fz?.0011:.0008,h*.3,fz?.0008:.0011,slot,rot); } }
+  }
+  // A facade panel with shallow triangular relief (Najdi-inspired): a grid of cells, each folded into four triangles
+  // around a slightly recessed centre, so the pattern reads by light and shade rather than by thousands of pieces.
+  // o: origin [x,y,z], u (along the face), v (up), nrm (outward), nu × nv cells, depth, colours {base, lit, dark, band}.
+  function reliefPanel(o){ const {org,u,v,nrm,nu,nv,depth,col}=o, P=(a,b,dn=0)=>[org[0]+u[0]*a+v[0]*b+nrm[0]*dn, org[1]+u[1]*a+v[1]*b+nrm[1]*dn, org[2]+u[2]*a+v[2]*b+nrm[2]*dn];
+    for (let i=0;i<nu;i++) for (let j=0;j<nv;j++){ const a0=i/nu, a1=(i+1)/nu, b0=j/nv, b1=(j+1)/nv, c=P((a0+a1)/2,(b0+b1)/2,-depth), band=(j%4===3), alt=(i+j)%2;
+      const base=band?col.band:col.base, q=[P(a0,b0),P(a1,b0),P(a1,b1),P(a0,b1)];
+      addTri(q[3],q[2],c,band?col.band:col.lit); addTri(q[0],c,q[1],shade(base,alt?.86:.92)); addTri(q[0],q[3],c,shade(base,alt?1:.95)); addTri(q[1],c,q[2],shade(base,alt?.95:1)); } }
   function addSolar(x,z,cols,rows,sp=.05){for(let i=0;i<cols;i++)for(let j=0;j<rows;j++){const px=x+(i-cols/2)*sp,pz=z+(j-rows/2)*sp*.8;addBox(px,G+.002,pz,sp*.84,.006,sp*.56,[.20,.42,.78]);addBox(px,G+.008,pz,sp*.78,.0015,sp*.5,[.42,.66,.95]);}}
   // Authored low-poly models (models.js, exported from VN2030_Assets.blend): metres, origin at the base centre,
   // x east / y up / z south. Decoded once, then stamped into the current target like any other primitive.
-  const MODELS = window.VN_MODELS || {}, modelCache = {};
+  const MODELS = window.VN_MODELS || {}, modelCache = {}, missingModels = new Set();   // V15: names asked for but not in models.js (fallbacks drawn)
   const b64buf = s => { const bin=atob(s), u=new Uint8Array(bin.length); for (let i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i); return u.buffer; };
   function modelData(name){
     if (modelCache[name]) return modelCache[name]; const m=MODELS[name]; if (!m) return null;
@@ -384,11 +468,25 @@
   // between models); `hk` = extra vertical scale (the map exaggerates height, as the hand-built landmarks do); `sx` =
   // stretch along the model's own x (linear pieces); `rot` = yaw as in addBox; `y` = base height. Returns false if missing.
   function addModel(name, x, z, size, {rot=0, hk=1, y=G, k=null, sx=1}={}){
-    const d=modelData(name); if (!d) return false; const {m,v,i,f}=d;
+    const d=modelData(name); if (!d) { missingModels.add(name); return false; } const {m,v,i,f}=d;
     const s=(k ?? size/Math.max(m.w,m.d))*m.q, cs=Math.cos(rot), sn=Math.sin(rot);
     const V=j=>{ const a=v[j*3]*s*sx, b=v[j*3+1]*s*hk, c=v[j*3+2]*s; return [x+a*cs-c*sn, y+b, z+a*sn+c*cs]; };
     for (let t=0;t<f.length;t++) addTri(V(i[t*3]),V(i[t*3+1]),V(i[t*3+2]),m.pal[f[t]]);
     return true;
+  }
+  // A decorative rock formation (rocks.js) in both levels of detail. Its own seed (position + salt), so the shared
+  // scenery random streams are untouched. o: style, rot (main axis), salt, y (base), ground (base colour), test (clear
+  // ground for the tips and for greenery), treeK.
+  function rockAt(x, z, r, h, col, o = {}){
+    const RK = window.VisionRocks; if (!RK) return;
+    const st = ROCK_STYLE[o.style || 'rock'], y = o.y ?? G, ground = o.ground || landColor(x, z);
+    const spec = RK.plan({x, z, r, h:h * (st.hk || 1), rot:o.rot ?? null, salt:o.salt || 0, kinds:st.kinds, aspect:st.aspect, wk:st.wk || 1, test:o.test || null});
+    sceneryKeep.push([x, z, Math.max(spec.len, spec.wid) + .02]);
+    const prev = target, opt = {y, col, ground, strata:st.strata, veg:st.veg || 0, snow:st.snow || 0}, tri = (a, b, c, k) => addTri(a, b, c, k);
+    target = rockHi; RK.build(spec, Object.assign({lod:st.lod || 'hi'}, opt), tri);   // distant neighbours keep the broad faces
+    target = rockLo; RK.build(spec, Object.assign({lod:'lo'}, opt), tri);
+    if (st.veg && o.test) { target = detailMesh; for (const [tx, tz] of spec.spots.slice(0, 1)) if (o.test(tx, tz)) addTree(tx, tz, o.treeK || .26, [.18, .46, .24]); }
+    target = prev;
   }
   const modelK = (name, size) => { const m=MODELS[name]; return m ? size/Math.max(m.w,m.d) : 0; };
   // Largest model width that sits inside a project's footprint and keeps its marker pad clear.
@@ -405,7 +503,7 @@
   // Keep-out zones so generic city blocks don't sit on top of landmarks.
   const keepOut = [];
   const blocked = (x,z) => keepOut.some(([kx,kz,kr]) => Math.hypot(x-kx,z-kz) < kr);
-  function grove(lon,lat,n,r,kind){const [cx,cz]=geo(lon,lat),prev=target;target=detailMesh;for(let i=0;i<n;i++){const a=rng()*6.283,d=Math.sqrt(rng())*r,x=cx+Math.cos(a)*d,z=cz+Math.sin(a)*d;if(!inSaudi(x,z)||inAnyPlan(x,z)||!LY.decorAllowed(x,z,.055,.05,true))continue;kind==='palm'?addPalm(x,z,.7+rng()*.5):addTree(x,z,.7+rng()*.5,[.22+rng()*.08,.56+rng()*.14,.26]);}target=prev;}
+  function grove(lon,lat,n,r,kind){const [cx,cz]=geo(lon,lat),prev=target;sceneryKeep.push([cx,cz,r+.04]);target=detailMesh;for(let i=0;i<n;i++){const a=rng()*6.283,d=Math.sqrt(rng())*r,x=cx+Math.cos(a)*d,z=cz+Math.sin(a)*d;if(!inSaudi(x,z)||inAnyPlan(x,z)||!LY.decorAllowed(x,z,.055,.05,true))continue;kind==='palm'?addPalm(x,z,.7+rng()*.5):addTree(x,z,.7+rng()*.5,[.22+rng()*.08,.56+rng()*.14,.26]);}target=prev;}
   // Trees that belong to a project (parks, green belts): inside its own footprint, clear of its marker pad.
   function ownGrove(p,n,r,kind='tree'){for(let i=0,k=0;i<n*4&&k<n;i++){const a=rng()*6.283,d=Math.sqrt(rng())*r,x=p.x+Math.cos(a)*d,z=p.z+Math.sin(a)*d;if(Math.hypot(x-p.pad[0],z-p.pad[1])<.05)continue;k++;kind==='palm'?addPalm(x,z,.6+rng()*.3):addTree(x,z,.6+rng()*.4,[.22+rng()*.08,.56+rng()*.14,.26]);}}
 
@@ -445,6 +543,8 @@
     }
   }
 
+  const inPlan=(x,z)=>Math.abs(x-LY.RIYADH_CORE.x)<1.02&&Math.abs(z-LY.RIYADH_CORE.z+.05)<1.02||LY.inReserved(x,z,.08);   // the Riyadh plan and City Builder district stay free of dunes
+  const nearCity=(x,z)=>inPlan(x,z)||inAnyPlan(x,z)||D.cities.some(c=>Math.hypot(c.x-x,c.z-z)<(c.capital?.5:.3));
   function buildTerrain(){
     // Neighbouring land — warm but muted so the Kingdom reads first
     for (const n of neighbours) {
@@ -470,31 +570,38 @@
 
     // Hejaz & Sarawat mountains along the west
     const spine=[[42.95,17.2],[42.6,18.2],[41.9,19.2],[41.1,20.3],[40.5,21.2],[40.0,22.4],[39.6,23.6],[38.9,24.8],[38.1,25.9],[37.2,27.0],[36.2,28.1],[35.4,28.8]];
-    for (let i=0;i<spine.length-1;i++) for (let k=0;k<11;k++) {
+    for (let i=0;i<spine.length-1;i++) { const [sx0,sz0]=geo(...spine[i]), [sx1,sz1]=geo(...spine[i+1]), segRot=Math.atan2(sz1-sz0,sx1-sx0); for (let k=0;k<11;k++) {
       const t=rng(), lon=spine[i][0]+(spine[i+1][0]-spine[i][0])*t+(rng()-.5)*.9, lat=spine[i][1]+(spine[i+1][1]-spine[i][1])*t+(rng()-.5)*.6;
       const [x,z]=geo(lon,lat); if(!inSaudi(x,z)||inAnyPlan(x,z)) continue;   // regional plans draw their own mountains
-      const green=lat<20.2, c=green?mix([.36,.57,.31],[.52,.52,.38],rng()*.5):mix(lat>26.5?[.82,.72,.62]:[.72,.50,.38],[.66,.52,.42],rng());   // V11: regional rock tones
-      const r=.05+rng()*.06, hh=.05+rng()*.08; addBlob(x,G,z,r*1.1,hh*.55,r,c,0,.25); addCone(x+(rng()-.5)*r*.3,G+hh*.2,z,r*.62,hh*.8,shade(c,1.06),7); if(green&&rng()>.4) addTree(x+r*.6,z+r*.5,.7);
-    }
-    // Dune fields: Rub' al Khali, Nafud, Dahna
-    const inPlan=(x,z)=>Math.abs(x-LY.RIYADH_CORE.x)<1.02&&Math.abs(z-LY.RIYADH_CORE.z+.05)<1.02||LY.inReserved(x,z,.08);   // the Riyadh plan and City Builder district stay free of dunes
-    const nearCity=(x,z)=>inPlan(x,z)||inAnyPlan(x,z)||D.cities.some(c=>Math.hypot(c.x-x,c.z-z)<(c.capital?.5:.3));
-    const dune=(x,z,rot)=>{if(!inSaudi(x,z)||nearCity(x,z))return;addMound(x,z,.09+rng()*.07,.05+rng()*.02,.009+rng()*.008,rot+(rng()-.5)*.3,shade(landColor(x,z),.975+rng()*.025),8);};   // V11: low-contrast dunes
+      const green=lat<20.2, c=green?mix([.50,.42,.35],[.58,.49,.39],rng()*.5):mix(lat>26.5?[.80,.66,.52]:[.72,.50,.38],[.66,.52,.42],rng()*.6);   // V12: dark Aseer rock, sandstone north, terracotta Hejaz
+      const r=.05+rng()*.06, hh=.05+rng()*.08; rockAt(x,z,r,hh,c,{style:green?'aseer':lat>26.5?'neom':'hejaz', rot:segRot, salt:rng(), test:(px,pz)=>inSaudi(px,pz)&&!inAnyPlan(px,pz), treeK:.6}); if(green&&rng()>.4) addTree(x+r*.6,z+r*.5,.7);
+    } }
+    // An independent scenery stream adds larger national-scale ridges without moving earlier regional assets.
+    withRng(203018,()=>{for(let i=0;i<spine.length-1;i++)for(let k=0;k<12;k++){
+      const t=(k+.5)/12,lon=spine[i][0]+(spine[i+1][0]-spine[i][0])*t+(rng()-.5)*.6,lat=spine[i][1]+(spine[i+1][1]-spine[i][1])*t+(rng()-.5)*.30;
+      const [x,z]=geo(lon,lat),r=.065+rng()*.035;
+      if(!inSaudi(x,z)||inAnyPlan(x,z,r+.08)||nearCity(x,z)||!LY.decorAllowed(x,z,r,.07,true))continue;
+      sceneryKeep.push([x,z,r+.05]);rockAt(x,z,r,.11+rng()*.12,lat<20?[.49,.49,.35]:[.77,.54,.36],{style:lat<20?'aseer':'hejaz',rot:-.4,salt:i*20+k,test:(px,pz)=>inSaudi(px,pz)&&!inAnyPlan(px,pz)&&LY.decorAllowed(px,pz,.02,.035),treeK:.8});
+    }});
+    // Dune fields: Rub' al Khali, Nafud, Dahna. V13: the dunes themselves are built by buildDunes() (dunes.js) from their
+    // own seeds; these loops still draw from the shared scenery stream exactly as the old oval mounds did, so every
+    // later prop (ghaf, farms, groves, ridges, clouds) stays where it was.
+    const dune=(x,z)=>{if(!inSaudi(x,z)||nearCity(x,z))return;for(let k=0;k<5;k++)rng();};
     const dunes=(lon0,lon1,lat0,lat1,n,rot)=>{for(let i=0;i<n;i++){const [x,z]=geo(lon0+rng()*(lon1-lon0),lat0+rng()*(lat1-lat0));dune(x,z,rot);}};
     dunes(47.5,55.0,18.8,22.2,110,.45); dunes(39.8,43.2,27.6,29.3,45,.1);
     const dahna=[[44.8,28.0],[46.0,26.5],[47.2,24.7],[47.8,22.8],[48.4,21.0]];
     for(let i=0;i<30;i++){const k=Math.floor(rng()*(dahna.length-1)),t=rng(),[x,z]=geo(dahna[k][0]+(dahna[k+1][0]-dahna[k][0])*t+(rng()-.5)*.35,dahna[k][1]+(dahna[k+1][1]-dahna[k][1])*t+(rng()-.5)*.2);dune(x,z,1.1);}
     // Harrat lava patches
-    for (const [lon,lat,r] of [[39.9,25.4,.16],[40.3,25.9,.12],[40.0,22.9,.12],[39.2,26.8,.1]]){const [x,z]=geo(lon,lat);if(inAnyPlan(x,z,r))continue;addDisc(x,G+.003,z,r,[.66,.56,.48],16);}
+    for (const [lon,lat,r] of [[39.9,25.4,.16],[40.3,25.9,.12],[40.0,22.9,.12],[39.2,26.8,.1]]){const [x,z]=geo(lon,lat);if(inAnyPlan(x,z,r))continue;sceneryKeep.push([x,z,r+.02]);addDisc(x,G+.003,z,r,[.66,.56,.48],16);}
     // Centre-pivot farms (Qassim, Wadi ad-Dawasir, Tabuk, Al-Jawf)
-    for (const [lon,lat,n] of [[43.8,26.1,10],[45.2,20.4,9],[36.9,28.6,6],[39.4,29.8,6]]) for(let i=0;i<n;i++){const [x,z]=geo(lon+(rng()-.5)*.9,lat+(rng()-.5)*.6);if(inSaudi(x,z)&&!inAnyPlan(x,z))addDisc(x,G+.004,z,.022+rng()*.012,rng()>.3?[.45,.70,.32]:[.62,.72,.36],10);}
+    for (const [lon,lat,n] of [[43.8,26.1,10],[45.2,20.4,9],[36.9,28.6,6],[39.4,29.8,6]]) for(let i=0;i<n;i++){const [x,z]=geo(lon+(rng()-.5)*.9,lat+(rng()-.5)*.6);if(inSaudi(x,z)&&!inAnyPlan(x,z)){sceneryKeep.push([x,z,.05]);addDisc(x,G+.004,z,.022+rng()*.012,rng()>.3?[.45,.70,.32]:[.62,.72,.36],10);}}
     // Oases and greenery
     grove(49.55,25.42,26,.22,'palm'); grove(43.95,26.35,10,.14,'palm'); grove(39.65,24.5,10,.14,'palm'); grove(37.95,26.66,8,.1,'palm');
     grove(42.5,18.4,70,.36,'tree'); grove(42.3,19.3,30,.24,'tree'); grove(43.1,17.7,20,.2,'tree'); grove(40.45,21.2,10,.14,'tree');
     for (let i=0;i<160;i++){const [x,z]=geo(38+rng()*14,18+rng()*11);if(inSaudi(x,z)&&!blocked(x,z)&&!inPlan(x,z)&&!inAnyPlan(x,z)&&!D.cities.some(c=>Math.hypot(c.x-x,c.z-z)<.2))addGhaf(x,z,.7+rng()*.5);}
     for (const c of D.cities) if (c.name !== 'Riyadh' && !LY.cityPlan(c.name)) grove(...ungeo(c.x,c.z),10+Math.round(c.size*14),c.size*.42+.08,c.palette==='green'?'tree':'palm');
     // Neighbouring mountains (muted)
-    const ridge=(pts,n,col)=>{for(let i=0;i<n;i++){const k=Math.floor(rng()*(pts.length-1)),t=rng(),lon=pts[k][0]+(pts[k+1][0]-pts[k][0])*t+(rng()-.5)*.5,lat=pts[k][1]+(pts[k+1][1]-pts[k][1])*t+(rng()-.5)*.5,[x,z]=geo(lon,lat);if(!onAnyLand(x,z)||inSaudi(x,z))continue;{const r=.05+rng()*.05,hh=.04+rng()*.06;addBlob(x,NEI,z,r,hh*.5,r,col,0,.2);addCone(x,NEI+hh*.2,z,r*.6,hh*.7,col,6);}}};
+    const ridge=(pts,n,col)=>{for(let i=0;i<n;i++){const k=Math.floor(rng()*(pts.length-1)),t=rng(),lon=pts[k][0]+(pts[k+1][0]-pts[k][0])*t+(rng()-.5)*.5,lat=pts[k][1]+(pts[k+1][1]-pts[k][1])*t+(rng()-.5)*.5,[x,z]=geo(lon,lat);if(!onAnyLand(x,z)||inSaudi(x,z))continue;{const r=.05+rng()*.05,hh=.04+rng()*.06,[ax,az]=geo(...pts[k]),[bx,bz]=geo(...pts[k+1]);rockAt(x,z,r,hh*.9,col,{style:'far',y:NEI,ground:[.85,.78,.66],rot:Math.atan2(bz-az,bx-ax),test:(px,pz)=>onAnyLand(px,pz)&&!inSaudi(px,pz)});}}};   // V12
     ridge([[48.2,33.5],[50.5,31.0],[52.5,29.3],[55.5,28.0],[58.0,27.5]],40,[.74,.63,.50]);  // Zagros
     ridge([[56.2,26.1],[56.8,24.2],[58.3,23.3],[59.3,22.4]],16,[.72,.61,.49]);             // Hajar
     ridge([[43.6,13.4],[44.0,14.8],[44.2,16.0]],14,[.70,.62,.48]);                        // Yemen highlands
@@ -506,7 +613,11 @@
 
   function polyline(names){return names.map(pt);}
   function buildNetworks(){
-    for (const r of LY.CITY_ROADS) { const pts=r.pts; for(let i=0;i<pts.length-1;i++){ addStrip(pts[i],pts[i+1],r.w/2,G+.006,r.minor?[.56,.50,.44]:[.40,.38,.37]); addLine([pts[i][0],G+.009,pts[i][1]],[pts[i+1][0],G+.009,pts[i+1][1]],[.98,.92,.62]); } }
+    for (const r of LY.CITY_ROADS) { const pts=r.pts; for(let i=0;i<pts.length-1;i++){ addStrip(pts[i],pts[i+1],r.w/2,G+.006,r.minor?[.56,.50,.44]:[.38,.37,.37]); addLine([pts[i][0],G+.009,pts[i][1]],[pts[i+1][0],G+.009,pts[i+1][1]],[.98,.92,.62]); }
+      // V14: white edge lines inset from each kerb, broken wherever another road crosses (markings never run across a junction)
+      if (!r.minor && r.w > .012) for (let i=0;i<pts.length-1;i++){ const a=pts[i], b=pts[i+1], L=Math.hypot(b[0]-a[0],b[1]-a[1]), nx=-(b[1]-a[1])/L, nz=(b[0]-a[0])/L, st=.008;
+        for (let t=0;t<L-1e-6;t+=st){ const t1=Math.min(L,t+st), m=(t+t1)/2, mx=a[0]+(b[0]-a[0])*m/L, mz=a[1]+(b[1]-a[1])*m/L; if (LY.cityRoadDist(mx,mz,[r.id]) < .006) continue;
+          for (const e of [-1,1]) { const o=e*(r.w/2-.0016); addStrip([a[0]+(b[0]-a[0])*t/L+nx*o,a[1]+(b[1]-a[1])*t/L+nz*o],[a[0]+(b[0]-a[0])*t1/L+nx*o,a[1]+(b[1]-a[1])*t1/L+nz*o],.00035,G+.0064,[.93,.92,.88]); } } } }
     for (const pts of LY.intercity) { for(let i=0;i<pts.length-1;i++){addStrip(pts[i],pts[i+1],.016,G+.005,[.52,.46,.40]);addLine([pts[i][0],G+.007,pts[i][1]],[pts[i+1][0],G+.007,pts[i+1][1]],[.98,.86,.52]);} }
     for (const pts of LY.rails) { for(let i=0;i<pts.length-1;i++){const a=pts[i],b=pts[i+1],dx=b[0]-a[0],dz=b[1]-a[1],l=Math.hypot(dx,dz),nx=-dz/l*.02,nz=dx/l*.02;
       addLine([a[0]+nx,G+.008,a[1]+nz],[b[0]+nx,G+.008,b[1]+nz],[.46,.34,.70]);addLine([a[0]-nx,G+.008,a[1]-nz],[b[0]-nx,G+.008,b[1]-nz],[.46,.34,.70]);} }
@@ -520,28 +631,189 @@
   function polyLine(pts, y, col, off=0){ for (let i=1;i<pts.length;i++){ const a=pts[i-1], b=pts[i], L=Math.hypot(b[0]-a[0],b[1]-a[1])||1, nx=-(b[1]-a[1])/L*off, nz=(b[0]-a[0])/L*off; addLine([a[0]+nx,y,a[1]+nz],[b[0]+nx,y,b[1]+nz],col); } }
   // ★ Downtown: the split-top tower just east of King Fahd Road, Al Faisaliah to the west, and glass towers stepping down
   // to the edge on a few downtown streets. King Fahd Road runs clear through the middle; both icons keep clear air around them.
-  const KC = {dx:.045, dz:-.01, h:.42};                                   // split-top tower: position and height (label sits above it)
+  const KC = {dx:.045, dz:-.01, h:.25};   // V15: .42 → .25, in proportion with the districts (and a shorter shadow)                                   // split-top tower: position and height (label sits above it)
   function riyadhDowntown(ry, rn){
     keepOut.push([ry.x,ry.z,LY.RIYADH_CORE.r]);
     const kx=ry.x+KC.dx, kz=ry.z+KC.dz, H=KC.h;
-    addModel('RUH_KingdomCentre',kx,kz,.074,{hk:H/(.074/130*300)});                                     // split-top tower, as tall as the label expects
+    kingdomCentre(kx,kz,H);                                                                                 // V14: split-top tower, as tall as the label expects
     // King Abdullah Financial District: three coordinated towers north-west of the core, clear of King Fahd Road.
-    const FIN=[['RUH_FinTower_Faceted',-.062,-.07,.024,1.25],['RUH_FinTower_Stepped',-.036,-.088,.022,1.3],['RUH_FinTower_Slim',-.086,-.05,.016,1.5]];
-    for (const [nm,dx,dz,s,hk] of FIN) addModel(nm,ry.x+dx,ry.z+dz,s,{hk});
-    const fx=ry.x-.052, fz=ry.z+.03;                                                                        // Al Faisaliah: slim square pyramid, gold globe, spire
-    addBox(fx,G,fz,.05,.01,.05,[.80,.80,.78]); addCone(fx,G+.01,fz,.03,.29,[.58,.72,.78],4); addOcta(fx,G+.215,fz,.017,[.96,.76,.26]); addCylinder(fx,G+.29,fz,.002,.035,[.85,.85,.85],4);
+    const FIN=[['RUH_FinTower_Faceted',-.062,-.07,.024,.86],['RUH_FinTower_Stepped',-.036,-.088,.022,.9],['RUH_FinTower_Slim',-.086,-.05,.016,1.0]];   // V15: lower
+    for (const [nm,dx,dz,s,hk] of FIN) { addBox(ry.x+dx,G,ry.z+dz,s*1.5,.01,s*1.5,[.86,.84,.80]); addModel(nm,ry.x+dx,ry.z+dz,s,{hk}); }   // on stone podiums
+    const fx=ry.x-.052, fz=ry.z+.03;
+    faisaliah(fx,fz,.21);                                                                                   // V14: tapered tower, corner fins, golden sphere, spire
     // downtown streets (they explain the blocks) and towers stepping down from the centre
     lineTarget=lines; for (const o of [-.078,-.052,.052,.078]) { addStrip([ry.x+o,ry.z-.1],[ry.x+o,ry.z+.1],.003,G+.004,[.62,.60,.58]); addStrip([ry.x-.1,ry.z+o],[ry.x-.024,ry.z+o],.003,G+.004,[.62,.60,.58]); addStrip([ry.x+.024,ry.z+o],[ry.x+.1,ry.z+o],.003,G+.004,[.62,.60,.58]); }
-    const pal=[[.48,.70,.86],[.40,.62,.74],[.62,.76,.84],[.70,.74,.78],[.52,.80,.82],[.80,.76,.66]];
+    const pal=[[.50,.64,.76],[.44,.58,.70],[.60,.70,.78],[.66,.70,.74],[.54,.67,.74],[.80,.77,.70]];   // V14: balanced blue-grey glass, one stone
+    pal.push([.84,.80,.72],[.76,.72,.66],[.88,.86,.80]);                                                  // V15: warm stone and pale mid-rises break up the glass
     for (let gx=-5; gx<=5; gx++) for (let gz=-5; gz<=5; gz++) { const x=ry.x+gx*.021+(rn()-.5)*.004, z=ry.z+gz*.021+(rn()-.5)*.004, d=Math.hypot(x-ry.x,z-ry.z);
       if (d > .11 || Math.abs(x-ry.x) < .024) continue;                                   // King Fahd Road runs clear through downtown
       if (Math.abs(x-kx) < .045 && Math.abs(z-kz) < .04) continue;                          // clear air around the split-top
       if (Math.abs(x-fx) < .032 && Math.abs(z-fz) < .032) continue;                         // and around Al Faisaliah
       if (FIN.some(([,dx,dz]) => Math.hypot(x-ry.x-dx, z-ry.z-dz) < .022)) continue;            // and around the financial towers
       if ([-.078,-.052,.052,.078].some(o => Math.abs(x-ry.x-o) < .006 || Math.abs(z-ry.z-o) < .006)) continue;   // not on a street
-      const k=Math.pow(1-d/.12,1.1), h=.04+.27*k*(.5+rn()*.5), w=.012+rn()*.007, col=pal[Math.floor(rn()*pal.length)];
-      if (h > .12 && rn() > .5) { addBox(x,G,z,w+.004,h*.55,w+.004,col); addTower(x,z,w*.8,h,shade(col,1.08),rn()>.5?[.88,.92,.96]:null); }   // setback tower
-      else addTower(x,z,w,h,col,rn()>.72?[.85,.9,.95]:null); }
+      const k=Math.pow(1-d/.12,1.1), h=.03+.15*k*(.5+rn()*.5), w=.012+rn()*.007, col=pal[Math.floor(rn()*pal.length)];
+      if (h > .1 && rn() > .6) { addBox(x,G,z,w+.006,.012,w+.006,[.86,.84,.80]); addBox(x,G+.012,z,w+.004,h*.5,w+.004,shade(col,.96)); glassTower(x,z,w*.8,h,shade(col,1.06),rn,rn()>.85?[.88,.92,.96]:null); }   // podium + setback tower
+      else glassTower(x,z,w,h,col,rn,rn()>.9?[.85,.9,.95]:null); }
+    if (RX) RX.downtown(ry, [kx,kz], [fx,fz], FIN.map(([,dx,dz]) => [ry.x+dx, ry.z+dz]));   // V15: plazas, planted edges, entrances
+  }
+  // V15: Riyadh's park, boulevard and green-corridor trees use riyadh.js's light tree when it is loaded (same sizes).
+  const rTree = (x,z,k,col) => RX ? RX.smallTree(x,z,k,col) : addTree(x,z,k,col);
+  // V14: a glass tower read as floors: glass bands, light spandrels, a parapet and rooftop plant (optional crown).
+  function glassTower(x,z,w,h,col,rn,crown){
+    const floors=Math.max(3,Math.round(h/.018)), fh=h/floors, spand=mix(col,[.90,.89,.86],.55);
+    for (let i=0;i<floors;i++){ const y=G+i*fh; addBox(x,y,z,w,fh*.76,w,i%5===4?shade(col,1.07):col); addBox(x,y+fh*.76,z,w*1.03,fh*.24,w*1.03,spand); }
+    addBox(x,G+h,z,w*1.05,.003,w*1.05,shade(spand,.95));
+    addBox(x+(rn()-.5)*w*.3,G+h+.003,z+(rn()-.5)*w*.3,w*.45,.006,w*.4,[.74,.74,.72]);
+    if (crown) addCone(x,G+h+.009,z,w*.22,w*1.1,crown,6);
+  }
+  // V14 ★ Kingdom Centre: an elliptical glass-and-steel shaft whose sides curve in as it rises, a parabolic opening
+  // through the top third with the skybridge across it, on a low stone podium. Glass alternates in vertical bays with
+  // light floor bands; the opening's inner faces are a darker glass.
+  function kingdomCentre(x,z,H){
+    const n=24, a0=.036, b0=.0175, yo=.64*H, glass=[.70,.76,.82], glass2=[.64,.71,.78], band=[.76,.80,.84], inner=[.46,.54,.64];
+    const A=y=>a0*(1-.30*Math.pow(y/H,1.6)), B=y=>b0*(1-.40*Math.pow(y/H,1.3)), NS=14, NH=10, m=5;
+    addBox(x,G,z+.004,.13,.012,.052,[.86,.84,.80]); addBox(x,G+.012,z+.004,.12,.002,.046,[.93,.91,.87]);   // the mall podium
+    const fac=(r,i)=> r%3===2 ? band : (i%2 ? glass : glass2), rings=[];
+    for (let k=0;k<=NS;k++){ const y=yo*k/NS; rings.push(ellRing(x,G+y,z,A(y),B(y),n)); }
+    loft(rings, fac);
+    for (const s of [-1,1]) { const hr=[];
+      for (let k=0;k<=NH;k++){ const y=yo+(H-yo)*k/NH, a=A(y), b=B(y), w=a*.80*Math.sqrt(k/NH), ring=[], zz=xx=>b*Math.sqrt(Math.max(0,1-(xx/a)**2));
+        for (let i=0;i<=m;i++){ const xx=w+(a-w)*i/m; ring.push([x+s*xx,G+y,z+zz(xx)]); }
+        for (let i=m;i>=0;i--){ const xx=w+(a-w)*i/m; ring.push([x+s*xx,G+y,z-zz(xx)]); }
+        hr.push(ring); }
+      loft(hr,(r,i)=> i===2*m+1 ? inner : fac(r+NS+1,i)); capFan(hr[NH],band); }
+    const yb=.84*H, wb=A(yb)*.80*Math.sqrt((yb-yo)/(H-yo));                                                  // the skybridge
+    addBox(x,G+yb,z,2*wb+.004,.007,B(yb)*.9,[.72,.77,.83]); addBox(x,G+yb+.007,z,2*wb+.004,.0015,B(yb)*.9,band);
+  }
+  // V14 Al Faisaliah: a slim square tower tapering to a point, four light corner fins running to the apex, the golden
+  // sphere held between them, and the spire.
+  function faisaliah(x,z,H){
+    const s0=.044, ys=.64*H, half=y=>s0/2*(1-y/H), glass=[.46,.59,.69], glass2=[.52,.65,.74], fin=[.90,.89,.86], NS=12, rings=[];
+    addBox(x,G,z,.062,.008,.062,[.86,.84,.80]);
+    for (let k=0;k<=NS;k++){ const y=ys*k/NS, h=half(y)*.94; rings.push([[x-h,G+y,z-h],[x+h,G+y,z-h],[x+h,G+y,z+h],[x-h,G+y,z+h]]); }
+    loft(rings,(r,i)=> r<2 ? [.34,.40,.48] : (r%2 ? glass : glass2)); capFan(rings[NS],[.70,.72,.74]);
+    for (const [sx,sz] of [[-1,-1],[1,-1],[1,1],[-1,1]]) addRod([x+sx*s0/2,G,z+sz*s0/2],[x+sx*.0012,G+H,z+sz*.0012],.0034,fin);
+    const ysph=.735*H; addBlob(x,G+ysph,z,.0135,.0135,.0135,[.96,.79,.38],-1,.15); addCylinder(x,G+ysph-.001,z,.0139,.002,[.42,.36,.26],14);
+    addCylinder(x,G+H-.004,z,.0022,.04,[.88,.88,.86],6,.0008);
+  }
+  // V14 the Mukaab: a warm bronze cube whose four faces carry a shallow Najdi triangular relief with darker horizontal
+  // bands, deep entrance portals at the foot of each face, a crenellated parapet and, on the roof, an eight-point star
+  // crown with radiating lines (an artistic reading of the reference, not a documented design).
+  function mukaab(x,z,S,H){
+    const col={base:[.87,.66,.44], lit:[.97,.81,.58], band:[.76,.56,.38]}, h2=S/2;
+    for (const [org,u,nrm] of [[[x-h2,G,z+h2],[S,0,0],[0,0,1]],[[x+h2,G,z+h2],[0,0,-S],[1,0,0]],[[x+h2,G,z-h2],[-S,0,0],[0,0,-1]],[[x-h2,G,z-h2],[0,0,S],[-1,0,0]]]) {
+      reliefPanel({org, u, v:[0,H,0], nrm, nu:9, nv:9, depth:.0022, col});
+      const c=[org[0]+u[0]/2+nrm[0]*.0006, z, org[2]+u[2]/2+nrm[2]*.0006]; addBox(c[0],G,c[2],nrm[0]?.0012:.018,.014,nrm[0]?.018:.0012,[.30,.22,.16]); }   // portal
+    const top=G+H, c4=[[x-h2,top,z-h2],[x+h2,top,z-h2],[x+h2,top,z+h2],[x-h2,top,z+h2]], gold=[.97,.84,.52];
+    addQuad(c4[0],c4[1],c4[2],c4[3],[.86,.70,.50]);
+    for (let e=0;e<4;e++){ const a=c4[e], b=c4[(e+1)%4], n=18; for (let i=0;i<n;i++){ const t0=(i+.15)/n, t1=(i+.85)/n, tm=(i+.5)/n, L=t=>[a[0]+(b[0]-a[0])*t,top,a[2]+(b[2]-a[2])*t];
+      const m=L(tm); addTri(L(t0),L(t1),[m[0],top+.0045,m[2]],[.90,.72,.50]); } }
+    const star=k=>Array.from({length:16},(_,i)=>{ const a=i/16*6.283+.196, r=i%2?.012:.026; return [x+Math.cos(a)*r,top+k,z+Math.sin(a)*r]; });
+    loft([star(0),star(.004)],()=>gold); capFan(star(.004),shade(gold,1.04));
+    for (let i=0;i<8;i++){ const a=i/8*6.283+.196; addBox(x+Math.cos(a)*.034,top+.0004,z+Math.sin(a)*.034,.012,.001,.0016,[.94,.80,.52],a); }
+    addCylinder(x,top+.004,z,.007,.006,[.95,.90,.78],12); addDome(x,top+.01,z,.0068,[.98,.88,.60]);
+  }
+  // V14 New Murabba square (context, always drawn): lawn, a paved court round the cube, cross walks and a perimeter
+  // walk, four reflecting pools in the garden quarters, and palms lining the cross walks.
+  function murabbaPlaza(mu){
+    const x=mu.x, z=mu.z-.006, pave=[.91,.87,.76], walk=[.95,.91,.80];
+    addBox(x,G+.002,z+.006,.15,.004,.15,[.58,.76,.44]); addBox(x,G+.003,z,.104,.004,.104,pave);
+    for (const [ax,az,bx,bz] of [[0,-.075,0,.075],[-.075,0,.075,0],[-.068,-.068,.068,-.068],[.068,-.068,.068,.068],[.068,.068,-.068,.068],[-.068,.068,-.068,-.068]]) addStrip([x+ax,z+az],[x+bx,z+bz],.0028,G+.0062,walk);
+    for (const [sx,sz] of [[-1,-1],[1,-1],[-1,1],[1,1]]) { const px=x+sx*.062, pz=z+sz*.062; addBox(px,G+.006,pz,.017,.001,.017,[.82,.86,.86]); addBox(px,G+.0066,pz,.0135,.0006,.0135,[.30,.60,.80]); }
+    const prev=target; target=detailMesh;
+    const palm=(px,pz)=>{ if (Math.hypot(px-mu.pad[0],pz-mu.pad[1]) > .04) addPalm(px,pz,.17); };   // V15: in scale with the square   // the marker pad stays clear
+    for (const t of [-1,1]) for (const o of [.058,.07]) { palm(x+.007,z+t*o); palm(x-.007,z+t*o); palm(x+t*o,z+.007); palm(x+t*o,z-.007); }
+    target=prev;
+  }
+  // V14 Diriyah. The At-Turaif heritage core (context, always drawn): a low plateau above the wadi carrying courtyard
+  // compounds of matte clay with stepped rooflines, parapet merlons and slot windows, Salwa Palace at its heart and a
+  // few tapering watchtowers. diriyahGate: the new low Najdi-style cultural buildings round its west and north edge
+  // (signature, staged with the project).
+  function diriyahCore(dr, rn){
+    const cx=dr.x+.012, cz=dr.z-.012, Y=G+.006, clay=[[.80,.62,.44],[.76,.57,.40],[.84,.67,.49],[.78,.60,.42]];
+    addBox(cx,G,cz,.118,.006,.094,[.78,.63,.47]); addBox(cx,G+.006,cz,.112,.0006,.088,[.84,.71,.55]);   // plateau, its rim facing the wadi
+    for (let i=-3;i<=3;i++) for (let j=-2;j<=2;j++) { const x=cx+i*.0155+(rn()-.5)*.003, z=cz+j*.0165+(rn()-.5)*.003, k=rn();
+      if (Math.pow((x-cx)/.054,2)+Math.pow((z-cz)/.042,2) > 1 || (Math.abs(i)<=1 && Math.abs(j)<=0)) continue;   // the palace keeps the centre
+      if (k < .22) continue;                                                                                      // courtyards and lanes stay open
+      najdi(x,z,.011+rn()*.003,.010+rn()*.004,.007+rn()*.009,clay[Math.floor(rn()*4)],{y:Y,upper:rn()<.3,merlon:.0017}); }
+    najdi(cx,cz,.036,.022,.016,[.82,.64,.45],{y:Y,upper:true,merlon:.0022});                                     // Salwa Palace
+    for (const [dx,dz,h] of [[-.048,-.028,.03],[.046,-.03,.026],[-.044,.03,.024],[.05,.024,.028],[.014,-.01,.036]]) {
+      addCylinder(cx+dx,Y,cz+dz,.0042,h,[.80,.62,.44],4,.0028); for (let k=0;k<4;k++) addBox(cx+dx+(k%2?.0022:-.0022),Y+h,cz+dz+(k<2?.0022:-.0022),.0012,.002,.0012,[.86,.70,.52]); }
+  }
+  // V14 ROSHN: a walkable neighbourhood of low, light homes. Context: the site ground, a street grid and a central green
+  // spine. Signature: perimeter blocks of terraced homes (cream and white, varied parapets and roof terraces) round
+  // planted courtyards, and a community centre on the central green. Seeded, so the layout never changes between loads.
+  function roshn(rs){
+    const rn=mulberry32(4207), cx=rs.x, cz=rs.z-.012, sp=.034, blocks=[], R0=rs.foot-.006;
+    addDisc(rs.x,G+.0025,rs.z,R0,[.86,.82,.70],36);
+    for (let i=-2;i<=2;i++) for (let j=-2;j<=2;j++) { const x=cx+i*sp, z=cz+j*sp;
+      if (Math.hypot(x-rs.x,z-rs.z)+.021 > R0 || Math.hypot(x-rs.pad[0],z-rs.pad[1]) < .04) continue; blocks.push([x,z,i,j]); }
+    for (const t of [-2.5,-1.5,-.5,.5,1.5,2.5]) for (const vert of [0,1]) {                                     // streets between the blocks
+      const pts=[]; for (let k=-2.5;k<=2.5;k+=.25) { const x=cx+(vert?t:k)*sp, z=cz+(vert?k:t)*sp; if (Math.hypot(x-rs.x,z-rs.z) < R0-.004) pts.push([x,z]); }
+      for (let k=1;k<pts.length;k++) addStrip(pts[k-1],pts[k],.0022,G+.0034,[.74,.71,.66]); }
+    for (const [x,z,i,j] of blocks) if (i===0 && j===0) { addBox(x,G+.0035,z,.028,.001,.028,[.52,.74,.42]); }   // the central green
+    const cream=[[.97,.95,.90],[.94,.91,.85],[.92,.89,.84],[.96,.93,.86]], accent=[[.80,.62,.46],[.62,.70,.74],[.86,.78,.62]];
+    sig('roshn', () => {
+      for (const [x,z,i,j] of blocks) {
+        if (i===0 && j===0) { addBox(x,G,z-.004,.014,.008,.01,[.95,.93,.88]); addDome(x,G+.008,z-.004,.004,[.86,.80,.66]);   // community centre
+          for (const [dx,dz] of [[-.009,.009],[.009,.009],[-.01,-.011],[.01,-.011]]) addTree(x+dx,z+dz,.2,[.24,.56,.28]); continue; }
+        addBox(x,G+.0036,z,.012,.0008,.012,[.52,.73,.42]);                                                         // planted courtyard
+        addTree(x+(rn()-.5)*.004,z+(rn()-.5)*.004,.17+rn()*.05,[.22+rn()*.06,.54+rn()*.1,.26]);
+        for (let s=0;s<4;s++) { const n=3, a=s*Math.PI/2, cs=Math.cos(a), sn=Math.sin(a);                         // one terrace of homes per side
+          for (let k=0;k<n;k++) { const u=(k-(n-1)/2)*.0085, v=.0095, hx=x+u*cs-v*sn, hz=z+u*sn+v*cs, h=.0055+rn()*.0035, c=cream[Math.floor(rn()*4)];
+            addBox(hx,G,hz,.0078,h,.0062,c,a); addBox(hx,G+h,hz,.0078,.0011,.0062,shade(c,.93),a);
+            if (rn()<.35) { addBox(hx-.0015*cs,G+h,hz-.0015*sn,.0034,.0028,.0034,shade(c,1.02),a); }                // roof terrace room
+            else if (rn()<.3) addBox(hx,G+h+.0011,hz,.004,.0006,.003,accent[Math.floor(rn()*3)],a); } } } });   // shade sail / solar
+  }
+  // V14 Sports Boulevard. Context: one continuous planted verge with a pale pedestrian promenade on its north side and
+  // a red cycle path with a dashed centre line on its south side, laid just under the road surface so every crossing
+  // stays a clean road. Signature: clustered trees, palms and shrubs with open gaps, the cycle bridge over King Fahd
+  // Road, exercise pavilions and courts.
+  function sportsBoulevard(sp, ry){
+    const pts=sp.ribbon.pts, off=(o)=>pts.map((q,i)=>{ const a=pts[Math.max(0,i-1)], b=pts[Math.min(pts.length-1,i+1)], L=Math.hypot(b[0]-a[0],b[1]-a[1])||1; return [q[0]-(b[1]-a[1])/L*o, q[1]+(b[0]-a[0])/L*o]; });
+    polyStrip(pts,.027,G+.0048,[.48,.74,.38]);
+    polyStrip(off(.0095),.0034,G+.0055,[.94,.89,.78]);                                                            // promenade (north)
+    polyStrip(off(-.0095),.0029,G+.0055,[.80,.50,.42]);                                                           // cycle path (south)
+    for (let i=1;i<pts.length;i++){ const a=off(-.0095)[i-1], b=off(-.0095)[i], L=Math.hypot(b[0]-a[0],b[1]-a[1]);
+      for (let t=.006;t<L;t+=.016){ const x=a[0]+(b[0]-a[0])*t/L, z=a[1]+(b[1]-a[1])*t/L; if (LY.cityRoadDist(x,z) > .012) addBox(x,G+.0058,z,.006,.0003,.0007,[.98,.96,.92],Math.atan2(b[1]-a[1],b[0]-a[0])); } }
+    const rn=mulberry32(4212), clear=(x,z)=>LY.cityRoadDist(x,z) > .03 && Math.hypot(x-sp.pad[0],z-sp.pad[1]) > .045 && Math.abs(x-ry.x) > .05;
+    sig('sports', () => {
+      for (let i=1;i<pts.length;i++){ const a=pts[i-1], b=pts[i], L=Math.hypot(b[0]-a[0],b[1]-a[1]);
+        for (let t=.012;t<L;t+=.03+rn()*.03){ if (rn()<.22) continue;                                              // open gaps between clusters
+          const n=2+Math.floor(rn()*3);
+          for (let k=0;k<n;k++){ const tt=t+(rn()-.5)*.016, o=(rn()-.5)*.012, x=a[0]+(b[0]-a[0])*tt/L, z=a[1]+(b[1]-a[1])*tt/L+o; if (!clear(x,z)) continue;
+            const r=rn(); if (r<.55) rTree(x,z,.13+rn()*.06,[.22+rn()*.08,.54+rn()*.14,.25]); else if (r<.8) addPalm(x,z,.17+rn()*.04); else addBox(x,G+.0048,z,.006,.003,.004,[.40,.62,.30]); } } }   // V15: smaller
+      addModel('RUH_Sports_CycleBridge',ry.x,pts[2][1],.06,{hk:1.6});                                             // cycle bridge over King Fahd Road
+      addModel('RUH_Sports_ExercisePavilion',ry.x-.32,pts[0][1],.016,{hk:1.8});
+      addModel('RUH_Sports_Court',ry.x+.12,pts[0][1],.022,{hk:1.8});
+      addModel('RUH_Sports_Court',ry.x-.2,pts[0][1],.02,{hk:1.8});
+      addModel('RUH_Sports_ExercisePavilion',ry.x+.32,pts[0][1],.016,{hk:1.8,rot:Math.PI}); });
+  }
+  // V14 airport terminal: glass hall, light mullions on both facades, one barrel vault per module (small gaps between
+  // modules, so the roof reads as a modular series), and slim raking supports under the overhangs.
+  function airTerminal(x,z,len,dep){
+    const glass=[.56,.68,.78], roof=[.96,.96,.94], frame=[.86,.86,.84], h=.009, n=7, mod=len/n, ov=.004, rise=.007;
+    addBox(x,G,z,len,h,dep,glass); addBox(x,G,z,len*1.01,.0018,dep*1.02,[.84,.83,.80]);
+    for (let i=0;i<=n*2;i++) for (const e of [-1,1]) addBox(x-len/2+i*mod/2,G,z+e*(dep/2+.0006),.0009,h,.0009,frame);
+    for (let i=0;i<n;i++){ const cx=x-len/2+(i+.5)*mod, arc=k=>{ const a=Math.PI*k/8; return [-(dep/2+ov)*Math.cos(a), h+.0006+Math.sin(a)*rise]; };
+      for (let k=0;k<8;k++){ const [z0,y0]=arc(k), [z1,y1]=arc(k+1), c=shade(roof,.9+.1*Math.sin(Math.PI*(k+.5)/8));
+        addQuad([cx-mod/2+.0006,G+y0,z+z0],[cx+mod/2-.0006,G+y0,z+z0],[cx+mod/2-.0006,G+y1,z+z1],[cx-mod/2+.0006,G+y1,z+z1],c); }
+      for (const e of [-1,1]) addRod([cx,G,z+e*(dep/2+.0015)],[cx,G+h+.0006,z+e*(dep/2+ov*.9)],.0011,frame); }
+  }
+  // V14 Metro stop on the elevated line, aligned with the track (rot): platform deck, a white vaulted canopy with blue
+  // fascias, and a stair core down to the street.
+  function metroStop(x,z,deck,rot){
+    const cs=Math.cos(rot), sn=Math.sin(rot), W=(u,y,v)=>[x+u*cs-v*sn, y, z+u*sn+v*cs];
+    { const [sx,,sz]=W(0,0,.008); addBox(sx,G,sz,.006,deck-G,.005,[.92,.92,.90],rot); }
+    addBox(x,deck-.001,z,.03,.0016,.02,[.90,.90,.88],rot);
+    for (let k=0;k<6;k++){ const a0=Math.PI*k/6, a1=Math.PI*(k+1)/6, P=(a,e)=>W(e*.016,deck+.0055+Math.sin(a)*.005,-Math.cos(a)*.011);
+      addQuad(P(a0,-1),P(a0,1),P(a1,1),P(a1,-1),shade([.97,.97,.96],.92+.08*Math.sin((a0+a1)/2))); }
+    for (const e of [-1,1]) { const [fx,,fz]=W(0,0,e*.0108); addBox(fx,deck+.0045,fz,.032,.0012,.0006,[.20,.42,.82],rot); }
+  }
+  function diriyahGate(dr){
+    for (const [dx,dz,w,d,h,rot] of [[-.07,-.03,.026,.016,.015,1.4],[-.058,.024,.022,.018,.013,1.1],[-.018,-.072,.03,.016,.016,0],[.038,-.066,.024,.016,.014,-.35]]) {
+      const x=dr.x+dx, z=dr.z+dz; najdi(x,z,w,d,h,[.88,.76,.58],{rot,upper:true,merlon:.0022});
+      const cs=Math.cos(rot), sn=Math.sin(rot); for (let k=-2;k<=2;k++) addBox(x+k*w*.18*cs-(d/2+.0005)*sn,G,z+k*w*.18*sn+(d/2+.0005)*cs,.0035,h*.45,.001,[.36,.27,.19],rot); }   // arcade
   }
   // Expo 2030: its own paved, hedged parcel south of the airport — a large golden ring pavilion (lattice ribs, crown ring,
   // glass dome) on a central plaza, six exhibition pavilions around it, gardens between, and a footpath to the airport.
@@ -551,28 +823,49 @@
     addDisc(ex.x,G+.004,ex.z,.046,[.93,.90,.82],28);                                                                           // central plaza
     // Six distinct pavilions round the plaza, ring canopy, spire, shaded walks and planting. Pavilions sit at 30° + 60°k,
     // so the marker pad (south-east, 45°) falls in the gap between two of them.
-    addModel('RUH_Expo2030',ex.x,ex.z,2*(R0-.012),{hk:1.6});
+    for (let i=0;i<6;i++){ const a=i/6*6.283; addStrip([ex.x+Math.cos(a)*.046,ex.z+Math.sin(a)*.046],[ex.x+Math.cos(a)*(R0-.006),ex.z+Math.sin(a)*(R0-.006)],.0026,G+.0045,[.95,.91,.80]); }   // V14: radiating walks
+    // V14: the pavilions (signature, staged with the project — an unfinished Expo never looks finished), gardens of trees
+    // and palms between the pavilions, and a ring of flags round the plaza once it is open.
+    sig('expo', () => {
+      addModel('RUH_Expo2030',ex.x,ex.z,2*(R0-.012),{hk:1.6});
+      const rg=mulberry32(4230);
+      for (let i=0;i<6;i++) for (const sg of [-1,1]) { const a=i/6*6.283+sg*.2, r=.058+rg()*.006, x=ex.x+Math.cos(a)*r, z=ex.z+Math.sin(a)*r;
+        if (Math.hypot(x-ex.pad[0],z-ex.pad[1]) < .03) continue; rg()<.4 ? addPalm(x,z,.28) : rTree(x,z,.2+rg()*.06,[.22,.56+rg()*.1,.26]); } });
+    sig('expo', () => { for (let i=0;i<12;i++){ const a=i/12*6.283+.26, x=ex.x+Math.cos(a)*.049, z=ex.z+Math.sin(a)*.049;
+      addCylinder(x,G,z,.0006,.016,[.92,.92,.90],4); addBox(x+.0025,G+.0125,z,.005,.0032,.0005,[[.20,.62,.40],[.95,.62,.20],[.25,.50,.85],[.90,.30,.30]][i%4]); } }, 'fin');
     addStrip([ex.x-.012,ex.z-R0],[ks.x-.012,ks.z+ks.foot],.004,G+.006,[.90,.84,.66]);                                           // footpath to the airport
   }
   // King Salman International Airport: broad and low — two long runways with centre lines and thresholds, a parallel
   // taxiway with connectors, an apron, a long terminal with four piers and a slim tower, and the Metro's terminal stop.
   function riyadhAirport(ks){
     keepOut.push([ks.x,ks.z,ks.foot]);
-    const asphalt=[.30,.31,.33], taxi=[.44,.45,.47], apron=[.70,.71,.72], white=[.96,.96,.94];
+    const asphalt=[.30,.31,.33], taxi=[.44,.45,.47], apron=[.72,.73,.74], white=[.96,.96,.94], yel=[.95,.80,.32];
     addDisc(ks.x,G+.002,ks.z,ks.foot-.004,[.82,.76,.62],32);                                                    // airfield ground
-    for (const [dz, L] of [[-.075,.105],[-.02,.115]]) {                                                        // runways
+    for (const [dz, L] of [[-.075,.105],[-.02,.115]]) {                                                        // runways (alignment unchanged)
       addStrip([ks.x-L,ks.z+dz],[ks.x+L,ks.z+dz],.011,G+.005,asphalt);
       for (let t=-L+.02;t<L-.02;t+=.022) addBox(ks.x+t+.006,G+.0062,ks.z+dz,.011,.0008,.0015,white);          // centre-line dashes
-      for (const e of [-1,1]) for (let k=-2;k<=2;k++) addBox(ks.x+e*(L-.008),G+.0062,ks.z+dz+k*.004,.01,.0008,.002,white); }   // threshold bars
+      for (const e of [-1,1]) for (let k=-2;k<=2;k++) addBox(ks.x+e*(L-.008),G+.0062,ks.z+dz+k*.004,.01,.0008,.002,white);   // threshold bars
+      for (const e of [-1,1]) { addStrip([ks.x-L+.003,ks.z+dz+e*.0094],[ks.x+L-.003,ks.z+dz+e*.0094],.0005,G+.0056,white);   // V14: edge lines
+        for (const k of [-1,1]) addBox(ks.x+e*(L-.03),G+.0062,ks.z+dz+k*.005,.012,.0008,.0016,white); } }               // V14: touchdown-zone bars
     addStrip([ks.x-.1,ks.z+.012],[ks.x+.1,ks.z+.012],.0045,G+.0055,taxi);                                    // parallel taxiway
     for (const t of [-.085,-.03,.03,.085]) { addStrip([ks.x+t,ks.z-.075],[ks.x+t,ks.z+.012],.003,G+.0056,taxi); addStrip([ks.x+t,ks.z+.012],[ks.x+t,ks.z+.03],.003,G+.0056,taxi); }
-    // Terminal with its vaulted roof bays, concourse and apron (the model's airside faces north, toward the runways),
-    // a separate control tower and parked jets sharing one scale. The terminal stays south of the parallel taxiway.
+    addStrip([ks.x-.1,ks.z+.012],[ks.x+.1,ks.z+.012],.0005,G+.0058,yel);                                     // V14: taxiway centre lines
+    for (const t of [-.085,-.03,.03,.085]) addStrip([ks.x+t,ks.z-.069],[ks.x+t,ks.z+.012],.0005,G+.0058,yel);
+    addStrip([ks.x-.08,ks.z+.029],[ks.x+.07,ks.z+.029],.0105,G+.0052,apron);                                // V14: apron
+    const stands=[-.06,-.035,-.01,.015,.04];
+    for (const t of stands) addStrip([ks.x+t,ks.z+.021],[ks.x+t,ks.z+.039],.0005,G+.0057,yel);               // stand lead-in lines
+    addStrip([ks.x-.075,ks.z+.068],[ks.x+.06,ks.z+.068],.0035,G+.0052,[.52,.50,.48]);                       // landside forecourt road
+    // V14: the new terminal (signature, staged): a long glass hall under a modular barrel-vault roof on slim supports,
+    // jet bridges to the stands, the control tower and landside parking. Parked aircraft once it is operational.
     const kT=modelK('RUH_Airport_Terminal',.11);
-    addModel('RUH_Airport_Terminal',ks.x-.01,ks.z+.046,0,{k:kT,hk:1.8});
-    addModel('RUH_Airport_ControlTower',ks.x+.078,ks.z+.05,0,{k:kT,hk:1.8});
-    const jet=(x,z,rot)=>addModel('RUH_Aircraft_Parked',x,z,0,{k:kT*1.8,rot,hk:1.4,y:G+.0045});
-    for (const t of [-.045,-.015,.015,.045]) jet(ks.x+t,ks.z+.004,-Math.PI/2);                                   // parked on the apron, nose to the concourse
+    sig('ksip', () => {
+      airTerminal(ks.x-.01,ks.z+.052,.11,.018);
+      for (const t of stands) addBox(ks.x+t,G+.0035,ks.z+.0385,.0028,.0028,.008,[.90,.90,.88]);
+      addModel('RUH_Airport_ControlTower',ks.x+.078,ks.z+.05,0,{k:kT,hk:1.8});
+      for (const [dx,dz] of [[.03,.08],[.052,.08]]) { addBox(ks.x+dx,G+.0032,ks.z+dz,.018,.0006,.014,[.56,.56,.58]);
+        for (let i=0;i<4;i++) for (let j=0;j<2;j++) addBox(ks.x+dx-.006+i*.004,G+.0038,ks.z+dz-.003+j*.006,.0026,.0018,.0016,[[.92,.92,.92],[.30,.44,.66],[.70,.20,.18],[.86,.86,.82]][(i+j)%4]); } });
+    const jet=(x,z,rot)=>addModel('RUH_Aircraft_Parked',x,z,0,{k:kT*1.8,rot,hk:1.4,y:G+.0052});
+    sig('ksip', () => { for (const t of stands.slice(0,4)) jet(ks.x+t,ks.z+.028,-Math.PI/2); }, 'fin');   // at the stands (operational)
     jet(ks.x-.05,ks.z-.075,0);                                                                                  // one on the runway
     const me=LY.METRO_ROUTE[LY.METRO_ROUTE.length-1]; addBox(me[0],G,me[1],.02,.012,.012,[.95,.96,.98]); addBox(me[0],G+.012,me[1],.022,.003,.014,[.20,.42,.82]);   // Metro terminal stop
   }
@@ -582,20 +875,30 @@
     const R0=pk.foot-.004; keepOut.push([pk.x,pk.z,pk.foot]);
     addDisc(pk.x,G+.003,pk.z,R0,[.47,.72,.36],36); addRing(pk.x,G+.006,pk.z,R0,[.22,.46,.24],48);
     for (const [dx,dz,r,c] of [[-.03,-.03,.045,[.58,.80,.44]],[.035,-.02,.035,[.52,.76,.40]],[-.01,.04,.04,[.56,.79,.43]]]) addDisc(pk.x+dx,G+.004,pk.z+dz,r,c,24);   // lawns
-    const lake=[[.02,.015,.024],[.04,.03,.018],[.005,.035,.014]]; for (const [dx,dz,r] of lake) addDisc(pk.x+dx,G+.005,pk.z+dz,r,[.30,.62,.84],20);
-    addBox(pk.x+.022,G+.007,pk.z+.035,.006,.003,.03,[.92,.88,.78]);                                                     // footbridge over the lake
+    for (const [dx,dz,r,c] of [[.05,-.05,.022,[.62,.82,.48]],[-.06,.0,.02,[.50,.74,.40]]]) addDisc(pk.x+dx,G+.0042,pk.z+dz,r,c,20);   // V14: lawn variation
+    // V14: the lake with a soft edge — a stone rim, then shallow teal, then open water (opaque, stylized).
+    const lake=[[.02,.015,.024],[.04,.03,.018],[.005,.035,.014]];
+    for (const [dx,dz,r] of lake) addDisc(pk.x+dx,G+.0046,pk.z+dz,r+.0035,[.86,.84,.76],22);
+    for (const [dx,dz,r] of lake) addDisc(pk.x+dx,G+.005,pk.z+dz,r+.0012,[.44,.74,.78],22);
+    for (const [dx,dz,r] of lake) addDisc(pk.x+dx,G+.0054,pk.z+dz,r-.002,[.28,.58,.80],22);
+    addBox(pk.x+.022,G+.0062,pk.z+.035,.006,.003,.03,[.92,.88,.78]);                                                    // footbridge over the lake
     lineTarget=lines; const loop=[]; for (let i=0;i<=40;i++){ const a=i/40*6.283, r=.07+.012*Math.sin(a*3); loop.push([pk.x+Math.cos(a)*r,pk.z+Math.sin(a)*r*.9]); }
     polyStrip(loop,.0025,G+.006,[.93,.87,.70]);                                                                          // loop path
     polyStrip([[pk.x-.09,pk.z+.01],[pk.x-.04,pk.z+.005],[pk.x,pk.z-.01],[pk.x+.03,pk.z-.05],[pk.x+.05,pk.z-.075]],.002,G+.006,[.93,.87,.70]);   // cross path
-    addModel('RUH_Park_CulturalPavilion',pk.x-.045,pk.z+.032,.026,{hk:1.5});                                         // cultural pavilion
-    addModel('RUH_Park_GardenPavilion',pk.x+.045,pk.z-.035,.024,{hk:1.4});                                            // garden pavilion
-    addModel('RUH_Park_WaterFeature',pk.x-.035,pk.z-.035,.014,{hk:1.5});                                              // water feature
-    const clumps=[[-.055,-.05],[.0,-.075],[.06,-.055],[.075,.02],[.05,.07],[-.03,.075],[-.08,.02]];
-    for (const [cx,cz] of clumps) for (let i=0;i<5;i++){ const x=pk.x+cx+(rn()-.5)*.03, z=pk.z+cz+(rn()-.5)*.025;
-      if (Math.hypot(x-pk.x,z-pk.z) > R0-.008 || Math.hypot(x-pk.pad[0],z-pk.pad[1]) < .035) continue; addTree(x,z,.3+rn()*.22,[.18+rn()*.1,.50+rn()*.16,.24]); }
+    sig('park', () => {                                                                                                  // V14: built venues (staged)
+      addModel('RUH_Park_CulturalPavilion',pk.x-.045,pk.z+.032,.026,{hk:1.5});                                       // cultural pavilion
+      addModel('RUH_Park_GardenPavilion',pk.x+.045,pk.z-.035,.024,{hk:1.4});                                          // garden pavilion
+      addModel('RUH_Park_WaterFeature',pk.x-.035,pk.z-.035,.014,{hk:1.5}); });                                        // water feature
+    // V14: balanced clumps of varied shade trees and a few palms, sizes graded from the centre of each clump; the
+    // middle of the park stays open lawn so the skyline and the lake read across it.
+    const clumps=[[-.055,-.055,11],[.0,-.078,7],[.062,-.06,9],[.078,.018,7],[.05,.072,10],[-.035,.078,7],[-.082,.03,9]];   // V15: more, smaller trees
+    for (const [cx,cz,n] of clumps) for (let i=0;i<n;i++){ const a=rn()*6.283, d=Math.sqrt(rn())*.016, x=pk.x+cx+Math.cos(a)*d, z=pk.z+cz+Math.sin(a)*d;
+      if (Math.hypot(x-pk.x,z-pk.z) > R0-.008 || Math.hypot(x-pk.pad[0],z-pk.pad[1]) < .035) continue;
+      if (rn()<.18) addPalm(x,z,.19); else rTree(x,z,(.2-d*4)+rn()*.06,[.18+rn()*.1,.50+rn()*.16,.24]); }   // V15: smaller, in scale
     const x0=ry.x+LY.RIYADH_CORE.r+.004, x1=pk.x-pk.foot+.004;                                                         // promenade to downtown
     addStrip([x0,pk.z],[x1,pk.z],.008,G+.005,[.52,.74,.40]); addStrip([x0,pk.z],[x1,pk.z],.002,G+.006,[.93,.87,.70]);
-    for (let x=x0+.006; x<x1-.004; x+=.014) for (const sg of [-1,1]) addTree(x,pk.z+sg*.0065,.2,[.24,.56,.28]);
+    for (let x=x0+.006; x<x1-.004; x+=.01) for (const sg of [-1,1]) rTree(x,pk.z+sg*.0065,.12,[.24,.56,.28]);
+    if (RX) RX.park(pk);                                                                                         // V15: gardens, pergolas, playground, seating
   }
   // Green Riyadh: a wide, continuous ecological corridor along a meandering river — wetlands, sandy banks, native
   // flat-canopy trees and palms, trails on both banks and footbridges — running east beyond the plan. Distinct from the park.
@@ -605,58 +908,80 @@
     for (const q of pts.slice(1,-1)) { addDisc(q[0],G+.003,q[1],hw,[.62,.74,.46],18); addDisc(q[0],G+.004,q[1],hw*.72,[.52,.70,.38],16); }   // rounded bends
     const mw=[]; for (let i=1;i<pts.length;i++) for (let t=0;t<1;t+=.125){ const x=pts[i-1][0]+(pts[i][0]-pts[i-1][0])*t, z=pts[i-1][1]+(pts[i][1]-pts[i-1][1])*t; mw.push([x, z+Math.sin(x*24)*.03]); }
     mw.push(pts[pts.length-1]);
-    polyStrip(mw,.022,G+.0045,[.86,.80,.62]); polyStrip(mw,.014,G+.0055,[.26,.58,.82]);                                 // sandy banks, river
-    for (let i=3;i<mw.length;i+=7) addDisc(mw[i][0],G+.005,mw[i][1]+(i%2?.028:-.028),.016,[.44,.70,.62],14);             // wetlands
+    polyStrip(mw,.022,G+.0045,[.86,.80,.62]); polyStrip(mw,.0175,G+.005,[.46,.74,.76]); polyStrip(mw,.0125,G+.0055,[.27,.58,.81]);   // V14: sandy banks, shallows, river
+    for (const q of mw.slice(1,-1)) { addDisc(q[0],G+.0045,q[1],.022,[.86,.80,.62],12); addDisc(q[0],G+.005,q[1],.0175,[.46,.74,.76],12); addDisc(q[0],G+.0055,q[1],.0125,[.27,.58,.81],12); }   // smooth bends
+    for (let i=3;i<mw.length;i+=7) addDisc(mw[i][0],G+.0047,mw[i][1]+(i%2?.028:-.028),.016,[.44,.70,.62],14);             // wetlands
     lineTarget=lines; polyLine(pts,G+.007,[.93,.86,.66],hw*.82); polyLine(pts,G+.007,[.93,.86,.66],-hw*.82);             // trails
     for (const i of [5,15,26,36]) if (mw[i]) { const a=mw[i-1], b=mw[i+1]||mw[i], rot=Math.atan2(b[1]-a[1],b[0]-a[0]); addBox(mw[i][0],G+.008,mw[i][1],.036,.003,.008,[.84,.70,.50],-rot+Math.PI/2); }   // footbridges
     for (let i=1;i<pts.length;i++){ const a=pts[i-1], b=pts[i], L=Math.hypot(b[0]-a[0],b[1]-a[1]), nx=-(b[1]-a[1])/L, nz=(b[0]-a[0])/L;
-      for (let t=.012;t<L;t+=.026) for (const sg of [-1,1]) { const off=hw*(.35+rn()*.4)*sg, x=a[0]+(b[0]-a[0])*t/L+nx*off, z=a[1]+(b[1]-a[1])*t/L+nz*off;
+      for (let t=.008;t<L;t+=.014) for (const sg of [-1,1]) { const off=hw*(.3+rn()*.5)*sg, x=a[0]+(b[0]-a[0])*t/L+nx*off, z=a[1]+(b[1]-a[1])*t/L+nz*off;
         if (LY.polyDist(x,z,mw) < .026 || Math.hypot(x-gr.pad[0],z-gr.pad[1]) < .04 || LY.cityRoadDist(x,z) < .02) continue;
-        const r=rn(); if (r<.45) addGhaf(x,z,.45+rn()*.25); else if (r<.7) addPalm(x,z,.42+rn()*.15); else addTree(x,z,.3+rn()*.2,[.30+rn()*.08,.56+rn()*.1,.28]); } }
+        const r=rn(); if (r<.45) addGhaf(x,z,.2+rn()*.12); else if (r<.7) addPalm(x,z,.16+rn()*.05); else rTree(x,z,.13+rn()*.1,[.30+rn()*.08,.56+rn()*.1,.28]); } }   // V15: varied, in scale
+    if (RX) RX.green(gr, mw);                                                                                    // V15: reeds, feathered edge, shade pockets
   }
   function buildRiyadh(){
     const ry=C('Riyadh'), rn=mulberry32(2030);
     riyadhDowntown(ry, rn);
     // Riyadh Metro: a broad curved canopy over King Fahd Road; blue rails around King Salman Park and north to the airport.
     const mt=P('metro'); addDisc(mt.x,G+.003,mt.z,.056,[.86,.84,.80],22);
-    addModel('RUH_MetroStation',mt.x,mt.z-.004,fitFoot(mt,1.6),{hk:1.6});                               // vaulted elevated station (narrow plan, so wider than the pad square)
-    const MR=LY.METRO_ROUTE; polyStrip(MR,.0075,G+.008,[.93,.94,.96]); polyStrip(MR,.0055,G+.009,[.14,.30,.66]);          // trackbed with white edges
-    for (const q of MR.slice(1,-1)) { addDisc(q[0],G+.008,q[1],.0075,[.93,.94,.96],12); addDisc(q[0],G+.009,q[1],.0055,[.14,.30,.66],12); }   // smooth bends
-    lineTarget=lines; polyLine(MR,G+.0105,[.50,.80,1],.0022); polyLine(MR,G+.0105,[.50,.80,1],-.0022);
-    for (const q of [MR[2], MR[5]]) { addBox(q[0],G,q[1],.02,.011,.012,[.95,.96,.98]); addBox(q[0],G+.011,q[1],.024,.003,.016,[.20,.42,.82]); }   // intermediate stations
-    { const a=MR[3], b=MR[4]; addModel('RUH_MetroTrain',(a[0]+b[0])/2,(a[1]+b[1])/2,.05,{rot:Math.atan2(b[1]-a[1],b[0]-a[0]),hk:1.4,y:G+.009}); }   // a train on the line
+    // V14: an elevated guideway on the exact route: concrete deck with side beams, two dark rails, the blue guideway
+    // lines, and slim piers (none in a roadway). Stations and the main terminus are staged with the project; trains run
+    // along the two tracks in opposite directions once it is built (buildVehicles).
+    const MR=LY.METRO_ROUTE, DECK=G+.012;
+    for (let i=1;i<MR.length;i++){ const a=MR[i-1], b=MR[i], L=Math.hypot(b[0]-a[0],b[1]-a[1]), rot=Math.atan2(b[1]-a[1],b[0]-a[0]);
+      addBox((a[0]+b[0])/2,DECK-.003,(a[1]+b[1])/2,L,.003,.0115,[.80,.80,.79],rot);
+      for (let t=.014;t<L-.006;t+=.028){ const x=a[0]+(b[0]-a[0])*t/L, z=a[1]+(b[1]-a[1])*t/L; if (LY.cityRoadDist(x,z) > .012) addBox(x,G,z,.0036,DECK-.003-G,.0036,[.84,.84,.82],rot); } }
+    for (const q of MR.slice(1,-1)) addCylinder(q[0],DECK-.003,q[1],.00575,.003,[.80,.80,.79],12);
+    polyStrip(MR,.0058,DECK+.0001,[.88,.88,.86]); for (const q of MR.slice(1,-1)) addDisc(q[0],DECK+.0001,q[1],.0058,[.88,.88,.86],12);
+    for (const o of [-.0022,.0022]) { const off=MR.map((q,i)=>{ const a=MR[Math.max(0,i-1)], b=MR[Math.min(MR.length-1,i+1)], L=Math.hypot(b[0]-a[0],b[1]-a[1]); return [q[0]-(b[1]-a[1])/L*o, q[1]+(b[0]-a[0])/L*o]; });
+      polyStrip(off,.0011,DECK+.0003,[.36,.38,.42]); }
+    lineTarget=lines; polyLine(MR,DECK+.0005,[.50,.80,1],.0035); polyLine(MR,DECK+.0005,[.50,.80,1],-.0035);
+    sig('metro', () => {
+      addModel('RUH_MetroStation',mt.x,mt.z-.004,fitFoot(mt,1.6),{hk:1.6});                                       // vaulted elevated station
+      for (const i of [2, 5]) { const a=MR[i-1], b=MR[i+1]; metroStop(MR[i][0],MR[i][1],DECK,Math.atan2(b[1]-a[1],b[0]-a[0])); } });
+    if (RX) RX.metro(mt, MR);                                                                                    // V15: forecourts, entrances, bus and taxi bay
     const pk=P('park'); riyadhPark(pk, ry, rn);
     // New Murabba: one monumental gold cube in a landscaped square, low buildings around it, clear space on every side.
-    const mu=P('newmurabba'); keepOut.push([mu.x,mu.z,mu.foot]); addBox(mu.x,G+.002,mu.z,.15,.004,.15,[.62,.78,.48]); addBox(mu.x,G+.003,mu.z,.11,.004,.11,[.90,.86,.74]);
-    addModel('RUH_Mukaab',mu.x,mu.z-.006,.086);                                                                 // the Mukaab: bronze cube behind a gold lattice
-    for (let i=0;i<8;i++){ const a=i/8*6.283+.39; addBox(mu.x+Math.cos(a)*.086,G,mu.z+Math.sin(a)*.086,.018,.012,.018,[.93,.88,.76]); }
+    const mu=P('newmurabba'); keepOut.push([mu.x,mu.z,mu.foot]);
+    murabbaPlaza(mu);                                                                                     // V14: square, gardens, pools (always)
+    if (RX) RX.murabba(mu, .084, .086);                                                                          // V15: shaded walks, canopies, lights, life
+    sig('newmurabba', () => {                                                                                   // V14: staged architecture
+      mukaab(mu.x,mu.z-.006,.084,.086);
+      for (let i=0;i<8;i++){ const a=i/8*6.283+.39; najdi(mu.x+Math.cos(a)*.086,mu.z+Math.sin(a)*.086,.02,.016,.012+(i%3)*.003,[.90,.82,.68],{rot:-a,upper:i%2===0,merlon:.002}); } });
     // ROSHN: orderly low cream homes on shaded streets with planted avenues — far lower than the Mukaab and downtown.
     const rs=P('roshn'); keepOut.push([rs.x,rs.z,rs.foot]);
-    addModel('RUH_ROSHN_Cluster',rs.x,rs.z-.012,fitFoot(rs),{hk:1.8});                                          // homes, courtyards, shaded streets
-    const ks=P('ksip'); riyadhAirport(ks);
-    riyadhExpo(rn, ks);
+    if (RX) RX.roshn(rs); else roshn(rs);                                                                      // V15: housing family (riyadh.js); V14 fallback
+    const ks=P('ksip'); if (RX) { keepOut.push([ks.x,ks.z,ks.foot]); RX.airport(ks); } else riyadhAirport(ks);   // V15: riyadh.js
+    if (RX) { const ex=P('expo'); keepOut.push([ex.x,ex.z,ex.foot]); RX.expo(ex, ks); } else riyadhExpo(rn, ks);   // V15
     // Diriyah: compact warm-earth heritage blocks and courtyards beside the wadi, an escarpment behind King Khalid Road.
     const dr=P('diriyah'); keepOut.push([dr.x,dr.z,dr.foot]);
-    addModel('RUH_Diriyah_AtTuraif',dr.x,dr.z-.01,fitFoot(dr,1.15),{hk:1.6});                                      // At-Turaif on its plateau; the escarpment (+x) faces the wadi
+    diriyahCore(dr, mulberry32(1744));                                                                          // V14: At-Turaif on its plateau (heritage, always)
+    sig('diriyah', () => diriyahGate(dr));                                                                       // V14: new cultural buildings (staged)
+    if (RX) RX.diriyah(dr);                                                                                     // V15: enclosure wall, lanes, plaza, palms
     polyStrip(LY.WADI,.022,G+.004,[.46,.70,.38]); polyStrip(LY.WADI,.009,G+.006,[.28,.60,.80]);
     { const prev=target; target=detailMesh; const W2=LY.WADI; for (let i=1;i<W2.length;i++){ const a=W2[i-1], b=W2[i], L=Math.hypot(b[0]-a[0],b[1]-a[1]), nx=-(b[1]-a[1])/L, nz=(b[0]-a[0])/L;
-        for (let t=.02;t<L;t+=.045) for (const s2 of [-1,1]) { const x=a[0]+(b[0]-a[0])*t/L+nx*.04*s2, z=a[1]+(b[1]-a[1])*t/L+nz*.04*s2; if (LY.decorAllowed(x,z,.03,.045,true)) addPalm(x,z,.5+rn()*.2); } } target=prev; }
+        for (let t=.02;t<L;t+=.045) for (const s2 of [-1,1]) { const x=a[0]+(b[0]-a[0])*t/L+nx*.04*s2, z=a[1]+(b[1]-a[1])*t/L+nz*.04*s2; if (LY.decorAllowed(x,z,.03,.045,true)) addPalm(x,z,.17+rn()*.05); } } target=prev; }
     for (let z=-.85; z<=.12; z+=.07) { const x=ry.x-.79+Math.sin(z*7)*.015, zz=ry.z+z; if (LY.roadDist(x,zz) < .05) continue; addMound(x,zz,.05,.04,.045+rn()*.03,rn(),[.79,.64,.49],7); }   // V11: muted escarpment
     // Sports Boulevard: one continuous planted ribbon with walking and cycling paths, a bridge over King Fahd Road and activity areas.
-    const sp=P('sports'); polyStrip(sp.ribbon.pts,.026,G+.005,[.44,.72,.36]); lineTarget=lines; polyLine(sp.ribbon.pts,G+.008,[.93,.86,.66],.008); polyLine(sp.ribbon.pts,G+.008,[.86,.62,.52],-.008);
-    ownRibbonTrees(sp,.035,.02,.32);
-    addModel('RUH_Sports_CycleBridge',ry.x,sp.ribbon.pts[2][1],.06,{hk:1.6});                                       // cycle bridge over King Fahd Road
-    addModel('RUH_Sports_ExercisePavilion',ry.x-.32,sp.ribbon.pts[0][1],.016,{hk:1.8});
-    addModel('RUH_Sports_Court',ry.x+.12,sp.ribbon.pts[0][1],.022,{hk:1.8});
-    addModel('RUH_Sports_ExercisePavilion',ry.x+.32,sp.ribbon.pts[0][1],.016,{hk:1.8,rot:Math.PI});
+    const sp=P('sports'); sportsBoulevard(sp, ry); if (RX) RX.sports(sp);                                       // V14 paths, planting, venues; V15 furniture
     // Renewables: ordered solar rows and slim turbines on the outer north-west, with modest service tracks.
     const re=P('renewables'); keepOut.push([re.x,re.z,re.foot]);
+    if (RX) RX.renewables(re, addTurbine); else {                                                                 // V15: rows on posts, inverters, substation, fence
     for (let i=0;i<5;i++) for (let j=0;j<4;j++) addModel('RUH_SolarUnit',re.x-.068+i*.025,re.z-.05+j*.022,.024,{hk:2});   // repeated solar units
     for (let i=0;i<3;i++) addTurbine(re.x+.066,re.z-.045+i*.04,.55);
-    addLine([re.x-.09,G+.006,re.z+.045],[re.x+.09,G+.006,re.z+.045],[.86,.78,.60]); addLine([re.x+.045,G+.006,re.z-.07],[re.x+.045,G+.006,re.z+.07],[.86,.78,.60]);
+    addLine([re.x-.09,G+.006,re.z+.045],[re.x+.09,G+.006,re.z+.045],[.86,.78,.60]); addLine([re.x+.045,G+.006,re.z-.07],[re.x+.045,G+.006,re.z+.07],[.86,.78,.60]); }
     // Qiddiya: entertainment on stepped rocky terraces beyond the Tuwaiq cliffs.
     const qd=P('qiddiya'); keepOut.push([qd.x,qd.z,qd.foot]);
-    addModel('RUH_Qiddiya',qd.x,qd.z-.012,fitFoot(qd,1.25),{hk:1.3});                                             // stepped rock base, coaster, loop, venues
+    if (RX) RX.qiddiya(qd); else { { const R0=qd.foot-.005, prev=target; addDisc(qd.x,G+.0025,qd.z,R0,[.84,.74,.58],32);                         // V14: landscaped site ring, walks, palms
+      lineTarget=lines; const ring=[]; for (let i=0;i<=36;i++){ const a=i/36*6.283; ring.push([qd.x+Math.cos(a)*(R0-.006),qd.z+Math.sin(a)*(R0-.006)]); } polyStrip(ring,.0022,G+.0035,[.94,.88,.74]);
+      target=detailMesh; for (let i=0;i<14;i++){ const a=i/14*6.283+.1, x=qd.x+Math.cos(a)*(R0-.012), z=qd.z+Math.sin(a)*(R0-.012); if (Math.hypot(x-qd.pad[0],z-qd.pad[1]) > .04) addPalm(x,z,.3); } target=prev; }
+    sig('qiddiya', () => {                                                                                      // V14: attractions (staged)
+      addModel('RUH_Qiddiya',qd.x,qd.z-.012,fitFoot(qd,1.25),{hk:1.3});                                          // stepped rock base, coaster, loop, venues
+      { const wx=qd.x-.07, wz=qd.z+.035, r=.017, hub=[wx,G+r+.006,wz], rim=k=>{ const a=k/14*6.283; return [wx+Math.cos(a)*r,G+r+.006+Math.sin(a)*r,wz]; };   // observation wheel
+        for (let k=0;k<14;k++){ addRod(rim(k),rim(k+1),.0012,[.95,.95,.94]); if (k%2===0) addRod(hub,rim(k),.0006,[.86,.86,.88]); addBox(rim(k)[0],rim(k)[1]-.0016,wz,.0024,.0022,.0024,[[.92,.34,.30],[.98,.76,.24],[.30,.60,.90]][k%3]); }
+        for (const e of [-1,1]) { addRod([wx-.008,G,wz+e*.004],hub,.0016,[.80,.80,.82]); addRod([wx+.008,G,wz+e*.004],hub,.0016,[.80,.80,.82]); } }
+      { const px=qd.x+.06, pz=qd.z+.058; addDisc(px,G+.003,pz,.016,[.90,.86,.78],18); addDisc(px-.004,G+.0036,pz,.009,[.30,.70,.88],16); addDisc(px+.008,G+.0036,pz-.004,.005,[.36,.76,.90],12);   // water park
+        addRod([px-.012,G+.014,pz-.01],[px-.006,G+.004,pz-.002],.002,[.98,.70,.22]); addRod([px-.016,G+.012,pz-.004],[px-.008,G+.004,pz+.003],.002,[.30,.70,.40]); addBox(px-.014,G,pz-.008,.004,.014,.004,[.86,.84,.80]); } }); }
     // Tuwaiq escarpment: stepped cliffs between the city and Qiddiya (kept off roads and footprints).
     { const RG=LY.RIDGES; for (let i=1;i<RG.length;i++){ const a=RG[i-1], b=RG[i], L=Math.hypot(b[0]-a[0],b[1]-a[1]), rot=Math.atan2(b[1]-a[1],b[0]-a[0]);
         for (let t=0;t<L;t+=.045){ const x=a[0]+(b[0]-a[0])*t/L, z=a[1]+(b[1]-a[1])*t/L; for (const [o,h] of [[0,.05],[.04,.034],[.08,.018]]) { const xx=x+Math.sin(rot)*o, zz=z-Math.cos(rot)*o;   // stepped terraces, highest on the city side
@@ -665,6 +990,7 @@
     // Short access spurs join each district to its road (none cross another parcel).
     for (const [p, tz] of [[mu,-.48],[rs,-.48],[re,-.48]]) addStrip([p.x,p.z+p.foot],[p.x,ry.z+tz],.005,G+.006,[.60,.54,.46]);
     addStrip([dr.x+dr.foot,dr.z],[ry.x-.40,dr.z],.005,G+.006,[.60,.54,.46]);
+    if (RX) RX.roadMarks();                                                                                      // V15: lane dashes (traffic in buildVehicles)
     // Honest framing is added as a map label ("Illustrative district plan · not to scale").
   }
   // Riyadh's residential fabric. Inside the ring of named roads: flat, low city blocks between local streets (every
@@ -685,12 +1011,12 @@
       const dx=(i+.5)*S, dz=(j+.5)*S, x=ry.x+dx, z=ry.z+dz, d=Math.hypot(dx,dz), h=S*.38;
       if (!urban(dx,dz) || rn() > .92-.4*d || ![[-h,-h],[h,-h],[-h,h],[h,h],[0,0]].every(([ox,oz]) => open(x+ox,z+oz,.02))) continue;
       addBox(x,G+.0015,z,S*.8,.004+.004*rn(),S*.8,sand[Math.floor(rn()*3)]);
-      if (d < .42 && rn() < .35) { target=detailMesh; addHouse(x-.016,z+.012,.22,[.90,.84,.72],0); addHouse(x+.016,z-.012,.22,[.90,.84,.72],0); target=prev; } }
+      if (d < .42 && rn() < .35) { target=detailMesh; addHouse(x-.016,z+.012,.15,[.90,.84,.72],0); addHouse(x+.016,z-.012,.15,[.90,.84,.72],0); target=prev; } }
     target=detailMesh;
     for (let dx=-.82; dx<=.84; dx+=c) for (let dz=-.9; dz<=.86; dz+=c) {                                    // light scatter outside the roads
       const x=ry.x+dx+(rn()-.5)*.01, z=ry.z+dz+(rn()-.5)*.01;
       if (urban(dx,dz) || dx < -.72 || rn() > .08 || !open(x,z,.05)) continue;
-      addHouse(x,z,.22+rn()*.04,[.86,.79,.66],0); }
+      addHouse(x,z,.15+rn()*.03,[.86,.79,.66],0); }   // V15: in scale with the districts
     target=prev;
   }
   /* ------------------------------ regional plans ---------------------------- */
@@ -735,9 +1061,13 @@
   const fabric = (cx, cz, r, n, rn, pal, test) => { const prev = target; target = detailMesh; scatterIn(cx, cz, r, n, rn, (x, z) => addHouse(x, z, .2 + rn() * .08, pal[Math.floor(rn() * pal.length)], 0), test); target = prev; };
   const skyline = (cx, cz, r, n, hmax, rn, test, pal = [[.52,.72,.84],[.62,.78,.86],[.70,.74,.80],[.48,.66,.78]]) =>
     scatterIn(cx, cz, r, n, rn, (x, z) => { const d = Math.hypot(x - cx, z - cz) / r, h = .03 + hmax * Math.pow(1 - d, 1.2) * (.5 + rn() * .5); addTower(x, z, .01 + rn() * .006, h, pal[Math.floor(rn() * pal.length)], rn() > .7 ? [.85, .9, .95] : null); }, test);
-  const mountain = (x, z, r, h, col, rn) => { addBlob(x, G, z, r * 1.05, h * .45, r, shade(col, .92), 0, .25); addCone(x + (rn() - .5) * r * .3, G + h * .2, z, r * .62, h * .8, shade(col, 1.05), 7); };   // V11: darker flanks, lighter peak
-  const range = (cx, cz, rx, rz, n, rn, col, hmin, hmax, test) => { for (let i = 0, k = 0; i < n * 8 && k < n; i++) { const x = cx + (rn() * 2 - 1) * rx, z = cz + (rn() * 2 - 1) * rz; if (Math.pow((x - cx) / rx, 2) + Math.pow((z - cz) / rz, 2) > 1 || !test(x, z)) continue; k++; mountain(x, z, .03 + rn() * .035, hmin + rn() * (hmax - hmin), mix(col, [.66, .52, .40], rn() * .3), rn); } };
-  const hillOpen = (x, z) => onLand(x, z) && LY.decorAllowed(x, z, .05, .045);
+  // V12: one rock formation (rocks.js); consumes one value of the plan's random stream, as the old blob + cone did.
+  const mountain = (x, z, r, h, col, rn, o = {}) => rockAt(x, z, r, h, col, Object.assign({}, o, {salt:rn()}));
+  // A range's formations line up with its long axis, so neighbours join into ridges; their tips stay off roads and parcels.
+  const range = (cx, cz, rx, rz, n, rn, col, hmin, hmax, test, style = 'rock') => { const rot = rx > rz * 1.3 ? 0 : rz > rx * 1.3 ? Math.PI / 2 : null;
+    for (let i = 0, k = 0; i < n * 8 && k < n; i++) { const x = cx + (rn() * 2 - 1) * rx, z = cz + (rn() * 2 - 1) * rz; if (Math.pow((x - cx) / rx, 2) + Math.pow((z - cz) / rz, 2) > 1 || !test(x, z)) continue; k++; mountain(x, z, .03 + rn() * .035, hmin + rn() * (hmax - hmin), mix(col, [.66, .52, .40], rn() * .3), rn, {style, rot, test:tipOpen}); } };
+  const tipOpen = (x, z) => onLand(x, z) && LY.decorAllowed(x, z, .03, .03);
+  const hillOpen = (x, z) => onLand(x, z) && LY.decorAllowed(x, z, .05, .045) && !Object.values(window.VisionScenicSites||{}).some(s=>s.x!=null&&Math.hypot(x-s.x,z-s.z)<s.r+.065);
 
   // Regional networks: highways (asphalt + centre line), railways (ballast, rails, sleepers), the causeway and boat routes.
   function buildPlanNetworks(){
@@ -762,8 +1092,7 @@
     addDisc(jb.x, G + .003, jb.z, jb.foot - .004, [.82, .78, .70], 28);
     // Three smaller industrial modules (tank farm, processing unit, factory halls) instead of one enormous complex.
     const kJ = modelK('EP_Jubail_Processing', .052);
-    addModel('EP_Jubail_TankFarm', jb.x - .03, jb.z - .04, 0, {k:kJ, hk:1.8});
-    addModel('EP_Jubail_Processing', jb.x - .035, jb.z + .02, 0, {k:kJ, hk:1.5});
+    // Tank farm and process units are supplied by the detailed eastern clay kit below.
     addModel('EP_Jubail_Factories', jb.x + .03, jb.z - .005, 0, {k:kJ, hk:1.8});
     const cE = RG_coast('east', jb.z);                                    // port on the Gulf shore: quay deck out over the water, sea side east
     quay([cE - .012, jb.z - .015], [cE + .05, jb.z - .015], .022);
@@ -790,7 +1119,7 @@
     // Dhahran: a landscaped knowledge and energy campus — low modern buildings around plazas and a domed hall.
     const dh = PLv('dhahran'); keepOut.push([dh.x, dh.z, dh.r]);
     addDisc(dh.x, G + .003, dh.z, dh.r - .004, [.58, .76, .46], 28); addDisc(dh.x, G + .004, dh.z, .018, [.92, .90, .84], 16);
-    addModel('EP_Dhahran_Campus', dh.x, dh.z, 2 * dh.r - .016, {hk:1.4});                  // spaced courtyard buildings, covered walks, central tower
+    // The Ithra-inspired stone forms occupy the landscaped campus below.
     // Al Khobar: waterfront skyline, promenade, marina — and the King Fahd Causeway heading out over the Gulf.
     const kh = PLv('khobar'); keepOut.push([kh.x, kh.z, kh.r]);
     // Towers behind a curved marina edge (the model's basin opens to +y, turned to face the Gulf).
@@ -807,14 +1136,15 @@
     addModel('EP_AlAhsa_Oasis', gr.x, gr.z - .012, fitFoot(gr, 1.2), {hk:1.4});            // dense date-palm grove, irrigation channels, spring, mud houses
     { const prev = target; target = detailMesh; scatterIn(gr.x, gr.z, gr.foot - .008, 14, rn, (x, z, n) => addModel(n % 3 ? 'EP_DatePalm_Tall' : 'EP_DatePalm_Young', x, z, .006, {hk:1.3}),   // stand-alone palms at the grove edge
         (x, z) => { const d = Math.hypot(x - gr.x, z - gr.z); return d > fitFoot(gr, 1.2) * .72 && d < gr.foot - .006 && Math.hypot(x - gr.pad[0], z - gr.pad[1]) > .03; }); target = prev; }
-    const hf = PLv('hofuf'); keepOut.push([hf.x, hf.z, hf.r]); addModel('EP_Hofuf_HeritageCore', hf.x - .004, hf.z - .004, 2 * hf.r - .018, {hk:1.6});
-    addCylinder(hf.x + .01, G, hf.z - .01, .0035, .04, [.92, .84, .66], 8); station(hf.x - .012, hf.z + .028, 0);
+    const hf = PLv('hofuf'); keepOut.push([hf.x, hf.z, hf.r]);
+    station(hf.x - .012, hf.z + .028, 0);
     station(2.07, -1.125, -.6);                                                         // Dammam rail station
     // King Fahd International Airport (inland of Dammam) and inland desert hills on the west edge.
     const ap = LY.MISSION_SITES['east:kfia']; addStrip([ap[0] - .045, ap[1] - .01], [ap[0] + .045, ap[1] - .01], .006, G + .005, [.32, .33, .35]); addBox(ap[0], G, ap[1] + .012, .04, .008, .012, [.90, .92, .94]);
-    for (const [x, z, r] of P.decor.hills) mountain(x, z, r, .05 + rn() * .03, [.80, .71, .60], rn);   // V11: cooler, paler eastern hills
+    for (const [x, z, r] of P.decor.hills) mountain(x, z, r, .05 + rn() * .03, [.82, .70, .56], rn, {style:'desert', test:tipOpen});   // V12: low desert outcrops
     fabric(dm.x - .06, dm.z + .04, .05, 12, rn, [[.94,.88,.76],[.90,.82,.68]]); fabric(kh.x - .07, kh.z, .045, 10, rn, [[.94,.88,.76],[.90,.82,.68]]);
     palmGrove(1.95, -1.33, .06, 10, rn); palmGrove(2.18, -.68, .05, 8, rn);
+    window.VisionEastClay?.({G,box:addBox,cylinder:addCylinder,cone:addCone,dome:addDome,blob:addBlob,quad:addQuad,palm:addPalm,LY,jubail:jb,dhahran:dh,khobar:kh,hofuf:hf,coast:z=>RG_coast('east',z)});
   }
 
   // ------------------------------------------------------------------ Western Corridor
@@ -822,11 +1152,11 @@
     const P = RPL.west; if (!P) return; const rn = mulberry32(502);
     // Mountains first (they frame everything): the Hejaz massif east of the rail line, the buffer between Jeddah and
     // Makkah, and the uplands round Taif. Never on a road, railway or landmark.
-    range(-2.40, .55, .15, .42, 40, rn, [.71, .48, .36], .05, .1, hillOpen);   // V11: Hejaz terracotta (#B97852 family)
-    range(-2.58, 1.44, .018, .08, 6, rn, [.69, .47, .36], .04, .07, hillOpen);
-    range(-2.30, 1.66, .16, .13, 18, rn, [.68, .48, .37], .05, .09, hillOpen);
-    range(-2.12, 1.30, .08, .1, 12, rn, [.66, .50, .40], .05, .09, hillOpen);
-    range(-2.30, -.30, .1, .08, 8, rn, [.72, .51, .39], .04, .07, hillOpen);
+    range(-2.40, .55, .15, .42, 40, rn, [.71, .48, .36], .05, .1, hillOpen, 'hejaz');   // V12: Hejaz terracotta ridges
+    range(-2.58, 1.44, .018, .08, 6, rn, [.69, .47, .36], .04, .07, hillOpen, 'hejaz');
+    range(-2.30, 1.66, .16, .13, 18, rn, [.68, .48, .37], .05, .09, hillOpen, 'hejaz');    // Taif uplands
+    range(-2.12, 1.30, .08, .1, 12, rn, [.66, .50, .40], .05, .09, hillOpen, 'hejaz');
+    range(-2.30, -.30, .1, .08, 8, rn, [.74, .50, .37], .04, .07, hillOpen, 'alula');     // north: layered sandstone
     // Madinah: a calm, spacious city around the Prophet's Mosque — white arcades, green dome, minarets, open courtyards.
     const md = PLv('madinah'); keepOut.push([md.x, md.z, md.r]);
     addDisc(md.x, G + .003, md.z, md.r - .002, [.95, .94, .90], 28);
@@ -858,15 +1188,13 @@
     { const pts = []; for (let i = 0; i <= 14; i++) { const z = jd.z - .09 + i * .013; pts.push([RG_coast('west', z) + .006, z]); } polyStrip(pts, .003, G + .006, [.93, .86, .66]);
       const mods = [['WC_Corniche_Plaza', .012], ['WC_Corniche_Canopy', .009], ['WC_Corniche_Pavilion', .006]];
       pts.forEach((q, i) => { if (i % 3) return; const [nm, s] = mods[(i / 3) % 3]; addModel(nm, q[0] + .009, q[1], s, {rot:-Math.PI / 2, hk:1.8}); }); }
-    addCylinder(RG_coast('west', jd.z - .05) - .02, SEA, jd.z - .05, .003, .08, [.95, .95, .95], 6);   // King Fahd's Fountain
+    // King Fahd's Fountain is animated by world-cosmetics.js rather than a solid white cylinder.
     const jc = P1('jeddahcentral'); keepOut.push([jc.x, jc.z, jc.foot]); const cJ = RG_coast('west', jc.z);
     addDisc(jc.x, G + .003, jc.z, jc.foot - .003, [.92, .88, .76], 20);
     addModel('WC_JeddahCentral', jc.x - .002, jc.z - .006, fitFoot(jc, 1.15), {rot:-Math.PI / 2, hk:1.6});   // compact parcel: venue shell, terraces, marina edge to the sea
     marina(cJ - .002, jc.z + .012, Math.PI, 3, rn);
     // Al Balad: individual historic houses (pale plaster, coral stone, wooden roshan) set along narrow lanes.
-    { const bl = LY.MISSION_SITES['west:balad'], hs = ['WC_AlBalad_House_A', 'WC_AlBalad_House_B', 'WC_AlBalad_House_C'], kB = modelK('WC_AlBalad_House_C', .0085);
-      for (let i = -2; i <= 2; i++) for (let j = -2; j <= 2; j++) { const x = bl[0] + i * .0095 + (j % 2) * .003, z = bl[1] + j * .0085;
-        if (Math.hypot(i, j) > 2.3 || !onLand(x, z) || !LY.decorAllowed(x, z, .003, .01)) continue; addModel(hs[(i * 7 + j * 3 + 15) % 3], x, z, 0, {k:kB, rot:(j % 2) * Math.PI, hk:1.6}); } }
+    // The local west-clay kit below provides roshan-fronted coral-plaster houses.
     // Jeddah Islamic Port: gate/terminal building plus the shared gantry cranes, container blocks and warehouse, south of the waterfront.
     { const jp = LY.MISSION_SITES['west:jport'], cP = RG_coast('west', jp[1]), kP = modelK('SHR_GantryCrane', .016);
       quay([cP + .01, jp[1]], [cP - .07, jp[1] - .01], .016);
@@ -884,7 +1212,7 @@
     addModel('WC_Haram', mk.x, mk.z, .072, {hk:1.2});
     addModel('WC_Kaaba', mk.x, mk.z, .0062, {hk:1.1});
     skyline(mk.x, mk.z, mk.r - .004, 14, .05, rn, (x, z) => Math.hypot(x - mk.x, z - mk.z) > .038 && Math.hypot(x - mk.x, z - mk.z) < mk.r - .004, [[.94,.92,.86],[.90,.88,.84],[.86,.84,.80]]);
-    addBox(mk.x + .006, G, mk.z - .046, .012, .12, .012, [.88, .86, .80]); addCone(mk.x + .006, G + .12, mk.z - .046, .006, .025, [.86, .74, .36], 6);   // clock tower (just north of the courtyard)
+    // Abraj Al-Bait's detailed clock-tower kit is placed south of the Haram below.
     // Masar Makkah: a planned boulevard district extending west from central Makkah — wholly inland.
     // Masar Makkah: repeatable hotel and commercial modules framing the pedestrian boulevard toward the Haram
     // (module fronts face the route: north side turned to face south, south side faces north).
@@ -911,26 +1239,25 @@
       const a = hp[Math.max(0, s - 1)], b = hp[Math.min(hp.length - 1, s + 1)]; addModel('WC_HaramainStation', hp[s][0], hp[s][1], .03, {rot:Math.atan2(b[1] - a[1], b[0] - a[0]), hk:1.6}); }
     { const a = hp[1], b = hp[2]; addModel('WC_HaramainTrain', (a[0] + b[0]) / 2, (a[1] + b[1]) / 2, .045, {rot:Math.atan2(b[1] - a[1], b[0] - a[0]), hk:1.5, y:G + .006}); }   // a train on the line
     palmGrove(-2.60, .18, .06, 10, rn); palmGrove(-2.56, 1.02, .05, 8, rn); palmGrove(-2.52, -.02, .05, 10, rn);
+    window.VisionWestClay?.({G,box:addBox,cylinder:addCylinder,cone:addCone,dome:addDome,blob:addBlob,palm:addPalm,quad:addQuad,LY,onLand,coast:z=>RG_coast('west',z),places:{jeddah:jd,madinah:md,makkah:mk,taif:tf}});
+    window.VisionScenicBuild?.({G,box:addBox,cylinder:addCylinder,cone:addCone,blob:addBlob,quad:addQuad,LY},'west');
   }
 
   // ------------------------------------------------------------------ NEOM / Northwest
   function buildNorthwest(){
     const P = RPL.northwest; if (!P) return; const rn = mulberry32(503);
     // Midian mountains: rugged peaks round Trojena, ranges framing THE LINE's valley (never on it), hills along the coast.
-    range(-4.42, -2.42, .2, .1, 26, rn, [.74, .64, .56], .07, .13, hillOpen);   // V11: pale, rugged northwest stone
-    range(-4.35, -1.98, .2, .05, 14, rn, [.82, .72, .62], .04, .08, hillOpen);
-    range(-3.95, -1.60, .18, .18, 16, rn, [.84, .75, .64], .04, .08, hillOpen);
-    range(-3.70, -1.05, .2, .2, 14, rn, [.86, .77, .66], .04, .07, hillOpen);
-    range(-4.30, -2.24, .1, .05, 6, rn, [.80, .70, .62], .05, .09, hillOpen);
+    range(-4.42, -2.42, .2, .1, 26, rn, [.76, .62, .50], .07, .13, hillOpen, 'neom');   // V12: rugged sandstone ridges and peaks
+    range(-4.35, -1.98, .2, .05, 14, rn, [.80, .66, .53], .04, .08, hillOpen, 'neom');
+    range(-3.95, -1.60, .18, .18, 16, rn, [.80, .64, .50], .04, .08, hillOpen, 'neom');
+    range(-3.70, -1.05, .2, .2, 14, rn, [.77, .52, .38], .04, .07, hillOpen, 'alula');  // towards AlUla: terracotta cliffs and mesas
+    range(-4.30, -2.24, .1, .05, 6, rn, [.78, .64, .51], .05, .09, hillOpen, 'neom');
     // THE LINE: one slim, reflective corridor from the NEOM coast inland through the valley.
     // THE LINE: one mirrored segment model (two reflective walls, flat top, gardens between) repeated along the route,
     // each copy stretched slightly so whole segments tile each straight run exactly.
-    const ln = P1('neom'); { const pts = ln.ribbon.pts, kL = .007 / 200, seg = 500 * kL * 2.2;
-      for (let i = 1; i < pts.length; i++) { const a = pts[i - 1], b = pts[i], L = Math.hypot(b[0] - a[0], b[1] - a[1]), rot = Math.atan2(b[1] - a[1], b[0] - a[0]), n = Math.max(1, Math.round(L / seg));
-        for (let k = 0; k < n; k++) { const t = (k + .5) / n; addModel('NW_TheLine_Segment', a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, 0, {k:kL, sx:L / n / (500 * kL), rot, hk:.03 / (500 * kL)}); } } }
     // Trojena: an elevated mountain destination — snow-tipped peaks, a small lake, terraced lodges.
     const tj = P1('trojena'); keepOut.push([tj.x, tj.z, tj.foot]);
-    for (let i = 0; i < 6; i++) { const a = i / 6 * 6.283 + .4, x = tj.x + Math.cos(a) * .052, z = tj.z + Math.sin(a) * .046, h = .12 + rn() * .06; addCone(x, G, z, .035, h, [.60, .52, .46], 7); addCone(x, G + h * .72, z, .011, h * .28, [.97, .97, .99], 7); }
+    for (let i = 0; i < 5; i++) { const a = Math.PI + i / 4 * Math.PI, x = tj.x + Math.cos(a) * .062, z = tj.z + Math.sin(a) * .061, h = .085 + rn() * .035; rockAt(x, z, .03, h, [.70, .60, .52], {style:'peak', rot:a + Math.PI / 2, salt:i}); }   // V12: a ring of snow-tipped peaks
     addDisc(tj.x, G + .006, tj.z + .004, .02, [.34, .70, .86], 18);
     addModel('NW_Trojena_Resort', tj.x - .006, tj.z - .022, .03, {hk:1.6});                   // angular lodges above the lake
     addModel('NW_Trojena_Lakeside', tj.x, tj.z + .004, .032, {hk:1.5, y:G + .004});             // the long mirrored structure spanning the lake
@@ -984,6 +1311,7 @@
       addModel(nm, rs.x + dx, rs.z + dz, s, {y:SEA + .002, hk:2.5, rot:dx * 40});
     for (let i = 0; i < 3; i++) boat(rs.x + .06 + i * .012, rs.z - .01 + i * .01, .5, 1);
     palmGrove(-3.76, -.62, .03, 6, rn);
+    window.VisionNeomClay?.({G,box:addBox,cylinder:addCylinder,blob:addBlob,quad:addQuad,palm:addPalm,LY,projects:D.projects.map(p=>P1(p.id))});
   }
 
   // ------------------------------------------------------------------ Southwest
@@ -996,10 +1324,10 @@
       let rr = r; while (rr > .02 && !Array.from({length:12}, (_, i) => i / 12 * 6.283).every(a => onLand(px + Math.cos(a) * rr, pz + Math.sin(a) * rr))) rr -= .01;   // whole rim on Saudi land
       if (rr > .02 && onLand(px, pz)) addDisc(px, G + .0025, pz, rr, [.54, .70, .40], 18); }
     for (let i = 1; i < belt.length; i++) { const a = belt[i - 1], b = belt[i]; for (let t = 0; t < 1; t += .14) { const x = a[0] + (b[0] - a[0]) * t, z = a[1] + (b[1] - a[1]) * t;
-      for (let k = 0; k < 5; k++) { const px = x + (rn() - .5) * .22, pz = z + (rn() - .5) * .1; if (!forest(px, pz)) continue; const h = .06 + rn() * .06; mountain(px, pz, .035 + rn() * .02, h, mix([.32, .54, .29], [.46, .46, .33], rn() * .4), rn);   // V11: richer green
+      for (let k = 0; k < 5; k++) { const px = x + (rn() - .5) * .22, pz = z + (rn() - .5) * .1; if (!forest(px, pz)) continue; const h = .06 + rn() * .06; mountain(px, pz, .035 + rn() * .02, h, mix([.50, .42, .35], [.60, .50, .40], rn()), rn, {style:'aseer', rot:Math.atan2(b[1] - a[1], b[0] - a[0]), test:forest, ground:[.54, .70, .40]});   // V12: darker rock, green lower slopes
         if (rn() > .3) { const prev = target; target = detailMesh; addTree(px + .03, pz + .02, .28, [.18, .46, .24]); target = prev; } } } }
-    range(-.78, 3.05, .16, .12, 14, rn, [.64, .50, .40], .04, .07, hillOpen);   // V11: deeper southern rock
-    range(-.70, 3.60, .18, .12, 12, rn, [.67, .53, .42], .03, .06, hillOpen);
+    range(-.78, 3.05, .16, .12, 14, rn, [.62, .49, .40], .04, .07, hillOpen, 'rock');   // V12: deeper southern rock
+    range(-.70, 3.60, .18, .12, 12, rn, [.67, .53, .42], .03, .06, hillOpen, 'desert');
     // Jazan Industrial City: orderly factories, tank farm, logistics yards and its own cargo port.
     const ji = P1('jazan'); keepOut.push([ji.x, ji.z, ji.foot]); const cJ = RG_coast('west', ji.z);
     addDisc(ji.x, G + .003, ji.z, ji.foot - .004, [.82, .80, .74], 26);
@@ -1009,7 +1337,7 @@
     ship(cJ - .05, ji.z + .055, .1, .06, [.78, .24, .22], rn);
     // Jazan: a southern coastal civic city — compact buildings, palms, a waterfront marina and small boats.
     const jz = PLv('jazanc'); keepOut.push([jz.x, jz.z, jz.r]); const cZ = RG_coast('west', jz.z);
-    addModel('SW_JazanCity', Math.max(jz.x + .006, cZ + .05), jz.z, 2 * jz.r - .022, {rot:-Math.PI / 2, hk:1.6});   // warm coastal blocks, civic dome, palm waterfront (west)
+    addModel('SW_JazanCity', Math.max(jz.x-.006,cZ+.03), jz.z+.015, .065, {rot:-Math.PI / 2, hk:1.6}); // room for Dosariyah's waterfront hill to the north-east
     marina(cZ - .002, jz.z + .02, Math.PI, 3, rn); palmGrove(jz.x + .03, jz.z - .05, .03, 8, rn);
     for (let i = 0; i < 4; i++) boat(cZ - .06 - i * .012, jz.z - .02 + i * .015, i, 1);
     // Soudah: the highest forested ridge, west of Abha — viewpoints, terraces, small hospitality buildings.
@@ -1020,21 +1348,22 @@
     // Abha: a distinct highland city on a green plateau — Aseer-inspired architecture, squares and gardens.
     const ab = PLv('abha'); keepOut.push([ab.x, ab.z, ab.r]);
     addCylinder(ab.x, G, ab.z, ab.r - .002, .012, [.50, .66, .38], 22);
-    addModel('SW_Abha_Cluster', ab.x, ab.z, 2 * ab.r - .02, {y:G + .012, hk:1.5});            // plateau town: stepped rocky flanks, light buildings, terraces
+    // Shada Palace occupies the city centre; Aseer neighbourhoods are added outside its courtyard.
     { const kA = modelK('SW_AseerHouse', .007); for (const [dx, dz] of [[-.07, .02], [-.066, .035], [.07, -.03], [.062, .05]]) if (openAt(ab.x + dx, ab.z + dz, .004)) addModel('SW_AseerHouse', ab.x + dx, ab.z + dz, 0, {k:kA, hk:1.6, rot:dx * 20}); }   // outlying Aseer houses
     // Najran: an independent inland oasis city — wadi greenery, palms, earth-toned architecture.
     const nj = PLv('najran'); keepOut.push([nj.x, nj.z, nj.r]);
     const wadi = [[-.80, 3.30], [-.66, 3.40], [-.52, 3.44], [-.40, 3.46], [-.30, 3.47]]; polyStrip(wadi, .012, G + .004, [.50, .70, .40]); polyStrip(wadi, .004, G + .005, [.30, .60, .80]);
     addModel('SW_Najran_Buildings', nj.x - .014, nj.z + .01, .056, {hk:1.8});                 // earth-toned mud tower houses
-    addModel('SW_Najran_Heritage', nj.x + .026, nj.z - .022, .03, {hk:1.6});                   // the compact fortified heritage palace on its knoll
+    // Al-Aan Palace's mud-tower kit sits west of the city centre below.
     // Wadi vegetation along the channel: mature palms, young palm clusters and dryland shrubs (separate reusable models).
     { const prev = target; target = detailMesh; const veg = [['SW_Palm_Mature', .008], ['SW_Palm_Cluster', .009], ['SW_Shrub_Cluster', .007]];
       scatterIn(-.55, 3.45, .08, 30, rn, (x, z, n) => { const [nm, s] = veg[n % 3]; addModel(nm, x, z, s * (.8 + rn() * .4), {hk:1.4, rot:rn() * 6.283}); }, (x, z) => LY.polyDist(x, z, wadi) < .03 && openAt(x, z, .01)); target = prev; }
     // Khamis Mushait and Abha airport (mission sites) as small, quiet settlements; Rijal Almaa on the western slope.
     const km = LY.MISSION_SITES['south:khamis']; fabric(km[0], km[1], .03, 10, rn, [[.90,.84,.74],[.86,.78,.66]]);
     const aa = LY.MISSION_SITES['south:abhair']; addStrip([aa[0] - .03, aa[1]], [aa[0] + .03, aa[1]], .005, G + .005, [.32, .33, .35]);
-    const rj = LY.MISSION_SITES['south:rijal']; addModel('SW_AseerVillage_Cluster', rj[0], rj[1], .028, {hk:1.6});   // Rijal Almaa: a traditional Aseer village cluster
+    // Rijal Almaa's stone towers and white quartz bands are supplied by the scenic kit.
     palmGrove(-1.62, 2.86, .05, 10, rn); palmGrove(-1.30, 3.36, .05, 12, rn);
+    window.VisionScenicBuild?.({G,box:addBox,cylinder:addCylinder,cone:addCone,blob:addBlob,quad:addQuad,LY},'south');
   }
   // ----------------------------------------------------------------- shared
   const P1 = id => P(id);
@@ -1042,7 +1371,9 @@
   function buildRegions(){ buildPlanNetworks(); buildEast(); buildWest(); buildNorthwest(); buildSouth(); }
 
   function buildLandmarks(){
-    buildRiyadh();   // the stylized north-up Riyadh planning map (layout.js)
+    // V14: Riyadh draws its decoration from its own stream; the shared stream then advances exactly as the V13 Riyadh
+    // build advanced it (301 draws), so every scene built after it (regions, cities) is unchanged.
+    withRng(2031, buildRiyadh); for (let i=0;i<301;i++) rng();   // the stylized north-up Riyadh planning map (layout.js)
 
     buildRegions();  // Eastern Province, Western Corridor, NEOM / Northwest and Southwest (regions.js)
   }
@@ -1070,7 +1401,57 @@
   function ribbonEdges(p, off, y, col){ polyLine(p.ribbon.pts, y, col, p.ribbon.hw+off); polyLine(p.ribbon.pts, y, col, -(p.ribbon.hw+off)); }
   function buildMarkerRings(){ for (const p of D.projects) { const c=mix(shade(p.color,.9),[.96,.92,.84],.4); if (p.ribbon) ribbonEdges(p, 0, G+.008, c); else addRing(p.x,G+.008,p.z,p.foot,c,40); } }   // V11: softened footprint outlines
 
-  buildTerrain(); buildNetworks(); buildLandmarks(); buildCities(); buildMarkerRings();
+  // V13: decorative dune fields (dunes.js), built last so they can keep clear of everything already placed. Each field
+  // keeps one prevailing wind (gently curving across it): broad groups and long ridges in the Rub' al Khali (east and
+  // south-east), low, sparse dunes along Ad Dahna (central, outside the Riyadh plan), small spaced dunes in An Nafud (north).
+  function buildDunes(){
+    const DN = window.VisionDunes; if (!DN) return;
+    // Ground colour exactly as the terrain grid draws it (same lattice and diagonal), so each dune's foot matches it.
+    const xs=saudi.map(p=>p[0]), zs=saudi.map(p=>p[1]), minX=Math.min(...xs), minZ=Math.min(...zs), step=.09, cc=new Map();
+    const lc=(i,j)=>{const k=i+','+j; if(!cc.has(k)) cc.set(k, landColor(minX+i*step, minZ+j*step)); return cc.get(k);};
+    const ground=(x,z)=>{ const fi=(x-minX)/step, fj=(z-minZ)/step, i=Math.floor(fi), j=Math.floor(fj), fx=fi-i, fz=fj-j, c0=lc(i,j), c1=lc(i+1,j), c2=lc(i+1,j+1), c3=lc(i,j+1);
+      return fx>=fz ? [0,1,2].map(k=>c0[k]+fx*(c1[k]-c0[k])+fz*(c2[k]-c1[k])) : [0,1,2].map(k=>c0[k]+fz*(c3[k]-c0[k])+fx*(c2[k]-c3[k])); };
+    // Everything dunes keep clear of: props, rock formations, farms, lava, groves, mission and challenge sites.
+    // (small ones in a spatial hash scanned 3×3; the few large ones — groves, lava, sites — in a short list)
+    const HC=.25, hash=new Map(), big=[], keep=(x,z,r)=>{ if(r>HC){ big.push([x,z,r]); return; } const k=Math.floor(x/HC)+','+Math.floor(z/HC); if(!hash.has(k)) hash.set(k,[]); hash.get(k).push([x,z,r]); };
+    for (const geo3 of [mesh, detailMesh]) for (const arr of Object.values(geo3.inst||{})) for (let i=0;i<arr.length;i+=9) keep(arr[i], arr[i+2], .035);
+    for (const [x,z,r] of sceneryKeep) keep(x,z,r);
+    const sites=v=>Array.isArray(v)&&typeof v[0]==='number'?[v]:v&&typeof v==='object'?Object.values(v).flatMap(sites):[];
+    for (const [x,z] of sites(LY.MISSION_SITES).concat(sites(LY.CHALLENGE_SITES))) keep(x,z,.12);
+    const kept=(x,z)=>{ for (const [kx,kz,r] of big) if (Math.hypot(x-kx,z-kz)<r) return true;
+      const i0=Math.floor(x/HC), j0=Math.floor(z/HC); for (let i=i0-1;i<=i0+1;i++) for (let j=j0-1;j<=j0+1;j++) { const b=hash.get(i+','+j); if (b) for (const [kx,kz,r] of b) if (Math.hypot(x-kx,z-kz)<r) return true; } return false; };
+    const pad=.1, open=(x,z)=>inSaudi(x,z)&&inSaudi(x+pad,z)&&inSaudi(x-pad,z)&&inSaudi(x,z+pad)&&inSaudi(x,z-pad)&&!nearCity(x,z)&&!kept(x,z)
+      &&LY.rails.every(r=>LY.polyDist(x,z,r)>=.07)&&LY.decorAllowed(x,z,.04,.07);
+    // The planner asks this hundreds of thousands of times, so it is memoised on a fine lattice (filled lazily, so the
+    // result never depends on the order of the questions): a point is clear when all four lattice corners round it are.
+    const QC=.0125, QX=minX-1, QZ=minZ-1, QW=Math.ceil((Math.max(...xs)-minX+2)/QC)+2, QH=Math.ceil((Math.max(...zs)-minZ+2)/QC)+2, qm=new Int8Array(QW*QH);
+    const corner=(i,j)=>{ if(i<0||j<0||i>=QW||j>=QH) return false; const k=j*QW+i; if(!qm[k]) qm[k]=open(QX+i*QC,QZ+j*QC)?1:2; return qm[k]===1; };
+    const clear=(x,z)=>{ const i=Math.floor((x-QX)/QC), j=Math.floor((z-QZ)/QC); return corner(i,j)&&corner(i+1,j)&&corner(i,j+1)&&corner(i+1,j+1); };
+    const box=(lon0,lon1,lat0,lat1)=>R=>geo(lon0+R()*(lon1-lon0),lat0+R()*(lat1-lat0));
+    const dahna=[[44.8,28.0],[46.0,26.5],[47.2,24.7],[47.8,22.8],[48.4,21.0]];
+    const belt=R=>{const k=Math.floor(R()*(dahna.length-1)),t=R();return geo(dahna[k][0]+(dahna[k+1][0]-dahna[k][0])*t+(R()-.5)*.45,dahna[k][1]+(dahna[k+1][1]-dahna[k][1])*t+(R()-.5)*.3);};
+    const FIELDS=[
+      {seed:13031, groups:44, gap:.045, sample:box(47.5,55.0,18.8,22.2), wind:(x,z)=>-.85+.2*Math.sin(x*.9+z*.7), kinds:[['ridge',.6],['crescent',.25],['roll',.15]], H:[.028,.046], len:[.17,.3], train:3.6, chain:2, core:.62},   // Rub' al Khali
+      {seed:13032, groups:22, gap:.08, sample:belt, wind:(x,z)=>-2.0+.12*Math.sin(z*1.3), kinds:[['crescent',.45],['roll',.3],['ridge',.25]], H:[.012,.02], len:[.07,.12], train:2},                   // Ad Dahna
+      {seed:13033, groups:30, gap:.07, sample:box(39.8,43.2,27.6,29.3), wind:(x,z)=>-1.0+.15*Math.sin(x*1.1-z*.8), kinds:[['crescent',.5],['ridge',.3],['roll',.2]], H:[.015,.025], len:[.07,.12], train:2.2} // An Nafud
+    ];
+    const groups=[];
+    const emit=(a,b,c,ca,cb,cc2,na,nb,nc)=>addTriN(a,b,c,ca,cb,cc2,na,nb,nc), prev=target, y=G+.002;   // y: the terrain grid's surface
+    for (const f of FIELDS) { const gs=DN.plan(Object.assign({test:clear}, f)); groups.push(...gs);
+      target=duneHi; DN.build(gs, {cell:.0065, y, sink:.0015, ground}, emit);   // one continuous surface per field
+      target=duneLo; DN.build(gs, {cell:.018, y, sink:.0015, ground}, emit);    // Reduced: same shape, coarser lattice
+    }
+    target=prev;
+    window.__visionDunes = groups.map(g => ({x:g.x, z:g.z, r:g.r, n:g.elems.length, kinds:g.elems.map(e => e.kind)}));   // read-only, for tests
+    window.__visionDuneSand = () => { const p=duneHi.p, out=[]; for (let i=0;i<p.length;i+=3) if (p[i+1]>y+.0005) out.push([p[i],p[i+2],p[i+1]-y]); return out; };   // raised sand (x, z, height), for tests
+  }
+
+  // V15: Riyadh site kits (riyadh.js) get the renderer's own geometry helpers; without that file the V14 builders run.
+  const KIT = {G, LY, D, P, C, addBox, addCylinder, addCone, addBlob, addDome, addDisc, addStrip, polyStrip, polyLine, addRod, addTri, addTriN, addQuad, loft, capFan, ellRing,
+    addTree, addPalm, addGhaf, addModel, modelK, mix, shade, sig, inst, mulberry32, najdi, reliefPanel, glassTower, addLine,
+    target:() => target, into:(w, fn) => { const prev = target; target = w === 'detail' ? detailMesh : w === 'mesh' ? mesh : w; try { fn(); } finally { target = prev; } }};
+  const RX = window.VisionRiyadh ? window.VisionRiyadh.init(KIT) : null;
+  buildTerrain(); buildNetworks(); buildLandmarks(); buildCities(); buildMarkerRings(); buildDunes();
 
   // Clouds framing the diorama (drawn lit, but they cast no shadows)
   target = cloudGeo;
@@ -1118,15 +1499,74 @@
     for (const p of D.projects) {
       const st=projectState[p.id], k=tierCount(st), d=st.doneKeys||[], [px,pz]=p.pad, f=p.foot;   // progress lives on the marker pad at the footprint's south edge
       if (d.includes('site') || st.active==='site') addDisc(px,G+.004,pz,.034,st.active==='site'?[.72,.52,.34]:[.80,.66,.48],18);   // graded site pad
-      for (let i=0;i<k;i++) addCylinder(px,G+i*TIER,pz,.016-i*.0016,TIER,shade(p.color,.8+i*.06),12);  // one tier per completed package (V11: compact pedestal)
+      for (let i=0;i<k;i++) addCylinder(px,G+i*TIER,pz,.0125-i*.0012,TIER,shade(p.color,.8+i*.06),12);  // one tier per completed package (V14: slimmer, so buildings lead)
       addCylinder(px,G+k*TIER,pz,.0032,stalkH(k,p.id),[.97,.95,.88],6);
       if (d.includes('materials') && !d.includes('build')) for (let i=0;i<4;i++) addBox(px+.03+(i%2)*.014,G,pz-.01+Math.floor(i/2)*.014,.011,.01,.011,i%2?[.62,.64,.68]:[.86,.72,.46]);  // stockpiled materials
-      if (st.active==='build') { const h=.04+.14*(st.progress||0); addBox(p.x+f*.45,G,p.z-f*.1,.04,h,.04,[.86,.84,.78]); addCrane(p.x+f*.6,p.z-f*.45,.4,[.98,.72,.2]);
+      if (st.active==='build' && SIG[p.id]) addCrane(p.x+f*.62,p.z-f*.5,.4,[.98,.72,.2]);                           // V14: the real frame rises in the landmark layer
+      else if (st.active==='build') { const h=.04+.14*(st.progress||0); addBox(p.x+f*.45,G,p.z-f*.1,.04,h,.04,[.86,.84,.78]); addCrane(p.x+f*.6,p.z-f*.45,.4,[.98,.72,.2]);
         for (let y=.02;y<h;y+=.02) addBox(p.x+f*.45,G+y,p.z-f*.1,.046,.002,.046,[.95,.62,.2]); }                     // rising structure with scaffold bands
-      if (st.active==='utility' || d.includes('utility')) for (let i=0;i<3;i++) { addCylinder(p.x-f*.75+i*.03,G,p.z+f*.35,.003,.06,[.55,.5,.45],5); }  // utility connection poles
+      if (st.active==='utility') for (let i=0;i<3;i++) { addCylinder(p.x-f*.75+i*.03,G,p.z+f*.35,.0019,.045,[.80,.78,.74],5); }  // utility connection poles (V14: while the connection is being made)
       if (k>=6) { addCylinder(px,G+k*TIER,pz,.014,.004,[1,.82,.3],16); }                                               // operational: gold cap
     }
     target=mesh; lineTarget=lines; stageDirty=true;
+    buildSigMesh();
+  }
+  // V14: landmark architecture by real project state (packages from sim.js: design, site, materials, build, utility, test).
+  //   0 before site preparation: nothing (the marker pad shows the graded site)
+  //   1 site prepared: foundations — the building's own footprint as low concrete slabs
+  //   2 main construction: an open concrete frame, cut at a height that follows construction progress
+  //   3 built: the finished exterior (connection and testing still to come)
+  //   4 operational (all six packages): finished, plus finishing details (aircraft at the gates and similar)
+  // Each triangle carries its project's pick id, so selection behaves as it always has: a click on the site selects it.
+  const FRAME=[.84,.82,.78];
+  const sigPhase = st => { const d=st.doneKeys||[]; return (st.done??0)>=6 ? 4 : d.includes('build') ? 3 : st.active==='build' ? 2 : d.includes('site') ? 1 : 0; };
+  // V15: a separate, temporary completed-state preview (?preview=complete, or VisionWorld.debug.previewComplete(true)):
+  // every Riyadh landmark is drawn as operational. Visual only — project state, markers, sim and saves are untouched.
+  let previewDone = new URLSearchParams(location.search).get('preview') === 'complete', previewBadge = null;
+  const visPhase = id => previewDone ? 4 : projectState[id] ? sigPhase(projectState[id]) : 0;
+  function showPreviewBadge(){
+    if (!previewDone) { if (previewBadge) previewBadge.remove(); previewBadge = null; return; }
+    if (previewBadge || !document.body) return; previewBadge = document.createElement('div'); previewBadge.className = 'vn-preview-badge';
+    previewBadge.style.cssText = 'position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:60;padding:4px 10px;border-radius:8px;background:rgba(20,45,70,.82);color:#fff;font:12px/1.4 sans-serif;pointer-events:none';
+    previewBadge.textContent = 'Completed-state preview · visual only · game progress unchanged'; document.body.appendChild(previewBadge);
+  }
+  // Copies a part into a layer (instances included) and gives its vertices the project's pick id.
+  function copyPart(T, ids, g, pc){ if (!g) return; const n0=T.p.length;
+    for (let i=0;i<g.p.length;i++){ T.p.push(g.p[i]); T.c.push(g.c[i]); T.n.push(g.n[i]); }
+    for (const [key, arr] of Object.entries(g.inst||{})) (T.inst[key]=T.inst[key]||[]).push(...arr);
+    for (let i=n0;i<T.p.length;i+=3) ids.push(...pc); }
+  // Construction hoarding round a building's footprint (projects without their own 'prep' part): white panels with a
+  // band in the project colour, a gate on the south side, survey pegs at the corners and a pair of site cabins.
+  function autoPrep(id, s){
+    if (s.box === undefined) { const P=s.full.p; let x0=1e9,x1=-1e9,z0=1e9,z1=-1e9; for (let i=0;i<P.length;i+=3) if (P[i+1]>G+.006) { x0=Math.min(x0,P[i]); x1=Math.max(x1,P[i]); z0=Math.min(z0,P[i+2]); z1=Math.max(z1,P[i+2]); }
+      s.box = x1>x0 && x1-x0<.3 && z1-z0<.3 ? [x0-.006,x1+.006,z0-.006,z1+.006] : null; }
+    if (!s.box) return null; const g=Geo(1), prev=target; target=g; const [x0,x1,z0,z1]=s.box, pr=D.projects.find(p=>p.id===id), band=pr?mix(pr.color,[1,1,1],.25):[.9,.6,.3];
+    const run=(ax,az,bx,bz,gate)=>{ const L=Math.hypot(bx-ax,bz-az), n=Math.max(1,Math.round(L/.01)), rot=Math.atan2(bz-az,bx-ax);
+      for (let i=0;i<n;i++){ const t=(i+.5)/n; if (gate && Math.abs(t-.5)<.09) continue; const x=ax+(bx-ax)*t, z=az+(bz-az)*t;
+        addBox(x,G,z,L/n-.0006,.0042,.0007,[.95,.95,.93],rot); addBox(x,G+.0042,z,L/n-.0006,.0011,.0009,band,rot); } };
+    run(x0,z0,x1,z0); run(x1,z0,x1,z1); run(x1,z1,x0,z1,true); run(x0,z1,x0,z0);
+    for (const [x,z] of [[x0,z0],[x1,z0],[x1,z1],[x0,z1]]) addBox(x,G,z,.0014,.006,.0014,[.95,.52,.18]);
+    for (let i=0;i<2;i++) { addBox(x0+.008+i*.0085,G,z1-.007,.0075,.0042,.0045,[.93,.94,.95]); addBox(x0+.008+i*.0085,G+.0042,z1-.007,.0078,.0008,.0048,[.30,.50,.72]); }
+    target=prev; return g;
+  }
+  function buildSigMesh(){
+    const T=sigMesh; T.p.length=T.c.length=T.n.length=sigIds.length=0; T.inst={};
+    for (const M of [propMesh, tinyMesh, litMesh]) { M.p.length=M.c.length=M.n.length=0; M.inst={}; } propIds.length=tinyIds.length=litIds.length=0;
+    for (const [id, s] of Object.entries(SIG)) {
+      const st=projectState[id]; if (!st) continue; const ph=visPhase(id);
+      const k=PIDX[id]||0, pc=[(k&255)/255,((k>>8)&255)/255,k?1:0];
+      if (ph<=2) copyPart(T, sigIds, s.prep || (s.prep = autoPrep(id, s)), pc);   // V15: hoarding while the site is prepared and built
+      if (!ph) continue;
+      const n0=T.p.length;
+      if (s.top == null) { let t=G; for (let i=1;i<s.full.p.length;i+=3) t=Math.max(t,s.full.p[i]); s.top=t; }
+      if (ph>=3) { copyPart(T, sigIds, s.full, pc); if (ph===4) { copyPart(T, sigIds, s.fin, pc); copyPart(propMesh, propIds, s.props, pc); copyPart(tinyMesh, tinyIds, s.tiny, pc); copyPart(litMesh, litIds, s.lit, pc); } continue; }
+      { const yc = ph===1 ? G+.0035 : G+.008+(s.top-G-.008)*Math.max(.04,Math.min(1,st.progress||0)), P=s.full.p, Cc=s.full.c, N=s.full.n;
+        for (let t=0;t<P.length;t+=9) { const hi=(P[t+1]>yc)+(P[t+4]>yc)+(P[t+7]>yc);
+          if (hi===3) { if (N[t+1]+N[t+4]+N[t+7] < 1.5) continue;                                     // above the cut only floors remain, at the working level
+            for (let j=0;j<9;j+=3) { T.p.push(P[t+j],yc,P[t+j+2]); T.c.push(...shade(FRAME,ph===1?.96:1.04)); T.n.push(0,1,0); } }
+          else for (let j=0;j<9;j+=3) { T.p.push(P[t+j],Math.min(P[t+j+1],yc),P[t+j+2]); const c=[Cc[t+j],Cc[t+j+1],Cc[t+j+2]]; T.c.push(...(ph===1?FRAME:mix(c,FRAME,.72))); T.n.push(N[t+j],N[t+j+1],N[t+j+2]); } } }
+      for (let i=n0;i<T.p.length;i+=3) sigIds.push(...pc);
+    }
   }
   buildStageMesh();
 
@@ -1285,6 +1725,10 @@
 
   renderer.setPixelRatio(1); renderer.autoClear = false;
   const scene3 = new THREE.Scene(), cam3 = new THREE.PerspectiveCamera(.5 * 180 / Math.PI, 1, .1, 140), clearCol = new THREE.Color();
+  const cosmetics=window.VisionCosmetics?.(THREE,scene3,D,LY,G);
+  const kingdomDiorama=window.VisionKingdomDiorama?.(THREE,scene3,D,LY,geo,saudi,inSaudi);
+  const countryOverview=window.VisionCountryOverview?.(THREE,scene3,D,LY,geo,saudi,inSaudi,rockLo,triangulate(saudi).tris);
+  const frameRenderStats={calls:0,triangles:0};
   const nearest = {minFilter:THREE.NearestFilter, magFilter:THREE.NearestFilter, generateMipmaps:false, depthBuffer:true};
   const shadowRT = new THREE.WebGLRenderTarget(SHADOW_SIZE, SHADOW_SIZE, nearest);
   // Uniforms shared by every material (the same values the original renderer set once per frame).
@@ -1299,6 +1743,14 @@
   const addObj = (o, ud) => { o.frustumCulled = false; o.userData = ud; scene3.add(o); OBJS.push(o); return o; };
 
   // Grow-only dynamic attributes; the draw range follows the live vertex count.
+  // Explicit authored palette assignments; default stone/soil/foliage is rough.
+  const surfaceKey=(r,g,b)=>Math.round(r*1000)+','+Math.round(g*1000)+','+Math.round(b*1000);
+  const surfaces=new Map([
+    [[.50,.64,.76],.26], [[.42,.57,.63],.30], [[.70,.82,.90],.25],
+    [[.30,.38,.46],.28], [[.96,.96,.95],.44], [[.86,.87,.88],.48],
+    [[.68,.70,.71],.52], [[.83,.79,.70],.88], [[.29,.48,.30],.92]
+  ].map(([c,r])=>[surfaceKey(...c),r]));
+  function roughnessArray(colors){const a=new Float32Array(colors.length/3);for(let i=0;i<a.length;i++)a[i]=surfaces.get(surfaceKey(colors[i*3],colors[i*3+1],colors[i*3+2]))??.84;return a;}
   function fillDyn(g, n, attrs){
     for (const name in attrs) { const [arr, size] = attrs[name]; let a = g.getAttribute(name);
       if (!a || a.count < n) { a = new THREE.BufferAttribute(new Float32Array(Math.max(n, a ? a.count * 2 : 0, 4) * size), size); a.setUsage(THREE.DynamicDrawUsage); g.setAttribute(name, a); }
@@ -1310,8 +1762,21 @@
   const LAYERS = {
     mesh:{geo:mesh, glow:0, cast:1, pick:'ids'},
     detail:{geo:detailMesh, glow:0, cast:1, pick:'occ', when:() => detailOn()},
+    rock:{geo:rockHi, glow:0, cast:1, pick:'occ', when:() => quality !== 'low'},     // V12: rock formations, full detail
+    rockLo:{geo:rockLo, glow:0, cast:1, pick:'occ', when:() => quality === 'low'},   // ... and the light version on Reduced
+    // V13: sand dunes. Never in the pick pass (selection and placement ignore them), and no shadow casting: their slip
+    // faces are flatter than the sun is high, so they would only add shadow-map acne along the crests.
+    dune:{geo:duneHi, glow:0, cast:0, pick:null, when:() => quality !== 'low'},
+    duneLo:{geo:duneLo, glow:0, cast:0, pick:null, when:() => quality === 'low'},
     stage:{geo:stageMesh, glow:.05, cast:1, pick:'ids'},
-    veh:{geo:vehGeo, glow:.08, cast:1, pick:'occ'},
+    // V14: Riyadh landmark architecture by construction stage; pick ids come with the geometry (one per project).
+    landmark:{geo:sigMesh, glow:0, cast:1, pick:'ids', ids:() => new Float32Array(sigIds)},
+    // V15: close-view life round the landmarks (ground services, kiosks, benches, queues), High and Medium; people and
+    // edge lights on High only. Both appear only as the camera approaches, and select their project like its buildings.
+    landmarkProps:{geo:propMesh, glow:0, cast:1, pick:'ids', ids:() => new Float32Array(propIds), when:() => quality !== 'low' && camera.dist < PROPS_DIST},
+    landmarkLit:{geo:litMesh, glow:.7, cast:0, pick:'ids', ids:() => new Float32Array(litIds)},
+    landmarkTiny:{geo:tinyMesh, glow:.05, cast:0, pick:'ids', ids:() => new Float32Array(tinyIds), when:() => quality === 'high' && camera.dist < PROPS_DIST},
+    veh:{geo:vehGeo, glow:.08, cast:1, pick:null},
     mission:{geo:missionMesh, glow:.04, cast:1, pick:'ids'},
     city:{geo:cityMesh, glow:.03, cast:1, pick:null},
     cloud:{geo:cloudGeo, glow:.42, cast:0, pick:null}
@@ -1328,6 +1793,7 @@
   // parts (trunk, door, windows) exactly as before. aTintK is recovered by building the prototype at two tints.
   const PROTOS = {};
   const PROTO_DEF = key => {
+    if (RX && RX.protos[key]) return RX.protos[key];   // V15: riyadh.js props (aircraft, ground services, rides, people, furniture)
     const ship = /^ship(\d)(\d)$/.exec(key);
     if (ship) { const hull = ship[1] === '1' ? [.92,.30,.24] : [.20,.36,.62], kk = +ship[2];
       return {dy:0, build:() => { addBox(0,SEA-.004,0,.075,.016,.022,hull); addBox(0,SEA+.012,0,.07,.004,.02,[.97,.97,.95]); addBox(-.028,SEA+.016,0,.014,.022,.018,[1,1,1]);
@@ -1342,6 +1808,7 @@
       car0:{dy:0, build:() => { addBox(0,G+.006,0,.03,.013,.013,[.98,.96,.92]); addBox(0,G+.019,0,.03,.002,.014,[.86,.68,.30]); }},
       car1:{dy:0, build:() => { addBox(0,G+.006,0,.03,.013,.013,[.30,.55,.85]); addBox(0,G+.019,0,.03,.002,.014,[.95,.95,.95]); }},
       plane:{dy:0, build:() => { addBox(0,0,0,.07,.012,.012,[.98,.98,.98]); addBox(0,.004,0,.016,.003,.085,[.90,.92,.95]); addBox(-.03,.006,0,.012,.018,.004,[.14,.52,.34]); addBox(-.03,.006,0,.01,.003,.03,[.9,.92,.95]); }},
+      metroCar:{dy:0, build:() => { addBox(0,0,0,.0165,.0052,.0046,[.95,.96,.98]); addBox(0,.0024,0,.0167,.0015,.0047,[.24,.32,.46]); addBox(0,.0006,0,.0167,.0007,.0047,[.20,.45,.85]); }},   // V14
       convoy:{dy:0, tint:1, build:c => { addBox(0,G+.003,0,.034,.016,.014,c); addBox(.024,G+.003,0,.013,.018,.014,[.96,.96,.94]); }}
     }[key];
   };
@@ -1354,28 +1821,31 @@
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(A.c), 3));
     g.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(A.n), 3)); g.setAttribute('aTintK', new THREE.BufferAttribute(tk, 1));
+    g.setAttribute('aRoughness',new THREE.BufferAttribute(roughnessArray(A.c),1));
     return PROTOS[key] = {g, top, tris:n / 3};
   }
   function makeInstanced(L, key, cap, old){
     const P = proto(key), g = new THREE.BufferGeometry();
-    for (const nm of ['position', 'color', 'normal', 'aTintK']) g.setAttribute(nm, P.g.getAttribute(nm));
+    for (const nm of ['position', 'color', 'normal', 'aTintK', 'aRoughness']) g.setAttribute(nm, P.g.getAttribute(nm));
     g.setAttribute('aPick', new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3));
     const im = new THREE.InstancedMesh(g, L.mainI, cap); im.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     im.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3); im.count = 0;
-    if (old) { scene3.remove(old); OBJS.splice(OBJS.indexOf(old), 1); }
-    addObj(im, {L, inst:true, cap, mats:{main:L.mainI, depth:DEPTH[1], pick:L.pick ? PICK[L.pick][1] : null}});
+    if (old) { scene3.remove(old); OBJS.splice(OBJS.indexOf(old), 1); old.dispose();
+      for(const nm of ['position','color','normal','aTintK','aRoughness']) old.geometry.deleteAttribute(nm);
+      old.geometry.dispose(); } // Dispose owned instance buffers; retain shared prototype attributes/materials.
+    addObj(im, {L, inst:true, kind:key, cap, mats:{main:L.mainI, depth:DEPTH[1], pick:L.pick ? PICK[L.pick][1] : null}});
     return L.insts[key] = im;
   }
-  // Instance record: [x, y, z, yaw, scale, r, g, b]. Yaw follows addBox: local +x → (cos, sin) in x/z.
+  // Instance record: [x, y, z, yaw, scale, r, g, b, pitch]. Yaw follows addBox: local +x → (cos, sin) in x/z.
   function syncInstances(L){
     const data = L.geo.inst || {};
     for (const key of new Set([...Object.keys(L.insts), ...Object.keys(data)])) {
-      const arr = data[key] || [], n = arr.length / 8; let im = L.insts[key];
+      const arr = data[key] || [], n = arr.length / 9; let im = L.insts[key];
       if (!im && !n) continue;
       if (!im || im.userData.cap < n) im = makeInstanced(L, key, Math.max(16, n * 2), im);
       const M = im.instanceMatrix.array, Cc = im.instanceColor.array, Pk = im.geometry.getAttribute('aPick').array;
-      for (let i = 0; i < n; i++) { const o = i * 8, x = arr[o], y = arr[o+1], z = arr[o+2], k = arr[o+4], cs = Math.cos(arr[o+3]) * k, sn = Math.sin(arr[o+3]) * k, m = i * 16;
-        M[m]=cs; M[m+1]=0; M[m+2]=sn; M[m+3]=0; M[m+4]=0; M[m+5]=k; M[m+6]=0; M[m+7]=0; M[m+8]=-sn; M[m+9]=0; M[m+10]=cs; M[m+11]=0; M[m+12]=x; M[m+13]=y; M[m+14]=z; M[m+15]=1;
+      for (let i = 0; i < n; i++) { const o = i * 9, x = arr[o], y = arr[o+1], z = arr[o+2], k = arr[o+4], cs = Math.cos(arr[o+3]) * k, sn = Math.sin(arr[o+3]) * k, m = i * 16;
+        const cp=Math.cos(arr[o+8]), sp=Math.sin(arr[o+8]); M[m]=cs*cp; M[m+1]=k*sp; M[m+2]=sn*cp; M[m+3]=0; M[m+4]=-cs*sp; M[m+5]=k*cp; M[m+6]=-sn*sp; M[m+7]=0; M[m+8]=-sn; M[m+9]=0; M[m+10]=cs; M[m+11]=0; M[m+12]=x; M[m+13]=y; M[m+14]=z; M[m+15]=1;
         Cc[i*3] = arr[o+5]; Cc[i*3+1] = arr[o+6]; Cc[i*3+2] = arr[o+7];
         if (L.pick === 'ids') { const id = idOf(x, z); Pk[i*3] = (id & 255) / 255; Pk[i*3+1] = ((id >> 8) & 255) / 255; Pk[i*3+2] = id ? 1 : 0; } }
       im.count = n; im.instanceMatrix.needsUpdate = true; im.instanceColor.needsUpdate = true; im.geometry.getAttribute('aPick').needsUpdate = true;
@@ -1383,7 +1853,8 @@
   }
   function syncLayer(name){
     const L = LAYERS[name], geo = L.geo, n = geo.p.length / 3, at = {position:[geo.p, 3], color:[geo.c, 3], normal:[geo.n, 3]};
-    if (L.pick === 'ids') at.aPick = [idColors(geo), 3];
+    at.aRoughness=[roughnessArray(geo.c),1];
+    if (L.pick === 'ids') at.aPick = [L.ids ? L.ids() : idColors(geo), 3];
     fillDyn(L.obj.geometry, n, at); syncInstances(L);
   }
 
@@ -1398,34 +1869,90 @@
   const syncLines = (o, L) => fillDyn(o.geometry, L.p.length / 3, {position:[L.p, 3], color:[L.c, 3]});
 
   // Static layers: uploaded once.
-  syncLayer('mesh'); syncLayer('detail'); syncLayer('cloud'); syncLines(linesObj, lines);
+  syncLayer('mesh'); syncLayer('detail'); syncLayer('rock'); syncLayer('rockLo'); syncLayer('dune'); syncLayer('duneLo'); syncLayer('cloud'); syncLines(linesObj, lines);
+
+  // Static geometry is also uploaded in local cells for close-view culling. Keep
+  // original batches for the national overview and the complete sun-shadow pass.
+  // Triangles are copied intact (including normals, colours and picking IDs).
+  const spatialEnabled = new URLSearchParams(location.search).get('culling') === 'on';
+  const CELL_SIZE = .30, SPATIAL_DIST = 1.8;
+  const spatialRoot=new THREE.Group();scene3.add(spatialRoot);
+  let spatialBuilt=false;
+  const cellOf = (x,z) => Math.floor(x/CELL_SIZE)+','+Math.floor(z/CELL_SIZE);
+  function makeSpatialLayer(L){
+    const src=L.obj.geometry, count=L.geo.p.length/3, cells=new Map();
+    const position=src.getAttribute('position').array;
+    for(let v=0;v<count;v+=3){const j=v*3,key=cellOf((position[j]+position[j+3]+position[j+6])/3,(position[j+2]+position[j+5]+position[j+8])/3);
+      if(!cells.has(key))cells.set(key,[]);cells.get(key).push(v,v+1,v+2);}
+    for(const indices of cells.values()){
+      const g=new THREE.BufferGeometry();
+      for(const [name,attribute] of Object.entries(src.attributes)){
+        const size=attribute.itemSize, values=new Float32Array(indices.length*size);
+        for(let i=0;i<indices.length;i++)for(let c=0;c<size;c++)values[i*size+c]=attribute.array[indices[i]*size+c];
+        g.setAttribute(name,new THREE.BufferAttribute(values,size));
+      }
+      g.computeBoundingSphere();
+      spatialRoot.add(addObj(new THREE.Mesh(g,L.main),{L,spatial:true,mats:L.obj.userData.mats}));
+    }
+    for(const [key,original] of Object.entries(L.insts)){
+      const records=L.geo.inst[key], groups=new Map();
+      for(let i=0;i<original.count;i++){const o=i*9,cell=cellOf(records[o],records[o+2]);if(!groups.has(cell))groups.set(cell,[]);groups.get(cell).push(i);}
+      for(const indices of groups.values()){
+        const g=new THREE.BufferGeometry(),n=indices.length;
+        for(const name of ['position','color','normal','aTintK','aRoughness'])g.setAttribute(name,original.geometry.getAttribute(name));
+        const pick=new Float32Array(n*3),color=new Float32Array(n*3),im=new THREE.InstancedMesh(g,L.mainI,n);
+        const sourcePick=original.geometry.getAttribute('aPick').array;
+        for(let i=0;i<n;i++){
+          const j=indices[i];im.instanceMatrix.array.set(original.instanceMatrix.array.subarray(j*16,j*16+16),i*16);
+          color.set(original.instanceColor.array.subarray(j*3,j*3+3),i*3);pick.set(sourcePick.subarray(j*3,j*3+3),i*3);
+        }
+        g.setAttribute('aPick',new THREE.InstancedBufferAttribute(pick,3));
+        im.instanceColor=new THREE.InstancedBufferAttribute(color,3);im.instanceMatrix.needsUpdate=true;
+        im.computeBoundingSphere();
+        spatialRoot.add(addObj(im,{L,spatial:true,inst:true,mats:original.userData.mats}));
+      }
+    }
+    L.spatialReady=true;
+  }
+  function ensureSpatial(){if(!spatialEnabled||spatialBuilt)return;for(const name of ['mesh','detail','rock','rockLo','dune','duneLo'])makeSpatialLayer(LAYERS[name]);spatialBuilt=true;}
   // Top of each project's model (for label placement): the highest vertex (or instance) inside its footprint.
   const topY = Object.fromEntries(D.projects.map(p => [p.id, G+.1]).concat([[CORE_ID, G+.1]], PLACE_IDS.map(id => [id, G+.06])));
   for (let i=0;i<mesh.p.length;i+=3) { const id=LY.footprintAt(mesh.p[i],mesh.p[i+2]); if (id && mesh.p[i+1]>topY[id]) topY[id]=mesh.p[i+1]; }
-  for (const [key, arr] of Object.entries(mesh.inst)) { const P = proto(key); for (let i = 0; i < arr.length; i += 8) { const id = LY.footprintAt(arr[i], arr[i+2]), y = arr[i+1] + P.top * arr[i+4]; if (id && y > topY[id]) topY[id] = y; } }
-  const instTris = geo => Object.entries(geo.inst || {}).reduce((t, [k, a]) => t + proto(k).tris * a.length / 8, 0);
-  window.__visionStats = {triangles:(mesh.p.length + detailMesh.p.length + cloudGeo.p.length) / 9 + instTris(mesh) + instTris(detailMesh), detailTriangles:detailMesh.p.length / 9 + instTris(detailMesh),
-    water:WATER.idx.length / 3, lines:lines.p.length / 6, instances:Object.values(mesh.inst).concat(Object.values(detailMesh.inst)).reduce((n, a) => n + a.length / 8, 0), renderer:'three'};
+  for (const [id, sg] of Object.entries(SIG)) for (let i=1;i<sg.full.p.length;i+=3) if (sg.full.p[i]>topY[id]) topY[id]=sg.full.p[i];   // V14: labels sit above the finished building
+  for (const [key, arr] of Object.entries(mesh.inst)) { const P = proto(key); for (let i = 0; i < arr.length; i += 9) { const id = LY.footprintAt(arr[i], arr[i+2]), y = arr[i+1] + P.top * arr[i+4]; if (id && y > topY[id]) topY[id] = y; } }
+  const instTris = geo => Object.entries(geo.inst || {}).reduce((t, [k, a]) => t + proto(k).tris * a.length / 9, 0);
+  window.__visionStats = {triangles:(mesh.p.length + detailMesh.p.length + rockHi.p.length + duneHi.p.length + cloudGeo.p.length) / 9 + instTris(mesh) + instTris(detailMesh), detailTriangles:detailMesh.p.length / 9 + instTris(detailMesh),
+    rockTriangles:rockHi.p.length / 9, rockTrianglesReduced:rockLo.p.length / 9, duneTriangles:duneHi.p.length / 9, duneTrianglesReduced:duneLo.p.length / 9, landmarkTriangles:() => sigMesh.p.length / 9, landmarkTrianglesFull:Object.values(SIG).reduce((n, s2) => n + (s2.full.p.length + s2.fin.p.length) / 9, 0),
+    landmarkProps:() => ({props:propMesh.p.length / 9 + instTris(propMesh), tiny:tinyMesh.p.length / 9 + instTris(tinyMesh), landmarkInst:instTris(sigMesh)}), missingModels:[...missingModels],
+    water:WATER.idx.length / 3, lines:lines.p.length / 6, instances:Object.values(mesh.inst).concat(Object.values(detailMesh.inst)).reduce((n, a) => n + a.length / 9, 0), renderer:'three'};
   // Each pass picks every object's material and visibility, mirroring what the original renderer drew in that pass.
   function renderPass(pass){
+    cosmetics?.pass(pass);
+    kingdomDiorama?.pass(pass);
+    countryOverview?.pass(pass);
+    spatialRoot.visible=pass!=='depth' && spatialBuilt && camera.dist<SPATIAL_DIST;
     for (const o of OBJS) { const u = o.userData, L = u.L; let v = !L || !L.when || L.when();
+      if(L && L.spatialReady){const useCells=pass!=='depth' && camera.dist<SPATIAL_DIST;v=v && !!u.spatial===useCells;}
+      o.frustumCulled=!!u.spatial && pass!=='depth';
       if (pass === 'depth') v = v && !!(L && L.cast); else if (pass === 'pick') v = v && !!(L && L.pick);
-      if (u.inst) v = v && o.count > 0;
+      if (u.inst) v = v && o.count > 0; if(countryOverview&&camera.dist>6&&u.kind==='tree')v=false;
+      if(countryOverview&&camera.dist>6&&[LAYERS.rock,LAYERS.rockLo,LAYERS.dune,LAYERS.duneLo,LAYERS.cloud].includes(u.L))v=false;
       o.visible = v; if (v) o.material = u.mats[pass]; }
   }
 
   /* ------------------------------ camera ---------------------------- */
   const K = D.regions.kingdom;
   const FOV = .5, EYE = Math.tan(.36)/Math.tan(FOV/2); // narrower lens = closer to an isometric miniature look
-  const camera = {az:K.az-.35, el:1.42, dist:K.dist*1.5, target:[K.x,0,K.z], desired:{az:K.az, el:K.el, dist:K.dist, target:[K.x,0,K.z]}};
+  const camera = {az:K.az-.35, el:1.42, dist:K.dist*regionFit(K)*1.5, target:[K.x,0,K.z], desired:{az:K.az, el:K.el, dist:K.dist*regionFit(K), target:[K.x,0,K.z]}};
+  let countryAutoFrame=true,viewAspect=innerWidth/innerHeight;
   let width=0, height=0, dpr=1, vp, eye=[0,0,0], storm=0, stormTarget=0, directMode=false, selectedId=null, hoverId=null, onSelect=()=>{};
   let onPlace=()=>{}, onRegion=()=>{}, hazard=null, entities=[], overlay=[], convoyList=[], groundHandler=null, tint=[.80,.58,.32], follow=null;
   const TINTS={dust:[.80,.58,.32], rain:[.50,.58,.68], heat:[1.0,.74,.50]};
   const dynLines={p:[],c:[]}; let dynLineBuf=null;
-  let night=0, nightTarget=0, camSpeed=1, beaconsOn=true, bursts=[], missionScene=null, missionLights=[];
+  let night=0, nightTarget=0, camSpeed=1, beaconsOn=true, bursts=[], missionScene=null, missionLights=[], captureTime=null;
   const bounds={minX:-7,maxX:8,minZ:-6,maxZ:7};
 
-  function resize(){dpr=Math.min(devicePixelRatio||1,quality==='low'?1:2)*resScale;const w=Math.floor(innerWidth*dpr),h=Math.floor(innerHeight*dpr);if(canvas.width!==w||canvas.height!==h)renderer.setSize(w,h,false);width=w;height=h;}
+  function resize(){const aspect=innerWidth/innerHeight;if(countryAutoFrame&&Math.abs(aspect-viewAspect)>.01)camera.desired.dist=K.dist*regionFit(K);viewAspect=aspect;dpr=Math.min(devicePixelRatio||1,quality==='low'?1:2)*resScale;const w=Math.floor(innerWidth*dpr),h=Math.floor(innerHeight*dpr);if(canvas.width!==w||canvas.height!==h)renderer.setSize(w,h,false);width=w;height=h;}
   function updateCamera(dt){
     const k=1-Math.pow(.001,dt/1000*0.9*camSpeed);
     camera.az+=(camera.desired.az-camera.az)*k; camera.el+=(camera.desired.el-camera.el)*k; camera.dist+=(camera.desired.dist-camera.dist)*k;
@@ -1447,6 +1974,9 @@
   const CLUSTER_DIST = 8.5;
   const cityLights = []; { const rl=(s=>()=>{s=(s*16807)%2147483647;return s/2147483647;})(77); for (const c of D.cities) { const n=Math.round(20+c.size*110), R=.06+c.size*.3; for (let i=0;i<n;i++){ const a=rl()*6.283, r=Math.sqrt(rl())*R; const warm=rl(); cityLights.push([c.x+Math.cos(a)*r, c.z+Math.sin(a)*r*.85, 1, .72+warm*.2, .38+warm*.25, 2.2+rl()*2.2]); } } }
   const clusters = Object.values(D.projects.filter(p=>p.cl).reduce((m,p)=>{ const d=LY.cityDisplay[p.cl], c=d?{x:d[0],z:d[1]}:C(p.cl); (m[p.cl]=m[p.cl]||{anchor:p.cl,x:c.x,z:c.z,ids:[]}).ids.push(p.id); return m; },{}));
+  // V14: Riyadh Metro trains — two three-car trains, one per track, running end to end in opposite directions (each
+  // re-enters at its terminus), once the line is built. Decorative only: not connected to the simulation.
+  const metroPaths=[.0022,-.0022].map(o=>{ const M=LY.METRO_ROUTE; return M.map((q,i)=>{ const a=M[Math.max(0,i-1)], b=M[Math.min(M.length-1,i+1)], L=Math.hypot(b[0]-a[0],b[1]-a[1]); return [q[0]-(b[1]-a[1])/L*o, q[1]+(b[0]-a[0])/L*o]; }); }), metroL=metroPaths.map(pathLen);
   const heading=(path,L,q,dir)=>{const a=along(path,L,Math.min(.9999,Math.max(0,q))),b=along(path,L,Math.min(.9999,Math.max(0,q+(dir?.002:-.002))));return [a[0],a[1],Math.atan2(b[1]-a[1],b[0]-a[0])];};
   const flights=[['Riyadh','Jeddah'],['Riyadh','Dammam'],['Jeddah','Tabuk'],['Riyadh','Abha'],['Madinah','Riyadh']].map(([a,b])=>[C(a),C(b)]);
   function buildVehicles(t){
@@ -1458,12 +1988,15 @@
     }});
     railPaths.forEach((path,r)=>{const L=railL[r];for(let k=0;k<2;k++){const q0=((t*.00005)/L[L.length-1]*4+k*.5+r*.17)%1;
       for(let c=0;c<4;c++){const q=Math.max(.001,q0-c*.0065*(3/L[L.length-1])),[x,z,rot]=heading(path,L,q,true); inst(r===0?'car0':'car1', x, 0, z, rot, 1);}}});
+    if (camera.dist < DETAIL_DIST && projectState.metro && visPhase('metro') >= 3) metroPaths.forEach((path,r)=>{ const L=metroL[r], Lt=L[L.length-1], q0=(t/36000+r*.5)%1;
+      for (let c=0;c<3;c++){ const q=q0-c*.0175/Lt; if (q<0) continue; const [x,z,rot]=heading(path,L,r?1-q:q,!r); inst('metroCar',x,G+.0123,z,rot,1); } });
     if (camera.dist >= DETAIL_DIST) flights.forEach(([a,b],i)=>{   // V9: decorative flights only in the overview — in close views they crossed downtown towers and labels
       const q=((t*.00002*(1+i*.13))+i*.21)%1, f=i%2?q:1-q, A=i%2?a:b, B=i%2?b:a;
       const x=A.x+(B.x-A.x)*f, z=A.z+(B.z-A.z)*f, y=G+.12+Math.sin(Math.PI*f)*.45, rot=Math.atan2(B.z-A.z,B.x-A.x); inst('plane', x, y, z, rot, 1);});
+    if (RX && camera.dist < PROPS_DIST && quality !== 'low') RX.animate(t, {phase:visPhase, quality});   // V15: coaster trains, airside service traffic
     for (const cv of convoyList) inst('convoy', cv.x, 0, cv.z, cv.rot, 1, cv.color||[.95,.62,.18]);
     const bladeCol=[.97,.97,.96];
-    for (const [x,y,z,k] of turbines){ const a0=t*.003+x*7; for(let b=0;b<3;b++){const a=a0+b*2.094,L=.075*k,w=.006*k,ca=Math.cos(a),sa=Math.sin(a),px=-sa*w,py=ca*w;
+    for (const [x,y,z,k] of turbines){ const a0=(quality==='low'?0:t*.003)+x*7; /* V15: blades rest on Reduced */ for(let b=0;b<3;b++){const a=a0+b*2.094,L=.075*k,w=.006*k,ca=Math.cos(a),sa=Math.sin(a),px=-sa*w,py=ca*w;
       addTri([x+px,y+py,z],[x-px,y-py,z],[x+ca*L,y+sa*L,z],bladeCol);}}
     target=mesh;
   }
@@ -1526,6 +2059,7 @@
   const labels = [];
   let projLabelsOn = true;
   function makeLabel(text, cls, x, y, z, priority){ const el=document.createElement('span'); el.className='map-label '+cls; el.textContent=text; labelLayer.appendChild(el); const L={el,x,y,z,priority,w:0,h:0,dx:0,dy:0,base:text}; labels.push(L); return L; }
+  for(const site of Object.values(window.VisionScenicSites||{})){if(site.x==null)continue;const L=makeLabel(site.name,'road-name scenic-label',site.x,G+site.y+.012,site.z,3);L.scenic=site;L.el.style.pointerEvents='none';}
   for (const l of D.labels) { if (l.kind==='place' && LY.planAt(...geo(l.lon,l.lat), .1)) continue; const [x,z]=geo(l.lon,l.lat); makeLabel(l.text, l.kind, x, l.kind==='sea'?SEA:l.kind==='place'?G:NEI, z, l.kind==='place'?8:l.kind==='sea'?1:0); }
   // City labels sit where the city is drawn (its place on a regional plan); on a plan they select that place.
   const placeOfCity = name => Object.values(LY.places || {}).find(q => q.city === name);
@@ -1587,17 +2121,20 @@
     const focus = (hoverViaLabel ? null : hoverId) || selectedId, cand = [];
     for (const L of labels) {
       let show = true, x=L.x, y=L.y, z=L.z, pri=L.priority;
+      if(L.scenic){const text=document.documentElement.dir==='rtl'?L.scenic.ar:L.scenic.name;if(L.el.textContent!==text){L.el.textContent=text;L.w=0;}}
       if (L===projLabel) { const p=focus&&P(focus); if(!p||!projLabelsOn){show=false;} else { const k=Math.min(6,(projectState[p.id]||{}).done||0), key=p.id+':'+k; if (L.key!==key) { L.key=key; L.el.innerHTML=''; const b=document.createElement('b'); b.textContent=mapName(p); const m=document.createElement('small'); m.className='pl-metric'; m.textContent=k+'/6'; L.el.append(b, m); L.w=0; } L.el.dataset.pid=p.id; x=p.x; z=p.z; y=topY[p.id]+.035; } }
       else if ((L.cluster||L.small) && !projLabelsOn) show = false;
-      else if (L.cluster) show = far > CLUSTER_DIST;
+      else if (L.cluster) show = far > CLUSTER_DIST && !(countryOverview&&far>6);
       else if (L.region) show = far > 9;
       else if (L.district) show = far < 7;
       else if (L.heading) show = far < 6.5;
+      else if (L.scenic) show = projLabelsOn && far<4.4;
       else if (L.note) show = projLabelsOn && far < 5.2;
       else if (L.road) show = projLabelsOn && far < 4.2;
       else if (L.small) { show = far < (innerWidth < 600 ? 6.2 : 5.2) && L.pid!==focus;   /* phones frame regions from further out */ y = topY[L.pid]+.012; }
       else if (L.el.classList.contains('country')||L.el.classList.contains('sea')) show = far > 6.5;
       else if (!L.el.classList.contains('capital')) show = L.minor ? far < 11 : far < 24;   // distant view: major cities only
+      if(countryOverview&&far>6&&L.el.classList.contains('city'))y=G+.29;
       const s = show && project([x,y,z]);
       if (!s || s[2]>1 || s[0]<-60 || s[1]<-30 || s[0]>innerWidth+60 || s[1]>innerHeight+30) { hideLabel(L); continue; }
       if (L.small) pri = 2 + .9 * (1 - Math.min(1, Math.hypot(s[0]-cx, s[1]-cy) / diag)) + (ESSENTIAL_LABELS.has(L.pid) ? 1 : 0);   // nearer the middle = more relevant; key districts first
@@ -1612,7 +2149,7 @@
     for (const [id, pts] of LANDMARK_POINTS) for (const q of pts) { const a = project([q[0], G + .01, q[1]]); if (a && a[2] <= 1 && a[0] > -20 && a[0] < innerWidth + 20 && a[1] > -20 && a[1] < innerHeight + 20) anchors.push([id, a[0], a[1]]); }
     const coversOther = (r, pid) => anchors.some(([id, x, y]) => id !== pid && x > r.x - 4 && x < r.x + r.w + 4 && y > r.y - 4 && y < r.y + r.h + 4);
     for (const {L, s} of cand) {
-      measure(L); if (L===projLabel) { L.w=L.el.offsetWidth; L.h=L.el.offsetHeight; }
+      if(countryOverview&&far>6)L.w=0; measure(L); if (L===projLabel) { L.w=L.el.offsetWidth; L.h=L.el.offsetHeight; }
       const lift = L.el.classList.contains('city')||L===projLabel||L.cluster ? 18 : L.small ? 8 : 0;
       const at = w => ({x:Math.max(6, Math.min(innerWidth - w - 6, s[0]-w/2+(far>7?L.dx:0))), y:s[1]-L.h/2-lift+(far>7?L.dy:0), w, h:L.h});   // every label stays fully on screen
       // Decorative names (seas, countries, headings, corridors, the plan note) never sit over any landmark: they give way first.
@@ -1633,7 +2170,7 @@
   labelLayer.addEventListener('click', e => { const rg=e.target.closest('[data-region]'); if (rg) { hideChoices(); onRegion(rg.dataset.region); return; }
     const el=e.target.closest('[data-pid]'); if (!el || !selectable) return; hideChoices(); pickSelect(el.dataset.pid); });
   let lastPick=null;   // last map selection (tests)
-  const regionFit = r => r.fitWidth ? Math.min(r.phoneFit || 1.5, Math.max(1, Math.sqrt(1.1/(innerWidth/innerHeight)))) : 1;   // tall plans need less pull-back   // portrait screens: keep the whole plan in frame
+  function regionFit(r){return r.nationalFit ? Math.min(2.8,Math.max(1,Math.sqrt(1.75/(innerWidth/innerHeight)))) : r.fitWidth ? Math.min(r.phoneFit || 1.5, Math.max(1, Math.sqrt(1.1/(innerWidth/innerHeight)))) : 1;}
   function pickSelect(id){ lastPick=id; if (id===CORE_ID) { selectedId=null; onPlace('riyadh'); } else if (String(id).startsWith('place:')) { selectedId=null; onPlace(id); } else onSelect(P(id)); }
   let hoverViaLabel=false;   // hovering a label keeps that label in place, so a click lands where the pointer is
   labelLayer.addEventListener('pointerover', e => { const el=e.target.closest('[data-pid]'); if (el && selectable) { hoverId=el.dataset.pid; hoverViaLabel=true; } });
@@ -1661,16 +2198,21 @@
       if (fpsEl) fpsEl.textContent=`three.js · ${quality}\n${fpsStat.fps.toFixed(0)} fps · ${fpsStat.ms.toFixed(1)} ms\n${renderer.info.render.calls} calls · ${(renderer.info.render.triangles/1000).toFixed(0)}k tris`; }
     // Adaptive quality: drop shadows/tilt-shift automatically on slow machines.
     if (quality==='high' && ++frames>90 && frames<400) { if (dt>45) slowFrames++; if (slowFrames>60) setQuality('low', true); }
-    resize(); updateCamera(dt); let st=stormTarget;
+    if(captureTime!==null) t=captureTime; // isolated visual check freezes decorative motion and weather lighting
+    resize(); updateCamera(dt); if(camera.dist<SPATIAL_DIST)ensureSpatial(); let st=stormTarget;
     if (hazard) { const d=Math.hypot(camera.target[0]-hazard.x,camera.target[2]-hazard.z); st=Math.max(st,(hazard.plumes?.55:1)*hazard.intensity*Math.max(0,Math.min(1,1.7-d/(hazard.r*2.2)))*(hazard.type==='heat'?.45:1)); const tt=TINTS[hazard.type]||TINTS.dust; for(let i=0;i<3;i++) tint[i]+=(tt[i]-tint[i])*.05; }
     storm+=(st*(directMode?.6:1)-storm)*Math.min(1,dt*.002);
     if (follow) { camera.desired.target[0]=follow[0]; camera.desired.target[2]=follow[1]; }
-    if (stageDirty) { syncLayer('stage'); syncLines(stageLinesObj, stageLines); stageDirty=false; }
+    if (stageDirty) { syncLayer('stage'); syncLayer('landmark'); syncLayer('landmarkProps'); syncLayer('landmarkTiny'); syncLayer('landmarkLit'); showPreviewBadge(); syncLines(stageLinesObj, stageLines); stageDirty=false; }
     if (cityDirty) { syncLayer('city'); syncLines(cityLinesObj, cityLines); cityDirty=false; }
     if (missionDirty) { syncLayer('mission'); syncLines(missionLinesObj, missionLines); missionDirty=false; }
     buildVehicles(t); syncLayer('veh');
 
-    night+=(nightTarget-night)*Math.min(1,dt*.0015);
+    night=captureTime!==null?0:night+(nightTarget-night)*Math.min(1,dt*.0015);
+    cosmetics?.update(t,camera.dist,night);
+    kingdomDiorama?.update(t,camera.dist,night);
+    countryOverview?.update(t,camera.dist,night,quality);
+    document.body.classList.toggle('country-overview',!!countryOverview&&camera.dist>6);
     SU.uStorm.value=storm; SU.uDist.value=camera.dist*EYE; SU.uTime.value=t*.001; SU.uTint.value=tint; SU.uNight.value=night; SU.uEye.value=eye; SU.uVP.value=vp;
     for (const L of Object.values(LAYERS)) L.own.uShadowOn.value = L.cast && shadowsOn() ? 1 : 0;
     LAYERS.cloud.own.uOffset.value=[Math.sin(t*.00005)*.25,0,0];
@@ -1687,7 +2229,11 @@
     POINT_MAT.uniforms.uScale.value=dpr;
     buildDynLines(t); syncLines(dynLinesObj, dynLines);
     dynamicPoints(t);
+    kingdomDiorama?.begin(renderer,width,height,dpr,camera.dist);
     renderPass('main'); renderer.render(scene3, cam3);
+    frameRenderStats.calls=renderer.info.render.calls;frameRenderStats.triangles=renderer.info.render.triangles;
+    kingdomDiorama?.finish(renderer);
+    if(kingdomDiorama&&!countryOverview&&camera.dist>6){frameRenderStats.calls+=renderer.info.render.calls;frameRenderStats.triangles+=renderer.info.render.triangles;}
     updateLabels(); keyPan(dt);
     if (pendingHover && performance.now() - pendingHover.t > 90) { const h = pendingHover; pendingHover = null; runHover(h.x, h.y, h.touch); }   // hover picks only once the pointer rests
     requestAnimationFrame(render);
@@ -1794,6 +2340,7 @@
   canvas.addEventListener('contextmenu', e=>e.preventDefault());
   let dragTool=null, hoverTool=null;
   canvas.addEventListener('pointerdown', e=>{
+    countryAutoFrame=false;
     pointers.set(e.pointerId,{x:e.clientX,y:e.clientY}); canvas.setPointerCapture(e.pointerId); moved=0;
     if (dragTool && e.button===0 && !e.shiftKey && pointers.size===1) { const g=pickGround(e.clientX,e.clientY); if (g && dragTool('down',g[0],g[1])!==false) { dragMode='tool'; return; } }
     if (pointers.size===2){const [a,b]=[...pointers.values()];pinchStart=Math.hypot(a.x-b.x,a.y-b.y);pinchDist=camera.desired.dist;dragMode='pinch';}
@@ -1807,7 +2354,7 @@
       return; }
     const dx=e.clientX-prev.x, dy=e.clientY-prev.y; moved+=Math.abs(dx)+Math.abs(dy); prev.x=e.clientX; prev.y=e.clientY;
     if (dragMode==='tool') { const g=pickGround(e.clientX,e.clientY); if (g) dragTool('move',g[0],g[1]); return; }
-    if (dragMode==='pinch'&&pointers.size===2){const [a,b]=[...pointers.values()];const d=Math.hypot(a.x-b.x,a.y-b.y);camera.desired.dist=Math.max(1.6,Math.min(22,pinchDist*pinchStart/Math.max(20,d)));}
+    if (dragMode==='pinch'&&pointers.size===2){const [a,b]=[...pointers.values()];const d=Math.hypot(a.x-b.x,a.y-b.y);camera.desired.dist=Math.max(MIN_DIST,Math.min(22,pinchDist*pinchStart/Math.max(20,d)));}
     else if (dragMode==='pan') pan(dx,dy);
     else if (dragMode==='orbit'){camera.desired.az-=dx*.006;camera.desired.el=Math.max(.35,Math.min(1.45,camera.desired.el+dy*.004));}
   });
@@ -1820,29 +2367,29 @@
   };
   canvas.addEventListener('pointerup', endPointer); canvas.addEventListener('pointercancel', endPointer);
   canvas.addEventListener('pointerleave', ()=>{ if(!pointers.size){hoverId=null;canvas.style.cursor='';} });
-  canvas.addEventListener('wheel', e=>{e.preventDefault();camera.desired.dist=Math.max(1.6,Math.min(22,camera.desired.dist*Math.exp(e.deltaY*.0012)));},{passive:false});
+  canvas.addEventListener('wheel', e=>{e.preventDefault();countryAutoFrame=false;camera.desired.dist=Math.max(MIN_DIST,Math.min(Math.max(22,K.dist*regionFit(K)),camera.desired.dist*Math.exp(e.deltaY*.0012)));},{passive:false});
   const keys=new Set();
   addEventListener('keydown', e=>{ if(e.target.closest&&e.target.closest('input,textarea'))return; const k=e.key.toLowerCase(); if(['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright','q','e','=','+','-'].includes(k)){keys.add(k); if(k.startsWith('arrow'))e.preventDefault();} });
   addEventListener('keyup', e=>keys.delete(e.key.toLowerCase()));
   addEventListener('blur', ()=>keys.clear());
   function keyPan(dt){
-    if(!keys.size)return; const v=dt*.45;
+    if(!keys.size)return;countryAutoFrame=false; const v=dt*.45;
     if(keys.has('w')||keys.has('arrowup'))pan(0,v); if(keys.has('s')||keys.has('arrowdown'))pan(0,-v);
     if(keys.has('a')||keys.has('arrowleft'))pan(v,0); if(keys.has('d')||keys.has('arrowright'))pan(-v,0);
     if(keys.has('q'))camera.desired.az+=dt*.0015; if(keys.has('e'))camera.desired.az-=dt*.0015;
-    if(keys.has('=')||keys.has('+'))camera.desired.dist=Math.max(1.6,camera.desired.dist*(1-dt*.0015)); if(keys.has('-'))camera.desired.dist=Math.min(22,camera.desired.dist*(1+dt*.0015));
+    if(keys.has('=')||keys.has('+'))camera.desired.dist=Math.max(MIN_DIST,camera.desired.dist*(1-dt*.0015)); if(keys.has('-'))camera.desired.dist=Math.min(Math.max(22,K.dist*regionFit(K)),camera.desired.dist*(1+dt*.0015));
   }
 
   /* ------------------------------- API ------------------------------ */
   window.VisionWorld = {
-    start(){ setDesired(K.az,K.el,K.dist,K.x,K.z); },
-    focusProject(p){ selectedId=p.id; directMode=false; follow=null; setDesired(.3,.8,2.3,p.x,p.z,.02); },
-    focusRegion(id){ const r=D.regions[id]||K; selectedId=null; directMode=false;
+    start(){countryAutoFrame=true;setDesired(K.az,K.el,K.dist*regionFit(K),K.x,K.z); },
+    focusProject(p){countryAutoFrame=false; selectedId=p.id; directMode=false; follow=null; setDesired(.3,.8,2.3,p.x,p.z,.02); },
+    focusRegion(id){ const r=D.regions[id]||K; selectedId=null; directMode=false;countryAutoFrame=r===K;
       setDesired(r.az,r.el,r.dist*regionFit(r),r.x,r.z); },
-    overview(){ selectedId=null; directMode=false; follow=null; stormTarget=0; setDesired(K.az,K.el,K.dist,K.x,K.z); },
+    overview(){ selectedId=null; directMode=false; follow=null; stormTarget=0;countryAutoFrame=true; setDesired(K.az,K.el,K.dist*regionFit(K),K.x,K.z); },
     // World coordinates for simulation data (same anchor spread as projects)
     place(lon, lat, anchor){ let [x,z]=geo(lon,lat); const a=anchor&&C(anchor); if(a){x=a.x+(x-a.x)*ANCHOR_SPREAD;z=a.z+(z-a.z)*ANCHOR_SPREAD;} return [x,z]; },
-    focusPoint(x, z, dist=3.4, el=.72){ directMode=false; follow=null; setDesired(.35,el,dist,x,z,.03); },
+    focusPoint(x, z, dist=3.4, el=.72){countryAutoFrame=false; directMode=false; follow=null; setDesired(.35,el,dist,x,z,.03); },
     setHazard(h){ hazard=h; },
     setEntities(list){ entities=list||[]; },
     setOverlay(list){ overlay=list||[];   // lines follow routed paths (straight when clear, else along the Riyadh plan's roads)
@@ -1881,15 +2428,23 @@
     setSelectable(v){ selectable=!!v; if (!selectable) { hoverId=null; hideChoices(); canvas.style.cursor=groundHandler?'crosshair':''; } labelLayer.classList.toggle('selectable', selectable); },
     // Test/inspection helpers (read-only): what a click would select, and where each project is actually visible.
     debug:{
+      captureView(x,z,dist,el=.88){countryAutoFrame=false; directMode=false; follow=null; setDesired(.3,el,dist,x,z,G+.012); camera.az=.3; camera.el=el; camera.dist=dist; camera.target=[x,G+.012,z]; },
+      captureMode(v){captureTime=v?12000:null;},
+      projectStates:()=>JSON.parse(JSON.stringify(projectState)),
+      visualPhases:()=>Object.fromEntries(['ksip','qiddiya'].map(id=>[id,visPhase(id)])),
+      lighting:()=>({night,storm,sun:SUN,renderer:gl.getParameter(gl.RENDERER),vendor:gl.getParameter(gl.VENDOR)}),
       pickAt:(x, y, touch) => resolveAt(x, y, !!touch),
       visiblePixels(id, max=16){ const px=renderIds(0,0,width,height), k=PIDX[id], pts=[]; for (let j=0;j<height;j+=2) for (let i=0;i<width;i+=2) { const o=(j*width+i)*4; if (px[o+2] && px[o]+px[o+1]*256===k) pts.push([i/dpr,(height-j)/dpr]); }
         if (!pts.length) return []; const mx=pts.reduce((a,p)=>a+p[0],0)/pts.length, my=pts.reduce((a,p)=>a+p[1],0)/pts.length; return pts.sort((a,b)=>Math.hypot(a[0]-mx,a[1]-my)-Math.hypot(b[0]-mx,b[1]-my)).slice(0,max).map(([x,y])=>({x,y})).concat([{count:pts.length}]); },
       marker(id){ const pr=P(id), q=project([pr.pad[0],beaconTop(projectState[id],id)+.02,pr.pad[1]]); return q?{x:q[0],y:q[1]}:null; },
       screen(x,z,y=G){ const q=project([x,y,z]); return q?{x:q[0],y:q[1]}:null; },   // where a ground point is drawn (tests)
       lastPick(){ return lastPick; }, clearPick(){ lastPick=null; },
-      regionView(id){ const r=D.regions[id]; selectedId=null; directMode=false; follow=null; const d=r.dist*regionFit(r); setDesired(r.az,r.el,d,r.x,r.z,0); camera.az=r.az; camera.el=r.el; camera.dist=d; camera.target=[r.x,0,r.z]; },   // a region's default view, instantly
-      state:() => ({dist:camera.dist, selectable, hoverId, selectedId, detail:detailOn()}),
-      frameStats:() => ({fps:fpsStat.fps, ms:fpsStat.ms, quality, renderer:'three', calls:renderer.info.render.calls, triangles:renderer.info.render.triangles})
+      regionView(id){ const r=D.regions[id];countryAutoFrame=r===K; selectedId=null; directMode=false; follow=null; const d=r.dist*regionFit(r); setDesired(r.az,r.el,d,r.x,r.z,0); camera.az=r.az; camera.el=r.el; camera.dist=d; camera.target=[r.x,0,r.z]; },   // a region's default view, instantly
+      // V15: temporary completed-state preview of the Riyadh landmarks (visual only; see visPhase).
+      previewComplete(v){ previewDone=!!v; buildStageMesh(); return previewDone; },
+      holdQuality(){ frames=400; },   // V15 (tests): ends the adaptive-quality window, so captures keep the quality they set
+      state:() => ({dist:camera.dist,az:camera.az,el:camera.el,target:[...camera.target], selectable, hoverId, selectedId, detail:detailOn()}),
+      frameStats:() => ({fps:fpsStat.fps, ms:fpsStat.ms, quality, renderer:'three', calls:frameRenderStats.calls, triangles:frameRenderStats.triangles})
     }
   };
   requestAnimationFrame(render);

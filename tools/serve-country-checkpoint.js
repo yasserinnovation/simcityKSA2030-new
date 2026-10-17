@@ -1,0 +1,6 @@
+// Read-only baseline server: selected files come directly from the requested Git checkpoint.
+const http=require('http'),fs=require('fs'),path=require('path'),{execFileSync}=require('child_process');
+const root=path.resolve(__dirname,'..'),snapshot='34a23afd4bc670ceb09d0b93f698312a68b9fbe6',cache=new Map();
+for(const file of ['boot.js','engine.js','game.js','styles.css','world-cosmetics.js','kingdom-diorama.js','index.html'])cache.set(file,execFileSync('git',['show',snapshot+':'+file],{cwd:root,maxBuffer:20*1024*1024}));
+const types={'.js':'text/javascript','.html':'text/html','.css':'text/css','.json':'application/json','.png':'image/png','.woff2':'font/woff2'};
+http.createServer((req,res)=>{const rel=decodeURIComponent(new URL(req.url,'http://localhost').pathname).replace(/^\//,'')||'index.html',file=path.resolve(root,rel);if(!file.startsWith(root+path.sep)){res.writeHead(403);return res.end()}const send=(e,data)=>{if(e){res.writeHead(404);return res.end()}res.writeHead(200,{'Content-Type':types[path.extname(file)]||'application/octet-stream','Cache-Control':'no-store'});res.end(data)};cache.has(rel)?send(null,cache.get(rel)):fs.readFile(file,send)}).listen(8019,'127.0.0.1',()=>console.log('Read-only checkpoint at http://127.0.0.1:8019'));

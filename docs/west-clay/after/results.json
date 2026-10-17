@@ -1,0 +1,211 @@
+{
+  "errors": [],
+  "picking": {
+    "place:jeddah": {
+      "pixels": 6,
+      "hits": [
+        {
+          "select": "place:jeddah"
+        },
+        {
+          "select": "place:jeddah"
+        },
+        {
+          "select": "place:jeddah"
+        },
+        {
+          "select": "place:jeddah"
+        },
+        {
+          "select": "place:jeddah"
+        },
+        {
+          "select": "place:jeddah"
+        }
+      ]
+    },
+    "place:makkah": {
+      "pixels": 6,
+      "hits": [
+        {
+          "select": "place:makkah"
+        },
+        {
+          "select": "place:makkah"
+        },
+        {
+          "select": "place:makkah"
+        },
+        {
+          "select": "place:makkah"
+        },
+        {
+          "select": "place:makkah"
+        },
+        {
+          "select": "place:makkah"
+        }
+      ]
+    },
+    "place:madinah": {
+      "pixels": 6,
+      "hits": [
+        {
+          "select": "place:madinah"
+        },
+        {
+          "select": "place:madinah"
+        },
+        {
+          "select": "place:madinah"
+        },
+        {
+          "select": "place:madinah"
+        },
+        {
+          "select": "place:madinah"
+        },
+        {
+          "select": "place:madinah"
+        }
+      ]
+    },
+    "place:taif": {
+      "pixels": 6,
+      "hits": [
+        {
+          "select": "place:taif"
+        },
+        {
+          "select": "place:taif"
+        },
+        {
+          "select": "place:taif"
+        },
+        {
+          "select": "place:taif"
+        },
+        {
+          "select": "place:taif"
+        },
+        {
+          "select": "place:taif"
+        }
+      ]
+    },
+    "jeddahcentral": {
+      "pixels": 6,
+      "hits": [
+        {
+          "select": "jeddahcentral"
+        },
+        {
+          "select": "jeddahcentral"
+        },
+        {
+          "select": "jeddahcentral"
+        },
+        {
+          "select": "jeddahcentral"
+        },
+        {
+          "select": "jeddahcentral"
+        },
+        {
+          "select": "jeddahcentral"
+        }
+      ]
+    },
+    "masar": {
+      "pixels": 6,
+      "hits": [
+        {
+          "select": "masar"
+        },
+        {
+          "select": "masar"
+        },
+        {
+          "select": "masar"
+        },
+        {
+          "select": "masar"
+        },
+        {
+          "select": "masar"
+        },
+        {
+          "select": "masar"
+        }
+      ]
+    },
+    "hajj": {
+      "pixels": 6,
+      "hits": [
+        {
+          "select": "hajj"
+        },
+        {
+          "select": "hajj"
+        },
+        {
+          "select": "hajj"
+        },
+        {
+          "select": "hajj"
+        },
+        {
+          "select": "hajj"
+        },
+        {
+          "select": "hajj"
+        }
+      ]
+    },
+    "madinah": {
+      "pixels": 6,
+      "hits": [
+        {
+          "select": "madinah"
+        },
+        {
+          "select": "madinah"
+        },
+        {
+          "select": "madinah"
+        },
+        {
+          "select": "madinah"
+        },
+        {
+          "select": "madinah"
+        },
+        {
+          "select": "madinah"
+        }
+      ]
+    }
+  },
+  "pickingPassed": true,
+  "storageUnchanged": true,
+  "projectStatesUnchanged": true,
+  "cosmetics": {
+    "plots": 199,
+    "westPlots": 54,
+    "clouds": 12,
+    "airships": 3,
+    "fountain": "King Fahd’s Fountain"
+  },
+  "westLandmarks": {
+    "heritage": 21,
+    "promenade": 15,
+    "roses": 24,
+    "landmarks": [
+      "Abraj Al-Bait",
+      "Prophet’s Mosque courtyard",
+      "Al-Balad",
+      "Jeddah Corniche",
+      "Taif rose gardens"
+    ]
+  }
+}

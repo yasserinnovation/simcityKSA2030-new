@@ -1,0 +1,289 @@
+{
+  "phase": "before",
+  "errors": [],
+  "performanceRuns": {
+    "high": {
+      "samples": 100,
+      "meanMs": 17.410999999940394,
+      "fps": 57.43495491375702,
+      "p95Ms": 23.799999997019768,
+      "frame": {
+        "fps": 57.052921503049056,
+        "ms": 17.52758620689665,
+        "quality": "high",
+        "renderer": "three",
+        "calls": 139,
+        "triangles": 1850824
+      }
+    },
+    "medium": {
+      "samples": 100,
+      "meanMs": 13.588999999910593,
+      "fps": 73.58893222507758,
+      "p95Ms": 17.700000002980232,
+      "frame": {
+        "fps": 72.44957900920295,
+        "ms": 13.802702702702723,
+        "quality": "medium",
+        "renderer": "three",
+        "calls": 139,
+        "triangles": 1850824
+      }
+    },
+    "low": {
+      "samples": 100,
+      "meanMs": 12.370999999940395,
+      "fps": 80.83420903765403,
+      "p95Ms": 16.400000005960464,
+      "frame": {
+        "fps": 79.96801279488251,
+        "ms": 12.504999999999928,
+        "quality": "low",
+        "renderer": "three",
+        "calls": 139,
+        "triangles": 1702828
+      }
+    }
+  },
+  "cityHashes": {
+    "riyadh": "c2132ea1b9e7be81f45cd5bb1d3b573d2e071dccad1ee3f4fa3add35b35f8095",
+    "west": "fdd934ca66d39f9d658792e4d00194585561df7078050fd4c4fd7a02a3326440",
+    "east": "d1badb803fe7f20f218aefa2aa9666f5347115cfeaeeafa87f09f00194f03fe5",
+    "south": "b7e2c39b5616667931d0382c19a10bf033e20f7616494e88fb4365f59104b998",
+    "northwest": "9fe90675c12cdd0042bd7cd1121fca39777804ae61806dea20f6ee8fd6d2f13b"
+  },
+  "overlaps": [],
+  "picking": {
+    "neom": {
+      "pixels": 6,
+      "hits": [
+        {
+          "select": "neom"
+        },
+        {
+          "select": "neom"
+        },
+        {
+          "select": "neom"
+        },
+        {
+          "select": "neom"
+        },
+        {
+          "select": "neom"
+        },
+        {
+          "select": "neom"
+        }
+      ]
+    },
+    "oxagon": {
+      "pixels": 6,
+      "hits": [
+        {
+          "select": "oxagon"
+        },
+        {
+          "select": "oxagon"
+        },
+        {
+          "select": "oxagon"
+        },
+        {
+          "select": "oxagon"
+        },
+        {
+          "select": "oxagon"
+        },
+        {
+          "select": "oxagon"
+        }
+      ]
+    },
+    "alula": {
+      "pixels": 6,
+      "hits": [
+        {
+          "select": "alula"
+        },
+        {
+          "select": "alula"
+        },
+        {
+          "select": "alula"
+        },
+        {
+          "select": "alula"
+        },
+        {
+          "select": "alula"
+        },
+        {
+          "select": "alula"
+        }
+      ]
+    },
+    "eastern": {
+      "pixels": 6,
+      "hits": [
+        {
+          "select": "eastern"
+        },
+        {
+          "select": "eastern"
+        },
+        {
+          "select": "eastern"
+        },
+        {
+          "select": "eastern"
+        },
+        {
+          "select": "eastern"
+        },
+        {
+          "select": "eastern"
+        }
+      ]
+    },
+    "ksip": {
+      "pixels": 6,
+      "hits": [
+        {
+          "select": "ksip"
+        },
+        {
+          "select": "ksip"
+        },
+        {
+          "select": "ksip"
+        },
+        {
+          "select": "ksip"
+        },
+        {
+          "select": "ksip"
+        },
+        {
+          "select": "ksip"
+        }
+      ]
+    },
+    "expo": {
+      "pixels": 6,
+      "hits": [
+        {
+          "select": "expo"
+        },
+        {
+          "select": "expo"
+        },
+        {
+          "select": "expo"
+        },
+        {
+          "select": "expo"
+        },
+        {
+          "select": "expo"
+        },
+        {
+          "select": "expo"
+        }
+      ]
+    },
+    "place:makkah": {
+      "pixels": 6,
+      "hits": [
+        {
+          "select": "place:makkah"
+        },
+        {
+          "select": "place:makkah"
+        },
+        {
+          "select": "place:makkah"
+        },
+        {
+          "select": "place:makkah"
+        },
+        {
+          "select": "place:makkah"
+        },
+        {
+          "select": "place:makkah"
+        }
+      ]
+    },
+    "place:abha": {
+      "pixels": 6,
+      "hits": [
+        {
+          "select": "place:abha"
+        },
+        {
+          "select": "place:abha"
+        },
+        {
+          "select": "place:abha"
+        },
+        {
+          "select": "place:abha"
+        },
+        {
+          "select": "place:abha"
+        },
+        {
+          "select": "place:abha"
+        }
+      ]
+    }
+  },
+  "transitions": {
+    "kingdom": {
+      "dist": 15.0411466223049,
+      "selectable": true,
+      "hoverId": null,
+      "selectedId": null,
+      "detail": false
+    },
+    "west": {
+      "dist": 3.7643923301268134,
+      "selectable": true,
+      "hoverId": null,
+      "selectedId": null,
+      "detail": true
+    },
+    "south": {
+      "dist": 2.912041397818731,
+      "selectable": true,
+      "hoverId": null,
+      "selectedId": null,
+      "detail": true
+    },
+    "east": {
+      "dist": 2.555534294081967,
+      "selectable": true,
+      "hoverId": null,
+      "selectedId": null,
+      "detail": true
+    },
+    "northwest": {
+      "dist": 3.683003620317152,
+      "selectable": true,
+      "hoverId": null,
+      "selectedId": null,
+      "detail": true
+    },
+    "riyadh": {
+      "dist": 3.354781200486837,
+      "selectable": true,
+      "hoverId": null,
+      "selectedId": null,
+      "detail": true
+    }
+  },
+  "storageUnchanged": true,
+  "projectStatesUnchanged": true,
+  "overview": null
+}

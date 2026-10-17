@@ -1,0 +1,78 @@
+{
+  "unculled": {
+    "samples": {
+      "project-focus": {
+        "fps": 238.00079333597745,
+        "ms": 4.201666666666672,
+        "quality": "high",
+        "renderer": "three",
+        "calls": 67,
+        "triangles": 825450,
+        "medianMs": 4.199999999998909,
+        "p95Ms": 4.399999999999636,
+        "dist": 2.3
+      },
+      "kingdom": {
+        "fps": 239.95200959807934,
+        "ms": 4.167500000000018,
+        "quality": "high",
+        "renderer": "three",
+        "calls": 34,
+        "triangles": 607009,
+        "medianMs": 4.199999999998909,
+        "p95Ms": 4.400000000001455,
+        "dist": 15.2
+      },
+      "east": {
+        "fps": 54.19005225469317,
+        "ms": 18.453571428571454,
+        "quality": "high",
+        "renderer": "three",
+        "calls": 67,
+        "triangles": 825450,
+        "medianMs": 17.099999999998545,
+        "p95Ms": 25,
+        "dist": 2.55
+      }
+    },
+    "errors": []
+  },
+  "culled": {
+    "samples": {
+      "project-focus": {
+        "fps": 49.202912812438456,
+        "ms": 20.324000000000016,
+        "quality": "high",
+        "renderer": "three",
+        "calls": 67,
+        "triangles": 825450,
+        "medianMs": 20.799999999999272,
+        "p95Ms": 25.100000000000364,
+        "dist": 2.3
+      },
+      "kingdom": {
+        "fps": 75.95442734359396,
+        "ms": 13.16578947368419,
+        "quality": "high",
+        "renderer": "three",
+        "calls": 34,
+        "triangles": 607009,
+        "medianMs": 14.100000000000364,
+        "p95Ms": 20.80000000000291,
+        "dist": 15.2
+      },
+      "east": {
+        "fps": 53.139145837433354,
+        "ms": 18.818518518518598,
+        "quality": "high",
+        "renderer": "three",
+        "calls": 67,
+        "triangles": 825450,
+        "medianMs": 20.599999999998545,
+        "p95Ms": 29.299999999999272,
+        "dist": 2.55
+      }
+    },
+    "errors": []
+  }
+}

@@ -1,0 +1,112 @@
+{
+ "quality": "high",
+ "state": "start",
+ "lang": "none",
+ "bootMs": 9372,
+ "stats": {
+  "triangles": 598794,
+  "detailTriangles": 159147,
+  "rockTriangles": 54884,
+  "rockTrianglesReduced": 17134,
+  "duneTriangles": 128064,
+  "duneTrianglesReduced": 18011,
+  "landmarkTriangles": 10549,
+  "landmarkTrianglesFull": 32644,
+  "landmarkProps": {
+   "props": 0,
+   "tiny": 0,
+   "landmarkInst": 0
+  },
+  "missingModels": [],
+  "water": 106500,
+  "lines": 1309,
+  "instances": 920,
+  "renderer": "three"
+ },
+ "views": {
+  "full": {
+   "avg": 35.5,
+   "p95": 54.2,
+   "calls": 34,
+   "tris": 720332,
+   "q": "high",
+   "cw": 1440,
+   "dist": 3.35
+  },
+  "airport_close": {
+   "avg": 37.36,
+   "p95": 58.3,
+   "calls": 38,
+   "tris": 726992,
+   "q": "high",
+   "cw": 1440,
+   "dist": 0.45
+  },
+  "airport_gates": {
+   "avg": 35.61,
+   "p95": 54.3,
+   "calls": 38,
+   "tris": 726992,
+   "q": "high",
+   "cw": 1440,
+   "dist": 0.25
+  },
+  "qiddiya_close": {
+   "avg": 36.09,
+   "p95": 54.3,
+   "calls": 38,
+   "tris": 726992,
+   "q": "high",
+   "cw": 1440,
+   "dist": 0.45
+  },
+  "qiddiya_rides": {
+   "avg": 37.42,
+   "p95": 62.2,
+   "calls": 38,
+   "tris": 726992,
+   "q": "high",
+   "cw": 1440,
+   "dist": 0.25
+  },
+  "skyline_close": {
+   "avg": 35.95,
+   "p95": 54.2,
+   "calls": 38,
+   "tris": 726992,
+   "q": "high",
+   "cw": 1440,
+   "dist": 0.6
+  },
+  "murabba_close": {
+   "avg": 35.22,
+   "p95": 54.2,
+   "calls": 38,
+   "tris": 726992,
+   "q": "high",
+   "cw": 1440,
+   "dist": 0.45
+  },
+  "roshn_close": {
+   "avg": 35.75,
+   "p95": 54,
+   "calls": 38,
+   "tris": 726992,
+   "q": "high",
+   "cw": 1440,
+   "dist": 0.45
+  },
+  "expo_close": {
+   "avg": 36.06,
+   "p95": 54.3,
+   "calls": 38,
+   "tris": 726992,
+   "q": "high",
+   "cw": 1440,
+   "dist": 0.45
+  }
+ },
+ "picks": {},
+ "simUnchanged": true,
+ "errors": []
+}

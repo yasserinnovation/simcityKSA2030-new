@@ -1,0 +1,40 @@
+{
+ "quality": "high",
+ "state": "complete",
+ "lang": "en",
+ "bootMs": 5205,
+ "stats": {
+  "triangles": 611309,
+  "detailTriangles": 145640,
+  "rockTriangles": 54884,
+  "rockTrianglesReduced": 17134,
+  "duneTriangles": 128064,
+  "duneTrianglesReduced": 18011,
+  "water": 106500,
+  "lines": 1359,
+  "instances": 752,
+  "renderer": "three"
+ },
+ "views": {
+  "full": {
+   "avg": 14.67,
+   "p95": 16.8,
+   "calls": 30,
+   "tris": 724719
+  }
+ },
+ "picks": {
+  "newmurabba": "visible",
+  "roshn": "visible",
+  "ksip": "visible",
+  "expo": "visible",
+  "diriyah": "visible",
+  "sports": "visible",
+  "park": "visible",
+  "greenriyadh": "visible",
+  "metro": "visible",
+  "qiddiya": "visible",
+  "renewables": "visible"
+ },
+ "errors": []
+}

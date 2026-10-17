@@ -1,0 +1,387 @@
+{
+  "label": "clay-v17",
+  "viewport": [
+    1440,
+    900
+  ],
+  "samples": {
+    "overview-normal-high": {
+      "sourceStats": {
+        "triangles": 598846,
+        "detailTriangles": 159147,
+        "rockTriangles": 54884,
+        "rockTrianglesReduced": 17134,
+        "duneTriangles": 128064,
+        "duneTrianglesReduced": 18011,
+        "landmarkTrianglesFull": 34317,
+        "missingModels": [],
+        "water": 106500,
+        "lines": 1309,
+        "instances": 920,
+        "renderer": "three"
+      },
+      "fps": 36.19737092779592,
+      "ms": 27.62631578947357,
+      "quality": "high",
+      "renderer": "three",
+      "calls": 42,
+      "triangles": 809276,
+      "medianMs": 29.19999999999891,
+      "p95Ms": 54
+    },
+    "airport-normal-high": {
+      "sourceStats": {
+        "triangles": 598846,
+        "detailTriangles": 159147,
+        "rockTriangles": 54884,
+        "rockTrianglesReduced": 17134,
+        "duneTriangles": 128064,
+        "duneTrianglesReduced": 18011,
+        "landmarkTrianglesFull": 34317,
+        "missingModels": [],
+        "water": 106500,
+        "lines": 1309,
+        "instances": 920,
+        "renderer": "three"
+      },
+      "fps": 36.80030989734655,
+      "ms": 27.17368421052628,
+      "quality": "high",
+      "renderer": "three",
+      "calls": 39,
+      "triangles": 809124,
+      "medianMs": 25.400000000001455,
+      "p95Ms": 54.10000000000218
+    },
+    "qiddiya-normal-high": {
+      "sourceStats": {
+        "triangles": 598846,
+        "detailTriangles": 159147,
+        "rockTriangles": 54884,
+        "rockTrianglesReduced": 17134,
+        "duneTriangles": 128064,
+        "duneTrianglesReduced": 18011,
+        "landmarkTrianglesFull": 34317,
+        "missingModels": [],
+        "water": 106500,
+        "lines": 1309,
+        "instances": 920,
+        "renderer": "three"
+      },
+      "fps": 32.979113228288575,
+      "ms": 30.322222222222383,
+      "quality": "high",
+      "renderer": "three",
+      "calls": 39,
+      "triangles": 809124,
+      "medianMs": 25.100000000002183,
+      "p95Ms": 45.89999999999782
+    },
+    "overview-complete-preview-high": {
+      "sourceStats": {
+        "triangles": 598846,
+        "detailTriangles": 159147,
+        "rockTriangles": 54884,
+        "rockTrianglesReduced": 17134,
+        "duneTriangles": 128064,
+        "duneTrianglesReduced": 18011,
+        "landmarkTrianglesFull": 34317,
+        "missingModels": [],
+        "water": 106500,
+        "lines": 1309,
+        "instances": 920,
+        "renderer": "three"
+      },
+      "fps": 30.487804878049033,
+      "ms": 32.79999999999973,
+      "quality": "high",
+      "renderer": "three",
+      "calls": 71,
+      "triangles": 896702,
+      "medianMs": 33.10000000000218,
+      "p95Ms": 54.30000000000291
+    },
+    "airport-complete-preview-high": {
+      "sourceStats": {
+        "triangles": 598846,
+        "detailTriangles": 159147,
+        "rockTriangles": 54884,
+        "rockTrianglesReduced": 17134,
+        "duneTriangles": 128064,
+        "duneTrianglesReduced": 18011,
+        "landmarkTrianglesFull": 34317,
+        "missingModels": [],
+        "water": 106500,
+        "lines": 1309,
+        "instances": 920,
+        "renderer": "three"
+      },
+      "fps": 32.73322422258584,
+      "ms": 30.550000000000082,
+      "quality": "high",
+      "renderer": "three",
+      "calls": 68,
+      "triangles": 896550,
+      "medianMs": 29.299999999995634,
+      "p95Ms": 50.099999999998545
+    },
+    "qiddiya-complete-preview-high": {
+      "sourceStats": {
+        "triangles": 598846,
+        "detailTriangles": 159147,
+        "rockTriangles": 54884,
+        "rockTrianglesReduced": 17134,
+        "duneTriangles": 128064,
+        "duneTrianglesReduced": 18011,
+        "landmarkTrianglesFull": 34317,
+        "missingModels": [],
+        "water": 106500,
+        "lines": 1309,
+        "instances": 920,
+        "renderer": "three"
+      },
+      "fps": 25.37080405932858,
+      "ms": 39.415384615384724,
+      "quality": "high",
+      "renderer": "three",
+      "calls": 68,
+      "triangles": 896550,
+      "medianMs": 29.299999999995634,
+      "p95Ms": 54.200000000004366
+    },
+    "airport-complete-preview-medium": {
+      "sourceStats": {
+        "triangles": 598846,
+        "detailTriangles": 159147,
+        "rockTriangles": 54884,
+        "rockTrianglesReduced": 17134,
+        "duneTriangles": 128064,
+        "duneTrianglesReduced": 18011,
+        "landmarkTrianglesFull": 34317,
+        "missingModels": [],
+        "water": 106500,
+        "lines": 1309,
+        "instances": 920,
+        "renderer": "three"
+      },
+      "fps": 47.22550177095658,
+      "ms": 21.17499999999988,
+      "quality": "medium",
+      "renderer": "three",
+      "calls": 62,
+      "triangles": 877630,
+      "medianMs": 20.900000000001455,
+      "p95Ms": 33.60000000000582
+    },
+    "qiddiya-complete-preview-medium": {
+      "sourceStats": {
+        "triangles": 598846,
+        "detailTriangles": 159147,
+        "rockTriangles": 54884,
+        "rockTrianglesReduced": 17134,
+        "duneTriangles": 128064,
+        "duneTrianglesReduced": 18011,
+        "landmarkTrianglesFull": 34317,
+        "missingModels": [],
+        "water": 106500,
+        "lines": 1309,
+        "instances": 920,
+        "renderer": "three"
+      },
+      "fps": 50.73170731707317,
+      "ms": 19.71153846153846,
+      "quality": "medium",
+      "renderer": "three",
+      "calls": 62,
+      "triangles": 877630,
+      "medianMs": 20.80000000000291,
+      "p95Ms": 33.10000000000582
+    },
+    "airport-complete-preview-low": {
+      "sourceStats": {
+        "triangles": 598846,
+        "detailTriangles": 159147,
+        "rockTriangles": 54884,
+        "rockTrianglesReduced": 17134,
+        "duneTriangles": 128064,
+        "duneTrianglesReduced": 18011,
+        "landmarkTrianglesFull": 34317,
+        "missingModels": [],
+        "water": 106500,
+        "lines": 1309,
+        "instances": 920,
+        "renderer": "three"
+      },
+      "fps": 49.164208456243855,
+      "ms": 20.34,
+      "quality": "low",
+      "renderer": "three",
+      "calls": 41,
+      "triangles": 689433,
+      "medianMs": 20.80000000000291,
+      "p95Ms": 37.400000000001455
+    },
+    "qiddiya-complete-preview-low": {
+      "sourceStats": {
+        "triangles": 598846,
+        "detailTriangles": 159147,
+        "rockTriangles": 54884,
+        "rockTrianglesReduced": 17134,
+        "duneTriangles": 128064,
+        "duneTrianglesReduced": 18011,
+        "landmarkTrianglesFull": 34317,
+        "missingModels": [],
+        "water": 106500,
+        "lines": 1309,
+        "instances": 920,
+        "renderer": "three"
+      },
+      "fps": 54.644808743170024,
+      "ms": 18.29999999999979,
+      "quality": "low",
+      "renderer": "three",
+      "calls": 41,
+      "triangles": 689433,
+      "medianMs": 16.89999999999418,
+      "p95Ms": 37.29999999998836
+    }
+  },
+  "previewStorageUnchanged": true,
+  "previewProjectStatesUnchanged": true,
+  "lighting": {
+    "night": 0,
+    "storm": 0,
+    "sun": [
+      -0.42346548685193386,
+      0.7699372488216979,
+      0.4773610942694527
+    ],
+    "renderer": "WebKit WebGL",
+    "vendor": "WebKit"
+  },
+  "picking": {
+    "ksip": {
+      "pixels": 12,
+      "hits": [
+        {
+          "select": "ksip"
+        },
+        {
+          "select": "ksip"
+        },
+        {
+          "select": "ksip"
+        },
+        {
+          "select": "ksip"
+        },
+        {
+          "select": "ksip"
+        },
+        {
+          "select": "ksip"
+        },
+        {
+          "select": "ksip"
+        },
+        {
+          "select": "ksip"
+        },
+        {
+          "select": "ksip"
+        },
+        {
+          "select": "ksip"
+        },
+        {
+          "select": "ksip"
+        },
+        {
+          "select": "ksip"
+        }
+      ]
+    },
+    "qiddiya": {
+      "pixels": 12,
+      "hits": [
+        {
+          "select": "qiddiya"
+        },
+        {
+          "select": "qiddiya"
+        },
+        {
+          "select": "qiddiya"
+        },
+        {
+          "select": "qiddiya"
+        },
+        {
+          "select": "qiddiya"
+        },
+        {
+          "select": "qiddiya"
+        },
+        {
+          "select": "qiddiya"
+        },
+        {
+          "select": "qiddiya"
+        },
+        {
+          "select": "qiddiya"
+        },
+        {
+          "select": "qiddiya"
+        },
+        {
+          "select": "qiddiya"
+        },
+        {
+          "select": "qiddiya"
+        }
+      ]
+    }
+  },
+  "construction": {
+    "ksip-foundations": {
+      "expected": 1,
+      "actual": 1
+    },
+    "qiddiya-foundations": {
+      "expected": 1,
+      "actual": 1
+    },
+    "ksip-structure": {
+      "expected": 2,
+      "actual": 2
+    },
+    "qiddiya-structure": {
+      "expected": 2,
+      "actual": 2
+    },
+    "ksip-exterior": {
+      "expected": 3,
+      "actual": 3
+    },
+    "qiddiya-exterior": {
+      "expected": 3,
+      "actual": 3
+    },
+    "ksip-operational": {
+      "expected": 4,
+      "actual": 4
+    },
+    "qiddiya-operational": {
+      "expected": 4,
+      "actual": 4
+    }
+  },
+  "arabic": {
+    "lang": "ar",
+    "dir": "rtl"
+  },
+  "pickingPassed": true,
+  "constructionPassed": true,
+  "errors": []
+}

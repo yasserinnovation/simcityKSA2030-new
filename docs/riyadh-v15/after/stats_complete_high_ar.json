@@ -1,0 +1,40 @@
+{
+ "quality": "high",
+ "state": "complete",
+ "lang": "ar",
+ "bootMs": 9456,
+ "stats": {
+  "triangles": 598794,
+  "detailTriangles": 159147,
+  "rockTriangles": 54884,
+  "rockTrianglesReduced": 17134,
+  "duneTriangles": 128064,
+  "duneTrianglesReduced": 18011,
+  "landmarkTriangles": 32644,
+  "landmarkTrianglesFull": 32644,
+  "landmarkProps": {
+   "props": 14880,
+   "tiny": 8040,
+   "landmarkInst": 11720
+  },
+  "missingModels": [],
+  "water": 106500,
+  "lines": 1309,
+  "instances": 920,
+  "renderer": "three"
+ },
+ "views": {
+  "full": {
+   "avg": 36.58,
+   "p95": 54.3,
+   "calls": 39,
+   "tris": 756373,
+   "q": "high",
+   "cw": 1440,
+   "dist": 3.35
+  }
+ },
+ "picks": {},
+ "simUnchanged": true,
+ "errors": []
+}

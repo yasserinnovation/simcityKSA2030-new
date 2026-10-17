@@ -1,0 +1,110 @@
+{
+  "airport-complete-preview-high.png": {
+    "meanChannelDifference": 0.005636831275720165,
+    "pixelsChangedOver6": 379,
+    "changedFraction": 0.00029243827160493825,
+    "maxChannelDifference": 55
+  },
+  "airport-complete-preview-low.png": {
+    "meanChannelDifference": 0.010269194243553218,
+    "pixelsChangedOver6": 328,
+    "changedFraction": 0.0005990211118416246,
+    "maxChannelDifference": 55
+  },
+  "airport-complete-preview-medium.png": {
+    "meanChannelDifference": 0.014504967206790124,
+    "pixelsChangedOver6": 1156,
+    "changedFraction": 0.0013937114197530864,
+    "maxChannelDifference": 55
+  },
+  "airport-normal-high.png": {
+    "meanChannelDifference": 0.005802469135802469,
+    "pixelsChangedOver6": 371,
+    "changedFraction": 0.0002862654320987654,
+    "maxChannelDifference": 55
+  },
+  "ksip-exterior.png": {
+    "meanChannelDifference": 0.0010046296296296296,
+    "pixelsChangedOver6": 30,
+    "changedFraction": 0.000023148148148148147,
+    "maxChannelDifference": 55
+  },
+  "ksip-foundations.png": {
+    "meanChannelDifference": 0.0012507716049382717,
+    "pixelsChangedOver6": 30,
+    "changedFraction": 0.000023148148148148147,
+    "maxChannelDifference": 55
+  },
+  "ksip-operational.png": {
+    "meanChannelDifference": 0.000955761316872428,
+    "pixelsChangedOver6": 30,
+    "changedFraction": 0.000023148148148148147,
+    "maxChannelDifference": 55
+  },
+  "ksip-structure.png": {
+    "meanChannelDifference": 0.0009845679012345679,
+    "pixelsChangedOver6": 29,
+    "changedFraction": 0.000022376543209876542,
+    "maxChannelDifference": 55
+  },
+  "overview-complete-preview-high.png": {
+    "meanChannelDifference": 0.006151748971193416,
+    "pixelsChangedOver6": 363,
+    "changedFraction": 0.0002800925925925926,
+    "maxChannelDifference": 116
+  },
+  "overview-normal-high.png": {
+    "meanChannelDifference": 0.006209619341563786,
+    "pixelsChangedOver6": 366,
+    "changedFraction": 0.00028240740740740743,
+    "maxChannelDifference": 116
+  },
+  "qiddiya-complete-preview-high.png": {
+    "meanChannelDifference": 0,
+    "pixelsChangedOver6": 0,
+    "changedFraction": 0,
+    "maxChannelDifference": 0
+  },
+  "qiddiya-complete-preview-low.png": {
+    "meanChannelDifference": 0,
+    "pixelsChangedOver6": 0,
+    "changedFraction": 0,
+    "maxChannelDifference": 0
+  },
+  "qiddiya-complete-preview-medium.png": {
+    "meanChannelDifference": 0,
+    "pixelsChangedOver6": 0,
+    "changedFraction": 0,
+    "maxChannelDifference": 0
+  },
+  "qiddiya-exterior.png": {
+    "meanChannelDifference": 0,
+    "pixelsChangedOver6": 0,
+    "changedFraction": 0,
+    "maxChannelDifference": 0
+  },
+  "qiddiya-foundations.png": {
+    "meanChannelDifference": 0,
+    "pixelsChangedOver6": 0,
+    "changedFraction": 0,
+    "maxChannelDifference": 0
+  },
+  "qiddiya-normal-high.png": {
+    "meanChannelDifference": 0,
+    "pixelsChangedOver6": 0,
+    "changedFraction": 0,
+    "maxChannelDifference": 0
+  },
+  "qiddiya-operational.png": {
+    "meanChannelDifference": 0,
+    "pixelsChangedOver6": 0,
+    "changedFraction": 0,
+    "maxChannelDifference": 0
+  },
+  "qiddiya-structure.png": {
+    "meanChannelDifference": 0,
+    "pixelsChangedOver6": 0,
+    "changedFraction": 0,
+    "maxChannelDifference": 0
+  }
+}

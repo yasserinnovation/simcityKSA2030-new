@@ -1,8 +1,8 @@
 #!/bin/sh
 # Vision Nexus 2030 — start a local server and open the game (macOS / Linux). Works offline.
 cd "$(dirname "$0")" || exit 1
-PORT=${PORT:-8000}
-URL="http://localhost:$PORT/index.html"
+PORT=${PORT:-8123}
+URL="http://127.0.0.1:$PORT/index.html"
 if command -v python3 >/dev/null 2>&1; then python3 -m http.server "$PORT" --bind 127.0.0.1 >/dev/null 2>&1 &
 elif command -v python >/dev/null 2>&1; then python -m http.server "$PORT" --bind 127.0.0.1 >/dev/null 2>&1 &
 elif command -v node >/dev/null 2>&1; then node tools/serve.js "$PORT" >/dev/null 2>&1 &

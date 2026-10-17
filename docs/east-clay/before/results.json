@@ -1,0 +1,178 @@
+{
+  "errors": [],
+  "picking": {
+    "place:dammam": {
+      "pixels": 6,
+      "hits": [
+        {
+          "select": "place:dammam"
+        },
+        {
+          "select": "place:dammam"
+        },
+        {
+          "select": "place:dammam"
+        },
+        {
+          "select": "place:dammam"
+        },
+        {
+          "select": "place:dammam"
+        },
+        {
+          "select": "place:dammam"
+        }
+      ]
+    },
+    "place:dhahran": {
+      "pixels": 6,
+      "hits": [
+        {
+          "select": "place:dhahran"
+        },
+        {
+          "select": "place:dhahran"
+        },
+        {
+          "select": "place:dhahran"
+        },
+        {
+          "select": "place:dhahran"
+        },
+        {
+          "select": "place:dhahran"
+        },
+        {
+          "select": "place:dhahran"
+        }
+      ]
+    },
+    "place:khobar": {
+      "pixels": 6,
+      "hits": [
+        {
+          "select": "place:khobar"
+        },
+        {
+          "select": "place:khobar"
+        },
+        {
+          "select": "place:khobar"
+        },
+        {
+          "select": "place:khobar"
+        },
+        {
+          "select": "place:khobar"
+        },
+        {
+          "select": "place:khobar"
+        }
+      ]
+    },
+    "place:hofuf": {
+      "pixels": 6,
+      "hits": [
+        {
+          "select": "place:hofuf"
+        },
+        {
+          "select": "place:hofuf"
+        },
+        {
+          "select": "place:hofuf"
+        },
+        {
+          "select": "place:hofuf"
+        },
+        {
+          "select": "place:hofuf"
+        },
+        {
+          "select": "place:hofuf"
+        }
+      ]
+    },
+    "place:qatif": {
+      "pixels": 6,
+      "hits": [
+        {
+          "select": "place:qatif"
+        },
+        {
+          "select": "place:qatif"
+        },
+        {
+          "select": "place:qatif"
+        },
+        {
+          "select": "place:qatif"
+        },
+        {
+          "select": "place:qatif"
+        },
+        {
+          "select": "place:qatif"
+        }
+      ]
+    },
+    "eastern": {
+      "pixels": 6,
+      "hits": [
+        {
+          "select": "eastern"
+        },
+        {
+          "select": "eastern"
+        },
+        {
+          "select": "eastern"
+        },
+        {
+          "select": "eastern"
+        },
+        {
+          "select": "eastern"
+        },
+        {
+          "select": "eastern"
+        }
+      ]
+    },
+    "green": {
+      "pixels": 6,
+      "hits": [
+        {
+          "select": "green"
+        },
+        {
+          "select": "green"
+        },
+        {
+          "select": "green"
+        },
+        {
+          "select": "green"
+        },
+        {
+          "select": "green"
+        },
+        {
+          "select": "green"
+        }
+      ]
+    }
+  },
+  "pickingPassed": true,
+  "storageUnchanged": true,
+  "projectStatesUnchanged": true,
+  "cosmetics": {
+    "plots": 199,
+    "westPlots": 54,
+    "southPlots": 66,
+    "clouds": 12,
+    "highlandMist": 3,
+    "airships": 3,
+    "fountain": "King Fahd’s Fountain"
+  }
+}

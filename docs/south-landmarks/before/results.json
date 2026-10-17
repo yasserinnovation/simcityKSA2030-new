@@ -1,0 +1,177 @@
+{
+  "errors": [],
+  "picking": {
+    "place:abha": {
+      "pixels": 6,
+      "hits": [
+        {
+          "select": "place:abha"
+        },
+        {
+          "select": "place:abha"
+        },
+        {
+          "select": "place:abha"
+        },
+        {
+          "select": "place:abha"
+        },
+        {
+          "select": "place:abha"
+        },
+        {
+          "select": "place:abha"
+        }
+      ]
+    },
+    "place:jazanc": {
+      "pixels": 6,
+      "hits": [
+        {
+          "select": "place:jazanc"
+        },
+        {
+          "select": "place:jazanc"
+        },
+        {
+          "select": "place:jazanc"
+        },
+        {
+          "select": "place:jazanc"
+        },
+        {
+          "select": "place:jazanc"
+        },
+        {
+          "select": "place:jazanc"
+        }
+      ]
+    },
+    "place:najran": {
+      "pixels": 6,
+      "hits": [
+        {
+          "select": "place:najran"
+        },
+        {
+          "select": "place:najran"
+        },
+        {
+          "select": "place:najran"
+        },
+        {
+          "select": "place:najran"
+        },
+        {
+          "select": "place:najran"
+        },
+        {
+          "select": "place:najran"
+        }
+      ]
+    },
+    "soudah": {
+      "pixels": 6,
+      "hits": [
+        {
+          "select": "soudah"
+        },
+        {
+          "select": "soudah"
+        },
+        {
+          "select": "soudah"
+        },
+        {
+          "select": "soudah"
+        },
+        {
+          "select": "soudah"
+        },
+        {
+          "select": "soudah"
+        }
+      ]
+    },
+    "jazan": {
+      "pixels": 6,
+      "hits": [
+        {
+          "select": "jazan"
+        },
+        {
+          "select": "jazan"
+        },
+        {
+          "select": "jazan"
+        },
+        {
+          "select": "jazan"
+        },
+        {
+          "select": "jazan"
+        },
+        {
+          "select": "jazan"
+        }
+      ]
+    },
+    "jeddahcentral": {
+      "pixels": 6,
+      "hits": [
+        {
+          "select": "jeddahcentral"
+        },
+        {
+          "select": "jeddahcentral"
+        },
+        {
+          "select": "jeddahcentral"
+        },
+        {
+          "select": "jeddahcentral"
+        },
+        {
+          "select": "jeddahcentral"
+        },
+        {
+          "select": "jeddahcentral"
+        }
+      ]
+    },
+    "lucid": {
+      "pixels": 6,
+      "hits": [
+        {
+          "select": "lucid"
+        },
+        {
+          "select": "lucid"
+        },
+        {
+          "select": "lucid"
+        },
+        {
+          "select": "lucid"
+        },
+        {
+          "select": "lucid"
+        },
+        {
+          "select": "lucid"
+        }
+      ]
+    }
+  },
+  "pickingPassed": true,
+  "storageUnchanged": true,
+  "projectStatesUnchanged": true,
+  "cosmetics": {
+    "plots": 199,
+    "westPlots": 54,
+    "clouds": 12,
+    "airships": 3,
+    "fountain": "King Fahd’s Fountain"
+  },
+  "sites": null
+}

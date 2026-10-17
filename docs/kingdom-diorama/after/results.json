@@ -1,0 +1,224 @@
+{
+  "errors": [],
+  "picking": {
+    "neom": {
+      "pixels": 6,
+      "hits": [
+        {
+          "select": "neom"
+        },
+        {
+          "select": "neom"
+        },
+        {
+          "select": "neom"
+        },
+        {
+          "select": "neom"
+        },
+        {
+          "select": "neom"
+        },
+        {
+          "select": "neom"
+        }
+      ]
+    },
+    "oxagon": {
+      "pixels": 6,
+      "hits": [
+        {
+          "select": "oxagon"
+        },
+        {
+          "select": "oxagon"
+        },
+        {
+          "select": "oxagon"
+        },
+        {
+          "select": "oxagon"
+        },
+        {
+          "select": "oxagon"
+        },
+        {
+          "select": "oxagon"
+        }
+      ]
+    },
+    "alula": {
+      "pixels": 6,
+      "hits": [
+        {
+          "select": "alula"
+        },
+        {
+          "select": "alula"
+        },
+        {
+          "select": "alula"
+        },
+        {
+          "select": "alula"
+        },
+        {
+          "select": "alula"
+        },
+        {
+          "select": "alula"
+        }
+      ]
+    },
+    "eastern": {
+      "pixels": 6,
+      "hits": [
+        {
+          "select": "eastern"
+        },
+        {
+          "select": "eastern"
+        },
+        {
+          "select": "eastern"
+        },
+        {
+          "select": "eastern"
+        },
+        {
+          "select": "eastern"
+        },
+        {
+          "select": "eastern"
+        }
+      ]
+    },
+    "ksip": {
+      "pixels": 6,
+      "hits": [
+        {
+          "select": "ksip"
+        },
+        {
+          "select": "ksip"
+        },
+        {
+          "select": "ksip"
+        },
+        {
+          "select": "ksip"
+        },
+        {
+          "select": "ksip"
+        },
+        {
+          "select": "ksip"
+        }
+      ]
+    },
+    "expo": {
+      "pixels": 6,
+      "hits": [
+        {
+          "select": "expo"
+        },
+        {
+          "select": "expo"
+        },
+        {
+          "select": "expo"
+        },
+        {
+          "select": "expo"
+        },
+        {
+          "select": "expo"
+        },
+        {
+          "select": "expo"
+        }
+      ]
+    },
+    "place:makkah": {
+      "pixels": 6,
+      "hits": [
+        {
+          "select": "place:makkah"
+        },
+        {
+          "select": "place:makkah"
+        },
+        {
+          "select": "place:makkah"
+        },
+        {
+          "select": "place:makkah"
+        },
+        {
+          "select": "place:makkah"
+        },
+        {
+          "select": "place:makkah"
+        }
+      ]
+    },
+    "place:abha": {
+      "pixels": 6,
+      "hits": [
+        {
+          "select": "place:abha"
+        },
+        {
+          "select": "place:abha"
+        },
+        {
+          "select": "place:abha"
+        },
+        {
+          "select": "place:abha"
+        },
+        {
+          "select": "place:abha"
+        },
+        {
+          "select": "place:abha"
+        }
+      ]
+    }
+  },
+  "pickingPassed": true,
+  "storageUnchanged": true,
+  "projectStatesUnchanged": true,
+  "cosmetics": {
+    "plots": 199,
+    "westPlots": 54,
+    "southPlots": 66,
+    "eastPlots": 71,
+    "northwestPlots": 64,
+    "clouds": 12,
+    "highlandMist": 3,
+    "pumpjacks": 3,
+    "airships": 3,
+    "fountain": "King Fahd’s Fountain",
+    "cableCars": 4
+  },
+  "kingdom": {
+    "farms": 100,
+    "palms": 708,
+    "reefs": 386,
+    "viaducts": 15,
+    "traffic": 30,
+    "ships": 22,
+    "cloudClusters": 10,
+    "border": "existing illustrative polygon",
+    "tiltShift": "Kingdom zoom only"
+  },
+  "frame": {
+    "fps": 14.03705783267824,
+    "ms": 71.24000000000015,
+    "quality": "high",
+    "renderer": "three",
+    "calls": 75,
+    "triangles": 2087443
+  }
+}

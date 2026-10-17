@@ -3,8 +3,8 @@ setlocal
 rem Vision Nexus 2030 — start a local server and open the game (Windows). Works offline.
 rem The three.js renderer needs http:// (browsers block ES modules on file:// pages).
 cd /d "%~dp0"
-set PORT=8000
-set URL=http://localhost:%PORT%/index.html
+set PORT=8123
+set URL=http://127.0.0.1:%PORT%/index.html
 
 where python >nul 2>nul
 if %errorlevel%==0 (
