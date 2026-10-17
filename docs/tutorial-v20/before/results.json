@@ -1,0 +1,39 @@
+{
+  "date": "2026-10-17T10:21:41.946Z",
+  "views": {
+    "desktop": {
+      "boot_ms": 6064,
+      "city": {
+        "pop": 340,
+        "jobs": 61,
+        "month": 30
+      },
+      "perf": {
+        "frames": 189,
+        "avg_ms": 21.16,
+        "fps": 47.3,
+        "p95_ms": 25.1,
+        "heap_mb": 555.7,
+        "quality": "high"
+      },
+      "errors": []
+    },
+    "phone": {
+      "boot_ms": 5311,
+      "city": {
+        "pop": 340,
+        "jobs": 61,
+        "month": 30
+      },
+      "perf": {
+        "frames": 245,
+        "avg_ms": 16.31,
+        "fps": 61.3,
+        "p95_ms": 17.1,
+        "heap_mb": 541.5,
+        "quality": "high"
+      },
+      "errors": []
+    }
+  }
+}
