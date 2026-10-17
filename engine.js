@@ -1639,7 +1639,7 @@
   function buildCity(){
     cityMesh.p.length=cityMesh.c.length=cityMesh.n.length=cityLines.p.length=cityLines.c.length=0; cityMesh.inst={};
     target=cityMesh; lineTarget=cityLines; const rngKeep=rngNow;   // per-parcel seeds: a parcel's trees and palms look the same on every rebuild
-    const d=cityDesc, CY=G+.011; if (d) {
+    const d=cityDesc, CY=G+.011, rich=quality!=='low'; if (d) {   // rich: parcel dressing (kerbs, courtyards, yard planting) above the Reduced tier
       const {x0,z0,ts,n}=d, X=i=>x0+(i+.5)*ts, Z=j=>z0+(j+.5)*ts, h=ts/2;
       const quad=(i,j,y,col,s=1)=>{ const x=X(i), z=Z(j), r=h*s; addQuad([x-r,y,z-r],[x+r,y,z-r],[x+r,y,z+r],[x-r,y,z+r],col); };
       const isRoad=(i,j)=>i>=0&&j>=0&&i<n&&j<n&&d.tiles[j*n+i]&&d.tiles[j*n+i].k==='r';
@@ -1653,7 +1653,7 @@
           const nb=[isRoad(i,j-1),isRoad(i+1,j),isRoad(i,j+1),isRoad(i-1,j)], cnt=nb.filter(Boolean).length;
           quad(i,j,CY+.0008,t.bridge?[.55,.52,.50]:t.art?[.30,.31,.34]:t.avenue?[.33,.34,.37]:[.38,.39,.42]);
           if (t.bridge) { addBox(x,G,z,ts*.9,.004,ts*.12,[.72,.70,.66]); }
-          else if (!t.art) { // pale kerbs and pavement on the sides that face a parcel (not another road)
+          else if (!t.art && rich) { // pale kerbs and pavement on the sides that face a parcel (not another road)
             const side=[[0,-1],[1,0],[0,1],[-1,0]], pv=[.84,.80,.72];
             for (let k=0;k<4;k++) if (!nb[k]) { const [di,dj]=side[k], cx=x+di*h*.86, cz=z+dj*h*.86, w=di?ts*.14:ts, dd=dj?ts*.14:ts; addBox(cx,CY,cz,w,.0009,dd,pv); } }
           const lc=t.art||t.avenue?[1,.86,.35]:[.95,.95,.92];
@@ -1677,7 +1677,7 @@
           if (t.zone==='T') { if (lv===1) { addBox(x,G,z,ts*.7,ts*.5,ts*.6,[.97,.93,.86]); addBox(x+h*.35,CY+.0006,z+h*.4,ts*.3,.001,ts*.2,[.35,.75,.9]); addTree(x-h*.6,z+h*.5,.28); }
             else { addTower(x,z,ts*.6,ts*(1.4+lv*.8+rr*.5),[.96,.90,.80],[.95,.75,.4]); addBox(x+h*.45,CY+.0006,z+h*.5,ts*.35,.001,ts*.22,[.35,.75,.9]); } continue; }
           if (t.zone==='M') { const hh=ts*(.5+lv*.55); addBox(x,G,z,ts*.8,ts*.3,ts*.76,COM[st%3]); addBox(x,G+ts*.3,z,ts*.72,hh,ts*.68,RES[st%4]); for(let k=0;k<4;k++) addBox(x-ts*.3+k*ts*.2,G+ts*.3+hh,z,ts*.08,ts*.05,ts*.7,shade(RES[st%4],.88)); continue; }
-          if (t.zone==='R' && lv===1) {   // villa plot: courtyard wall with a gate, yard planting, and garden trees when a park serves the home
+          if (t.zone==='R' && lv===1 && rich) {   // villa plot: courtyard wall with a gate, yard planting, and garden trees when a park serves the home
             const wc=shade(RES[(st+1)%4],.94); for (const [a,b,w,dd] of [[0,-.42,.86,.035],[-.42,0,.035,.86],[.42,0,.035,.86]]) addBox(x+a*ts,G,z+b*ts,w*ts,ts*.13,dd*ts,wc);
             for (const a of [-.27,.27]) addBox(x+a*ts,G,z+.42*ts,.3*ts,ts*.13,.035*ts,wc);
             if (rr>.35) addPalm(x+ts*.26,z+ts*.24,.12+rr*.03); else addTree(x+ts*.26,z+ts*.26,.11);
@@ -1685,7 +1685,12 @@
           if (t.zone==='R') { if (lv===1) { addHouse(x,z-ts*.04,.24+.04*rr,RES[st%4],(rnd%4)*Math.PI/2); if (rr>.5) for(let k=0;k<3;k++) addBox(x-ts*.18+k*ts*.18,G+ts*.36,z-ts*.28,ts*.06,ts*.05,ts*.03,shade(RES[st%4],.85)); }
             else if (lv===2) { addBox(x,G,z,ts*.72,ts*(.9+rr*.3),ts*.72,RES[st%4]); addBox(x,G+ts*(.9+rr*.3),z,ts*.76,ts*.06,ts*.76,shade(RES[st%4],.9)); }
             else addTower(x,z,ts*.6,ts*(2.4+rr*1.4),RES[(st+1)%4],null); }
-          else if (t.zone==='C') { if (lv===1) { addBox(x,G,z,ts*.78,ts*.45,ts*.7,[.94,.90,.82]); addBox(x,G+ts*.3,z+ts*.36,ts*.78,ts*.06,ts*.04,COM[st%3]); }
+          else if (t.zone==='C') { if (lv===1) {   // neighbourhood shops: glazed frontage, coloured awning, sign band, rooftop plant, a shade tree on some corners
+              const aw=[[.86,.42,.30],[.22,.52,.62],[.88,.66,.26]][st%3];
+              addBox(x,G,z-ts*.04,ts*.78,ts*.42,ts*.62,[.95,.91,.83]); addBox(x,G+ts*.02,z+ts*.275,ts*.7,ts*.2,ts*.012,[.30,.44,.54]);
+              addBox(x,G+ts*.24,z+ts*.32,ts*.78,ts*.025,ts*.12,aw); addBox(x,G+ts*.3,z+ts*.275,ts*.5,ts*.06,ts*.012,shade(aw,1.15));
+              addBox(x+ts*.18,G+ts*.42,z-ts*.12,ts*.14,ts*.06,ts*.12,[.82,.82,.84]);
+              if (rr>.6 && rich) addTree(x-ts*.32,z+ts*.36,.1); }
             else if (lv===2) addTower(x,z,ts*.68,ts*(1.3+rr*.6),COM[st%3],null);
             else addTower(x,z,ts*.62,ts*(3+rr*1.8),COM[(st+1)%3],[.98,.84,.4]); }
           else { addBox(x,G,z,ts*.86,ts*(.35+.2*lv),ts*.7,IND[st%3]); addBox(x,G+ts*(.35+.2*lv),z,ts*.86,ts*.04,ts*.7,shade(IND[st%3],.85)); if (lv>=2) addCylinder(x+h*.5,G,z-h*.4,ts*.06,ts*(.9+lv*.3),[.62,.62,.66],6); }
@@ -2275,6 +2280,7 @@
     quality = q==='low' ? 'low' : q==='medium' ? 'medium' : 'high';
     document.body.classList.toggle('gfx-low', quality==='low'); document.body.classList.toggle('gfx-medium', quality==='medium'); resScale = quality==='high' ? 1 : quality==='medium' ? .8 : .65; resize();
     dispatchEvent(new CustomEvent('vision-quality', {detail:{quality, auto:!!auto}}));
+    if (cityDesc) buildCity();   // parcel dressing depends on the tier
   }
 
   /* ------------------------------ input ----------------------------- */

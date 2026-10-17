@@ -39,6 +39,8 @@ const BUILD = () => {
     const boot = Date.now() - t0;
     await page.waitForTimeout(2500);
     const R = results.views[vp] = {boot_ms:boot};
+    // the engine drops to Reduced by itself if the first frames are slow (busy machine); pin High so runs are comparable
+    R.auto_quality = await page.evaluate(() => window.VisionWorld.getQuality()); await page.evaluate(() => window.VisionWorld.setQuality('high')); await page.waitForTimeout(800);
     const shot = async (name, worldOnly) => {
       if (worldOnly) await page.addStyleTag({content:'body>*:not(#world):not(#labels){visibility:hidden!important}'});
       await page.screenshot({path:path.join(out, `${vp}_${name}.png`)});
@@ -58,7 +60,8 @@ const BUILD = () => {
     await page.evaluate(() => { window.VNP.cityUI.dayT = .5; }); await page.waitForTimeout(2500); await cam(.95, .78); await shot('city_day_ui', false);
     // performance: frame times in the City Builder district view
     R.perf = await page.evaluate(() => new Promise(res => { const ts = []; let last = performance.now(); const f = now => { ts.push(now - last); last = now; if (ts.length < 400 && ts.reduce((a, b) => a + b, 0) < 4000) requestAnimationFrame(f); else { ts.shift(); const avg = ts.reduce((a, b) => a + b, 0) / ts.length, s = [...ts].sort((a, b) => a - b);
-      res({frames:ts.length, avg_ms:+avg.toFixed(2), fps:+(1000 / avg).toFixed(1), p95_ms:+s[Math.floor(s.length * .95)].toFixed(2), heap_mb:performance.memory ? +(performance.memory.usedJSHeapSize / 1048576).toFixed(1) : null, quality:window.VisionWorld.getQuality()}); } }; requestAnimationFrame(f); }));
+      res({frames:ts.length, avg_ms:+avg.toFixed(2), fps:+(1000 / avg).toFixed(1), p95_ms:+s[Math.floor(s.length * .95)].toFixed(2), heap_mb:performance.memory ? +(performance.memory.usedJSHeapSize / 1048576).toFixed(1) : null, quality:window.VisionWorld.getQuality(),
+      draw_calls:(window.VisionWorld.debug.frameStats ? window.VisionWorld.debug.frameStats().calls : null), triangles_k:(window.VisionWorld.debug.frameStats ? Math.round(window.VisionWorld.debug.frameStats().triangles / 1000) : null)}); } }; requestAnimationFrame(f); }));
     R.errors = errors.slice(0, 5);
     console.log(vp, JSON.stringify(R));
     await ctx.close();
