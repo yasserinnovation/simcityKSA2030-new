@@ -126,7 +126,7 @@
     float cloudShade(vec2 p, float tm){ float n=sin(p.x*.8+tm*.035)*sin(p.y*1.05-tm*.025)+.6*sin(p.x*.43-p.y*.57+tm*.02); return 1.0-.14*smoothstep(.55,1.15,n); }
     vec3 applyAtmos(vec3 c, float w){
       float f=clamp((w-uDist*.95)/(uDist*1.7),0.,1.);
-      vec3 sky=mix(mix(vec3(.66,.84,.95),vec3(.10,.14,.30),uNight),uTint,uStorm*.75);
+      vec3 sky=mix(mix(vec3(.66,.84,.95),mix(vec3(.80,.52,.44),vec3(.10,.14,.30),smoothstep(.35,1.0,uNight)),smoothstep(0.0,.5,uNight)),uTint,uStorm*.75);
       c=mix(c,sky,f*.5); c=mix(c,uTint*.9,uStorm*.34); return c; }`;
   const INST_ATTR = 'attribute mat4 instanceMatrix; attribute vec3 instanceColor; attribute float aTintK;';
   const WPOS = inst => inst ? '(instanceMatrix*vec4(position,1.0)).xyz' : 'position';
@@ -180,7 +180,9 @@
       float l=dot(c,vec3(.299,.587,.114)); c=mix(vec3(l),c,1.16);
       vec3 highlight=max(c-vec3(.78),vec3(0.0));
       c=min(c,vec3(.78))+highlight/(vec3(1.0)+highlight/.22); // soft exposure shoulder preserves pale roof detail
-      c=mix(c, c*vec3(.26,.32,.58)+vec3(.012,.018,.05)+vColor*uGlow*.6, uNight);   // dusk to night
+      // dusk to night in two stages: a warm golden-violet desert dusk first, then the cool night (lights read against both)
+      vec3 duskC=c*vec3(.78,.60,.60)+vec3(.03,.012,.004), nightC=c*vec3(.26,.32,.58)+vec3(.012,.018,.05);
+      c=mix(c, mix(duskC,nightC,smoothstep(.35,1.0,uNight)), smoothstep(0.0,.5,uNight)) + vColor*uGlow*.6*uNight;
       gl_FragColor=vec4(applyAtmos(c,vW),1.0);
     }`;
   // Depth-only pass for the sun shadow map (packed into RGBA).
@@ -1636,13 +1638,13 @@
   const RES = [[.96,.88,.72],[.93,.80,.62],[.98,.92,.80],[.90,.84,.74]], COM = [[.36,.62,.78],[.30,.55,.72],[.52,.72,.84]], IND = [[.78,.74,.68],[.70,.70,.72],[.82,.76,.62]];
   function buildCity(){
     cityMesh.p.length=cityMesh.c.length=cityMesh.n.length=cityLines.p.length=cityLines.c.length=0; cityMesh.inst={};
-    target=cityMesh; lineTarget=cityLines;
+    target=cityMesh; lineTarget=cityLines; const rngKeep=rngNow;   // per-parcel seeds: a parcel's trees and palms look the same on every rebuild
     const d=cityDesc, CY=G+.011; if (d) {
       const {x0,z0,ts,n}=d, X=i=>x0+(i+.5)*ts, Z=j=>z0+(j+.5)*ts, h=ts/2;
       const quad=(i,j,y,col,s=1)=>{ const x=X(i), z=Z(j), r=h*s; addQuad([x-r,y,z-r],[x+r,y,z-r],[x+r,y,z+r],[x-r,y,z+r],col); };
       const isRoad=(i,j)=>i>=0&&j>=0&&i<n&&j<n&&d.tiles[j*n+i]&&d.tiles[j*n+i].k==='r';
       for (let j=0;j<n;j++) for (let i=0;i<n;i++) {
-        const t=d.tiles[j*n+i]; if (!t) continue; const x=X(i), z=Z(j), rnd=((i*73856093)^(j*19349663))>>>0, rr=(rnd%1000)/1000;
+        const t=d.tiles[j*n+i]; if (!t) continue; const x=X(i), z=Z(j), rnd=((i*73856093)^(j*19349663))>>>0, rr=(rnd%1000)/1000; rngNow=mulberry32(rnd||1);
         if (t.k==='w') { quad(i,j,CY,[.72,.60,.44]); continue; }
         if (t.k==='x') { quad(i,j,CY+.0005,t.bridge?[.55,.52,.50]:[.56,.50,.44],.9); const hz=(i>0&&d.tiles[j*n+i-1]&&(d.tiles[j*n+i-1].k==='x'||d.tiles[j*n+i-1].rail))||(i<n-1&&d.tiles[j*n+i+1]&&(d.tiles[j*n+i+1].k==='x'||d.tiles[j*n+i+1].rail));
           if (hz) { addLine([x-h,CY+.002,z-h*.25],[x+h,CY+.002,z-h*.25],[.72,.72,.76]); addLine([x-h,CY+.002,z+h*.25],[x+h,CY+.002,z+h*.25],[.72,.72,.76]); } else { addLine([x-h*.25,CY+.002,z-h],[x-h*.25,CY+.002,z+h],[.72,.72,.76]); addLine([x+h*.25,CY+.002,z-h],[x+h*.25,CY+.002,z+h],[.72,.72,.76]); }
@@ -1651,6 +1653,9 @@
           const nb=[isRoad(i,j-1),isRoad(i+1,j),isRoad(i,j+1),isRoad(i-1,j)], cnt=nb.filter(Boolean).length;
           quad(i,j,CY+.0008,t.bridge?[.55,.52,.50]:t.art?[.30,.31,.34]:t.avenue?[.33,.34,.37]:[.38,.39,.42]);
           if (t.bridge) { addBox(x,G,z,ts*.9,.004,ts*.12,[.72,.70,.66]); }
+          else if (!t.art) { // pale kerbs and pavement on the sides that face a parcel (not another road)
+            const side=[[0,-1],[1,0],[0,1],[-1,0]], pv=[.84,.80,.72];
+            for (let k=0;k<4;k++) if (!nb[k]) { const [di,dj]=side[k], cx=x+di*h*.86, cz=z+dj*h*.86, w=di?ts*.14:ts, dd=dj?ts*.14:ts; addBox(cx,CY,cz,w,.0009,dd,pv); } }
           const lc=t.art||t.avenue?[1,.86,.35]:[.95,.95,.92];
           if (cnt<=2 && (nb[1]||nb[3]) && !(nb[0]||nb[2])) addLine([x-h*.6,CY+.002,z],[x+h*.6,CY+.002,z],lc);
           else if (cnt<=2 && (nb[0]||nb[2]) && !(nb[1]||nb[3])) addLine([x,CY+.002,z-h*.6],[x,CY+.002,z+h*.6],lc);
@@ -1663,14 +1668,21 @@
           const zc=ZCOL[t.zone];
           if (t.st===0) { quad(i,j,CY+.0004,mix(zc,[.86,.80,.66],.45),.92); continue; }
           quad(i,j,CY+.0004,t.st===4?[.55,.48,.42]:mix(zc,[.92,.88,.78],.55),.94);
-          if (t.st===1) { addBox(x,G,z,ts*.5,.002,ts*.5,[.76,.64,.48]); addCylinder(x+h*.5,G,z-h*.5,.0015,ts*.35,[.6,.6,.62],4); continue; }
+          if (t.st===1) { addBox(x,G,z,ts*.56,.0015,ts*.56,[.74,.62,.46]);   // serviced plot: levelled pad, site hoarding in the zone colour, survey pegs
+            const hc=mix(zc,[.98,.96,.9],.25); for (const [a,b,w,dd] of [[0,-.36,.74,.03],[0,.36,.74,.03],[-.36,0,.03,.74],[.36,0,.03,.74]]) if (!(b>0&&rr<.5)) addBox(x+a*ts,G,z+b*ts,w*ts,ts*.12,dd*ts,hc);
+            for (const [a,b] of [[-.22,-.22],[.22,.22]]) addCylinder(x+a*ts,G,z+b*ts,.0012,ts*.2,[.95,.45,.2],4); continue; }
           if (t.st===2) { const hh=ts*(.4+.5*(t.lv||1)); addBox(x,G,z,ts*.62,hh*.7,ts*.62,[.86,.84,.78]); for(let y=.006;y<hh*.7;y+=.008) addBox(x,G+y,z,ts*.66,.0012,ts*.66,[.95,.62,.2]); if (rr<.5) addCrane(x-h*.6,z-h*.6,.12+.06*(t.lv||1),[.98,.74,.16]); continue; }
           if (t.st===4) { addBox(x,G,z,ts*.6,ts*.35,ts*.6,[.46,.40,.36]); continue; }
           const lv=t.lv||1, st=t.style||0;
           if (t.zone==='T') { if (lv===1) { addBox(x,G,z,ts*.7,ts*.5,ts*.6,[.97,.93,.86]); addBox(x+h*.35,CY+.0006,z+h*.4,ts*.3,.001,ts*.2,[.35,.75,.9]); addTree(x-h*.6,z+h*.5,.28); }
             else { addTower(x,z,ts*.6,ts*(1.4+lv*.8+rr*.5),[.96,.90,.80],[.95,.75,.4]); addBox(x+h*.45,CY+.0006,z+h*.5,ts*.35,.001,ts*.22,[.35,.75,.9]); } continue; }
           if (t.zone==='M') { const hh=ts*(.5+lv*.55); addBox(x,G,z,ts*.8,ts*.3,ts*.76,COM[st%3]); addBox(x,G+ts*.3,z,ts*.72,hh,ts*.68,RES[st%4]); for(let k=0;k<4;k++) addBox(x-ts*.3+k*ts*.2,G+ts*.3+hh,z,ts*.08,ts*.05,ts*.7,shade(RES[st%4],.88)); continue; }
-          if (t.zone==='R') { if (lv===1) { addHouse(x,z,.24+.04*rr,RES[st%4],(rnd%4)*Math.PI/2); if (rr>.5) for(let k=0;k<3;k++) addBox(x-ts*.18+k*ts*.18,G+ts*.36,z-ts*.24,ts*.06,ts*.05,ts*.03,shade(RES[st%4],.85)); }
+          if (t.zone==='R' && lv===1) {   // villa plot: courtyard wall with a gate, yard planting, and garden trees when a park serves the home
+            const wc=shade(RES[(st+1)%4],.94); for (const [a,b,w,dd] of [[0,-.42,.86,.035],[-.42,0,.035,.86],[.42,0,.035,.86]]) addBox(x+a*ts,G,z+b*ts,w*ts,ts*.13,dd*ts,wc);
+            for (const a of [-.27,.27]) addBox(x+a*ts,G,z+.42*ts,.3*ts,ts*.13,.035*ts,wc);
+            if (rr>.35) addPalm(x+ts*.26,z+ts*.24,.12+rr*.03); else addTree(x+ts*.26,z+ts*.26,.11);
+            if (t.park) { addTree(x-ts*.27,z+ts*.27,.1); addBox(x,CY+.0007,z+ts*.3,ts*.5,.0006,ts*.14,[.50,.76,.40]); } }
+          if (t.zone==='R') { if (lv===1) { addHouse(x,z-ts*.04,.24+.04*rr,RES[st%4],(rnd%4)*Math.PI/2); if (rr>.5) for(let k=0;k<3;k++) addBox(x-ts*.18+k*ts*.18,G+ts*.36,z-ts*.28,ts*.06,ts*.05,ts*.03,shade(RES[st%4],.85)); }
             else if (lv===2) { addBox(x,G,z,ts*.72,ts*(.9+rr*.3),ts*.72,RES[st%4]); addBox(x,G+ts*(.9+rr*.3),z,ts*.76,ts*.06,ts*.76,shade(RES[st%4],.9)); }
             else addTower(x,z,ts*.6,ts*(2.4+rr*1.4),RES[(st+1)%4],null); }
           else if (t.zone==='C') { if (lv===1) { addBox(x,G,z,ts*.78,ts*.45,ts*.7,[.94,.90,.82]); addBox(x,G+ts*.3,z+ts*.36,ts*.78,ts*.06,ts*.04,COM[st%3]); }
@@ -1690,7 +1702,11 @@
           else if (f==='school') { addBox(x,G,z,ts*.86,ts*.45,ts*.6,c([.97,.93,.84])); addBox(x,G+ts*.45,z,ts*.9,ts*.06,ts*.64,c([.92,.52,.25])); }
           else if (f==='training') { addBox(x,G,z,ts*.8,ts*.55,ts*.6,c([.94,.94,.9])); addBox(x,G+ts*.55,z,ts*.84,ts*.06,ts*.64,c([.25,.62,.45])); }
           else if (f==='clinic') { addBox(x,G,z,ts*.8,ts*.6,ts*.7,c([.98,.98,.98])); addBox(x,G+ts*.6,z,ts*.3,ts*.03,ts*.09,c([.9,.25,.25])); addBox(x,G+ts*.6,z,ts*.09,ts*.03,ts*.3,c([.9,.25,.25])); }
-          else if (f==='park') { quad(i,j,CY+.0008,[.42,.74,.36],.95); for(let a=0;a<3;a++) addTree(x+(a-1)*ts*.28,z+(a%2?.2:-.2)*ts,.35); }
+          else if (f==='park') { quad(i,j,CY+.0008,[.44,.72,.36],.98);
+            addBox(x,CY+.0002,z,ts*.94,.0009,ts*.12,[.90,.84,.70]); addBox(x,CY+.0002,z,ts*.12,.0009,ts*.94,[.90,.84,.70]);   // crossing paths
+            addCylinder(x,CY,z,ts*.1,.0014,[.42,.66,.86],10);                                                        // small fountain
+            for (const [a,b] of [[-.27,-.27],[.27,.27]]) addTree(x+a*ts,z+b*ts,.13); for (const [a,b] of [[.27,-.27],[-.27,.27]]) addPalm(x+a*ts,z+b*ts,.14);
+            addBox(x+ts*.3,G+ts*.16,z-ts*.06,ts*.18,ts*.015,ts*.12,[.96,.94,.88]); for (const a of [-.07,.07]) addBox(x+ts*.3+a*ts,G,z-ts*.06,ts*.01,ts*.16,ts*.01,[.6,.58,.55]); }
           else if (f==='emergency') { addBox(x,G,z,ts*.8,ts*.45,ts*.7,c([.86,.28,.24])); addBox(x,G+ts*.45,z,ts*.3,ts*.35,ts*.3,c([.95,.95,.95])); }
           else if (f==='terminal') { addBox(x,G,z,ts*.9,ts*.12,ts*.6,c([.62,.64,.66])); for(let a=0;a<3;a++) for(let b=0;b<2;b++) addBox(x-ts*.3+a*ts*.3,G+ts*.12+b*ts*.1,z,ts*.24,ts*.1,ts*.16,c([[.85,.3,.25],[.2,.5,.85],[.95,.7,.2]][(a+b)%3])); addBox(x,G,z-ts*.3,ts*.05,ts*.6,ts*.05,c([.95,.75,.2])); addBox(x,G+ts*.6,z,ts*.9,ts*.05,ts*.05,c([.95,.75,.2])); }
           else if (f==='invest') { if (t.opened) { addTower(x,z,ts*.7,ts*3.2,[.55,.78,.9],[.98,.84,.4]); addBox(x,G,z,ts*.95,ts*.3,ts*.95,[.92,.9,.86]); } else { for (const [a,b] of [[-1,-1],[1,-1],[1,1],[-1,1]]) addBox(x+a*h*.9,G,z+b*h*.9,ts*.04,ts*.2,ts*.04,[.4,.62,.85]); addBox(x,G+ts*.15,z-h*.9,ts*.9,ts*.02,ts*.02,[.4,.62,.85]); addCylinder(x,G,z,ts*.03,ts*.8,[.6,.62,.66],5); addBox(x,G+ts*.8,z,ts*.4,ts*.18,ts*.03,[.25,.55,.85]); } }
@@ -1699,12 +1715,12 @@
         }
       }
       if (d.overlay) for (let j=0;j<n;j++) for (let i=0;i<n;i++) { const c=d.overlay[j*n+i]; if (c) quad(i,j,CY+.003,c,.96); }
-      for (const p of d.preview||[]) quad(p.i,p.j,CY+.004,p.ok?[.45,.95,.55]:[.98,.35,.3],.9);
+      for (const p of d.preview||[]) quad(p.i,p.j,CY+.004,p.hint?[1,.80,.28]:p.ok?[.45,.95,.55]:[.98,.35,.3],p.hint?.7:.9);
       for (const r of d.routes||[]) for (let k=1;k<r.path.length;k++) { const a=r.path[k-1], b=r.path[k]; addLine([X(a%n),CY+.006,Z((a/n)|0)],[X(b%n),CY+.006,Z((b/n)|0)],r.color); }
       // district boundary
       const x1=x0+n*ts, z1=z0+n*ts; for (const [a,b] of [[[x0,z0],[x1,z0]],[[x1,z0],[x1,z1]],[[x1,z1],[x0,z1]],[[x0,z1],[x0,z0]]]) addLine([a[0],CY+.0001,a[1]],[b[0],CY+.0001,b[1]],[1,.85,.4]);
     }
-    target=mesh; lineTarget=lines; cityDirty=true;
+    rngNow=rngKeep; target=mesh; lineTarget=lines; cityDirty=true;
   }
 
   /* ------------------------------ three.js scene -------------------- */
@@ -2098,9 +2114,9 @@
   function setDynLabels(list){
     const keep=new Set();
     for (const d of list) { keep.add(d.id); let L=dynLabels.get(d.id);
-      if (!L) { L=makeLabel(d.text,'dyn '+(d.cls||''),d.x,G+.12,d.z,12); dynLabels.set(d.id,L); }
+      if (!L) { L=makeLabel(d.text,'dyn '+(d.cls||''),d.x,d.y??G+.12,d.z,12); dynLabels.set(d.id,L); }
       if (L.el.textContent!==d.text) { L.el.textContent=d.text; L.w=0; }
-      L.el.className='map-label dyn '+(d.cls||''); L.x=d.x; L.z=d.z; }
+      L.el.className='map-label dyn '+(d.cls||''); L.x=d.x; L.z=d.z; if (d.y!=null) L.y=d.y; }
     for (const [id,L] of dynLabels) if (!keep.has(id)) { L.el.remove(); labels.splice(labels.indexOf(L),1); dynLabels.delete(id); }
   }
   function project(p){const v=M4.transform(vp,p);if(v[3]<=0.01)return null;const nx=v[0]/v[3],ny=v[1]/v[3];return [(nx*.5+.5)*width/dpr,(-ny*.5+.5)*height/dpr,v[2]/v[3]];}

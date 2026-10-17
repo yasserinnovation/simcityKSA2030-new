@@ -51,6 +51,8 @@
     for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) tiles.push({k:'e'});
     S = {v:VERSION, seed:opts.seed || 2026, month:0, startYear:2026, tiles, routes:[], budget:70, loan:null, policy:{conserve:false}, weather:{type:'clear', left:0}, spend:[], mission:null, missionLog:[], invest:null,
       tax:{R:7, C:7, I:7}, fund:{edu:1, health:1, park:1, safety:1, train:1, digital:1}, caps:[], goals:{}, challenges:[], log:[], hist:[], spentThisMonth:0, m:{}, nextRoute:1};
+    if (opts.gridPower != null) S.gridPower = opts.gridPower;   // spare regional-grid power entering at the gates (default 30; the tutorial district starts at 0)
+    if (opts.budget != null) S.budget = opts.budget;
     // Existing arterials (cannot be removed) with gates to the rest of Riyadh
     for (let i = 0; i < N; i++) setRoad(i, 21, true);
     for (let j = 0; j < N; j++) setRoad(6, j, true);
@@ -123,7 +125,7 @@
       if (f.unique && S.tiles.some(x => x.k === 'f' && x.fac === tool)) return {ok:false, why:L('Only one investment site can be designated','يمكن تحديد موقع استثماري واحد فقط')};
       const ok = t.k === 'e' || (t.k === 'z' && t.st < 3);
       return {ok:ok && f.cost <= S.budget, tiles:[[i, j]], cost:f.cost, why:!ok ? L('Choose an empty parcel','اختر قطعة فارغة') : f.cost > S.budget ? L('Not enough credits','الأرصدة غير كافية') : null,
-        info:accessRoad(i, j) ? L(`Upkeep ${f.upkeep} credits/month${f.serve ? ` · would reach about ${reachEstimate(i, j, f)} homes` : ''}${f.power || f.solar ? ` · adds ${f.power || f.solar} power to this network` : ''}${f.water ? ` · adds ${f.water} water` : ''}`, `صيانة ${f.upkeep} رصيد/شهر${f.serve ? ` · سيصل إلى نحو ${reachEstimate(i, j, f)} مسكن` : ''}`) : L('No road access: it will not work until a road reaches it','بلا وصول بالطرق: لن يعمل حتى يصله طريق')};
+        info:accessRoad(i, j) || f.walk ? L(`Upkeep ${f.upkeep} credits/month${f.serve ? ` · would reach about ${reachEstimate(i, j, f)} homes` : ''}${f.power || f.solar ? ` · adds ${f.power || f.solar} power to this network` : ''}${f.water ? ` · adds ${f.water} water` : ''}`, `صيانة ${f.upkeep} رصيد/شهر${f.serve ? ` · سيصل إلى نحو ${reachEstimate(i, j, f)} مسكن` : ''}`) : L('No road access: it will not work until a road reaches it','بلا وصول بالطرق: لن يعمل حتى يصله طريق')};
     }
     return {ok:false};
   }
@@ -199,7 +201,7 @@
         for (const [di, dj] of NB) { const vi = ui + di, vj = uj + dj; if (!inb(vi, vj)) continue; const v = idx(vi, vj); if (T[v].k !== 'r' || d.has(v)) continue; d.set(v, du + 1); q.push(v); } } return d; };
     // ---- utilities per connected component (utilities run along roads; the regional grid enters at gates)
     const supply = {}; const addS = (c, k, v) => { supply[c] = supply[c] || {power:0, water:0, solar:0, storage:0}; supply[c][k] += v; };
-    for (let c = 0; c < nc; c++) if (compGate[c]) { addS(c, 'power', 30); addS(c, 'water', 30); }
+    for (let c = 0; c < nc; c++) if (compGate[c]) { addS(c, 'power', S.gridPower ?? 30); addS(c, 'water', 30); }
     for (let u = 0; u < N * N; u++) if (T[u].k === 'f' && access[u] >= 0) { const f = FAC[T[u].fac], c = comp[access[u]]; if (f.power) addS(c, 'power', f.power); if (f.solar) addS(c, 'solar', f.solar); if (f.storage) addS(c, 'storage', f.storage); if (f.water) addS(c, 'water', f.water); }
     const dust = S.weather && S.weather.type === 'dust'; let solarEff = 0;
     for (const c in supply) { const s = supply[c]; const sf = (dust ? .6 : 1), st = has('smartgrid') ? 1.3 : 1; const e = s.solar * sf * (.7 + .3 * clamp(s.storage * st / Math.max(1, s.solar), 0, 1)); s.power += e; solarEff += e; }   // solar needs storage for the evening peak

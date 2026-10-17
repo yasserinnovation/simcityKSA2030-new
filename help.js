@@ -7,10 +7,10 @@
   const TEXT = {
     en: {title:'Map controls', open:'Show map controls', close:'Close', rows:[
       ['Drag', 'orbit the camera'], ['Right-drag · WASD', 'pan'], ['Scroll · pinch', 'zoom'], ['Q · E', 'rotate'],
-      ['Click', 'inspect a project or place'], ['Space', 'pause time (National Simulation)']]},
+      ['Click', 'inspect a project or place'], ['Space', 'pause time (National Simulation)']], tut:'🎓 Replay the first-neighbourhood tutorial'},
     ar: {title:'التحكم في الخريطة', open:'عرض أدوات التحكم في الخريطة', close:'إغلاق', rows:[
       ['اسحب', 'لتدوير الكاميرا'], ['اسحب بالزر الأيمن · WASD', 'للتحريك'], ['مرّر · قرّب بإصبعين', 'للتكبير'], ['Q · E', 'للاستدارة'],
-      ['انقر', 'لفحص مشروع أو مكان'], ['المسافة', 'لإيقاف الوقت (المحاكاة الوطنية)']]}
+      ['انقر', 'لفحص مشروع أو مكان'], ['المسافة', 'لإيقاف الوقت (المحاكاة الوطنية)']], tut:'🎓 أعد الدرس التعليمي للحي الأول'}
   };
   const lang = () => document.documentElement.dir === 'rtl' || document.body.classList.contains('national-ar') ? 'ar' : 'en';
   const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;'}[c]));
@@ -25,8 +25,10 @@
     const L = TEXT[lang()]; shownLang = lang();
     btn.setAttribute('aria-label', L.open); btn.title = L.open; pop.setAttribute('aria-label', L.title);
     pop.innerHTML = `<div class="mh-head"><b>${esc(L.title)}</b><button type="button" class="mh-close" aria-label="${esc(L.close)}">✕</button></div>`
-      + `<dl>${L.rows.map(([k, v]) => `<div><dt><kbd>${esc(k)}</kbd></dt><dd>${esc(v)}</dd></div>`).join('')}</dl>`;
+      + `<dl>${L.rows.map(([k, v]) => `<div><dt><kbd>${esc(k)}</kbd></dt><dd>${esc(v)}</dd></div>`).join('')}</dl>`
+      + (window.VNP && window.VNP.startTutorial ? `<button type="button" class="mh-tut">${esc(L.tut)}</button>` : '');
     pop.querySelector('.mh-close').onclick = () => setOpen(false);
+    const tb = pop.querySelector('.mh-tut'); if (tb) tb.onclick = () => { setOpen(false); window.VNP.startTutorial({from:window.VNP.mode}); };   // tutorial.js
   }
   function setOpen(v){ if (v) render(); pop.hidden = !v; btn.setAttribute('aria-expanded', String(v)); root.classList.toggle('open', v); place(); }
   btn.addEventListener('click', () => setOpen(pop.hidden));

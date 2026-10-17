@@ -12,7 +12,7 @@
 //     on top there — its own label may overlap its model, but no other label or panel may.
 // It runs in a separate browser context (fresh storage), so the player's saves are never touched.
 async (page) => {
-  const URL = 'http://127.0.0.1:8123/index.html';
+  const URL = 'http://127.0.0.1:8123/index.html?tutorial=off';   // fresh storage is a new player; skip the first-run tutorial here
   const TARGETS = {
     east:['eastern', 'green', 'place:qatif', 'place:dammam', 'place:dhahran', 'place:khobar', 'place:hofuf'],
     west:['madinah', 'ceer', 'lucid', 'jeddahcentral', 'masar', 'hajj', 'haramain', 'place:madinah', 'place:jeddah', 'place:makkah', 'place:taif'],

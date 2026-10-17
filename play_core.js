@@ -237,7 +237,7 @@
         <button class="tile wide" id="compBtn"><b>📊 ${esc(G.t('lensTitle'))}</b><small>${esc(G.t('menuCompSub'))}</small></button>
         <button class="tile" id="weeklyBtn"><b>★ ${esc(G.t('weekly'))}</b><small>${wd ? esc(G.t('dailyDone', {medal:G.t(wd)})) : esc(G.t(VM.mission(di.weekly.mission).title))}</small></button>
       </div>
-      <div class="menu-foot"><button class="link" id="settingsBtn">⚙ ${esc(G.t('settings'))}</button><button class="link" id="nationalBtn" title="${esc(G.t('nationalNote'))}">🧭 ${esc(G.t('national'))}</button></div>`;
+      <div class="menu-foot">${G.tutorialLink ? G.tutorialLink() : ''}<button class="link" id="settingsBtn">⚙ ${esc(G.t('settings'))}</button><button class="link" id="nationalBtn" title="${esc(G.t('nationalNote'))}">🧭 ${esc(G.t('national'))}</button></div>`;
     $('#playBtn').onclick = () => { G.sfx('select'); G.startMission(nm.id); };
     if ($('#resumeBtn')) $('#resumeBtn').onclick = () => G.resumeRun();
     $('#chapterBtn').onclick = G.showChapter; $('#upBtn').onclick = G.showUpgrades; $('#settingsBtn').onclick = G.showSettings;
@@ -246,6 +246,7 @@
     $('#nationalBtn').onclick = G.openNational;
     $('#compBtn').onclick = () => G.showLens && G.showLens('overview');
     $('#cityBtn').onclick = () => G.openCity && G.openCity(false);
+    G.bindTutorialLink && G.bindTutorialLink();
     const r = W.place(46.68, 24.71, 'Riyadh'); W.cam(.45, .7, 3.4, r[0] - .25, r[1], .6);
     clearInterval(G.menuCycle); if (!G.profile.reduced) { let ph = 0; G.menuCycle = setInterval(() => { if ($('#menu').classList.contains('hidden')) { clearInterval(G.menuCycle); W.setNight(0); return; } ph += .05; W.setNight(Math.max(0, Math.sin(ph) * .62)); }, 1000); }
     setTimeout(() => $('#playBtn') && $('#playBtn').focus(), 50);

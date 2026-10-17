@@ -37,7 +37,7 @@ function frameStats(png){ const {w, h, bpp, px} = decodePNG(png), seen = new Set
     const ctx = await browser.newContext({viewport:{width:1280, height:800}}), page = await ctx.newPage(), errors = [];
     page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
     page.on('pageerror', e => errors.push(String(e)));
-    await page.goto(`http://127.0.0.1:${port}/index.html${renderer === 'classic' ? '?renderer=classic' : ''}`);
+    await page.goto(`http://127.0.0.1:${port}/index.html?tutorial=off${renderer === 'classic' ? '&renderer=classic' : ''}`);   // the first-run tutorial is tested separately
     await page.waitForFunction(() => window.VisionWorld && window.VNP, null, {timeout:30000});
     ok(`[${renderer}] renderer booted`, await page.evaluate(() => window.VN_RENDERER) === renderer);
     // reach the home (Kingdom) view: skip the opening flight

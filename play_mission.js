@@ -488,6 +488,6 @@
   const params = new URLSearchParams(location.search);
   setTimeout(() => {
     if (params.has('national')) { G.openNational(); return; }
-    G.cinematic(G.showMenu, G.profile.seenIntro || params.has('short'));
+    G.cinematic(() => (G.afterIntro || G.showMenu)(), G.profile.seenIntro || params.has('short'));   // afterIntro (tutorial.js): resume or offer the tutorial
   }, 250);
 })();

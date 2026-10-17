@@ -27,11 +27,16 @@
   }
 
   /* ================================ ENTER =============================== */
-  G.openCity = (fresh) => {
+  // `session` (optional) is an isolated world such as the tutorial: {key, create(anchors) → new state, state: saved JSON or null,
+  // snapshot() → extra fields stored beside the city}. It is saved only under session.key and never touches the City Builder
+  // save (VC.KEY), the profile's city record or the competitiveness events.
+  G.openCity = (fresh, session) => {
     setupGrid();
     let loaded = false;
-    if (!fresh) for (const key of [VC.KEY, VC.KEY + '.backup']) { if (loaded) break; let s = null; try { s = localStorage.getItem(key); if (s) { VC.load(s); loaded = true; } } catch(e) { try { if (s) localStorage.setItem(VC.KEY + '.unreadable', s); } catch(e2) {} G.toast(t('cityLoadFail')); } }
-    if (!loaded) VC.newCity({seed:(Date.now() % 100000) || 7, anchors:anchorsInGrid()});
+    ui.session = session || null;
+    if (session) { if (session.state) { try { VC.load(session.state); loaded = true; } catch(e) { loaded = false; } } if (!loaded) session.create(anchorsInGrid()); fresh = true; }
+    else if (!fresh) for (const key of [VC.KEY, VC.KEY + '.backup']) { if (loaded) break; let s = null; try { s = localStorage.getItem(key); if (s) { VC.load(s); loaded = true; } } catch(e) { try { if (s) localStorage.setItem(VC.KEY + '.unreadable', s); } catch(e2) {} G.toast(t('cityLoadFail')); } }
+    if (!loaded && !session) VC.newCity({seed:(Date.now() % 100000) || 7, anchors:anchorsInGrid()});
     ui.savedRev = loaded ? VC.rev() : -1;   // a loaded city matches its save; a new one is written on the next autosave check
     ui.active = true; ui.speed = 0; ui.tool = 'select'; ui.overlay = null; ui.sel = null; ui.panel = null;
     G.hideAll(); $('#chud').classList.remove('hidden'); $('#play').classList.remove('hidden'); G.renderNav && G.renderNav('city');
@@ -40,10 +45,11 @@
     const c = [grid.x0 + N * grid.ts / 2, grid.z0 + N * grid.ts / 2], K = W.place(45.3, 23.7), core = W.place(46.68, 24.71, 'Riyadh');
     if (!G.profile.reduced) {   // one continuous move: Kingdom → Riyadh → the new district
       W.cam(.1, 1.05, 12, K[0], K[1], .6); say(t('zoomKingdom'), 'info');
-      setTimeout(() => { if (!ui.active) return; W.cam(.3, .95, 4.2, core[0] + .3, core[1], .5); say(t('zoomRiyadh'), 'info'); }, 1300);
-      setTimeout(() => { if (!ui.active) return; W.cam(.35, .82, 1.9, c[0], c[1], .5); say(loaded ? t('cityResumed') : t('cityWelcome'), 'info'); }, 2800);
+      ui.cutFlight = false;   // a guided step (tutorial) that aims the camera itself ends the scripted flight
+      setTimeout(() => { if (!ui.active || ui.cutFlight) return; W.cam(.3, .95, 4.2, core[0] + .3, core[1], .5); say(t('zoomRiyadh'), 'info'); }, 1300);
+      setTimeout(() => { if (!ui.active || ui.cutFlight) return; W.cam(.35, .82, 1.9, c[0], c[1], .5); if (!session) say(loaded ? t('cityResumed') : t('cityWelcome'), 'info'); }, 2800);
     } else W.cam(.35, .82, 1.9, c[0], c[1], 2);
-    render(); renderHUD(); if (G.profile.reduced) say(loaded ? t('cityResumed') : t('cityWelcome'), 'info');
+    render(); renderHUD(); if (G.profile.reduced && !session) say(loaded ? t('cityResumed') : t('cityWelcome'), 'info');
   };
   // The city saves automatically: every in-game month, when you leave or switch mode, and when the page closes.
   G.cityActive = () => ui.active;
@@ -58,8 +64,10 @@
     if (VC.rev() !== ui.savedRev && !ui.navDirty) { ui.navDirty = true; G.renderNav && G.renderNav('city'); }   // show "saving changes…"
     if (VC.autosaveDue(ui.savedRev) && !(ui.saveFailAt && Date.now() - ui.saveFailAt < 5000)) save();
   }, 250);
-  function leaveCity(next){ save(); ui.active = false; W.setDynamicLabels([]); W.setHazard(null); W.setProjectLabels(true); W.onGroundDrag(null); W.onGroundHover(null); W.setCity(null); W.setOverlay([]); W.setEntities([]); W.setMissionLights([]); $('#chud').classList.add('hidden'); { const nav = $('#modeNav'); if (nav && nav.parentNode !== document.body) document.body.appendChild(nav); } if (typeof next === 'function') next(); else G.showMenu(); }
-  function save(){ try { const prev = localStorage.getItem(VC.KEY); if (prev) localStorage.setItem(VC.KEY + '.backup', prev); const rv = VC.rev(); localStorage.setItem(VC.KEY, VC.serialize()); ui.savedRev = rv; ui.navDirty = false; if (ui.active && G.renderNav) G.renderNav('city');
+  function leaveCity(next){ save(); ui.active = false; ui.session = null; ui.hint = null; W.setDynamicLabels([]); W.setHazard(null); W.setProjectLabels(true); W.onGroundDrag(null); W.onGroundHover(null); W.setCity(null); W.setOverlay([]); W.setEntities([]); W.setMissionLights([]); $('#chud').classList.add('hidden'); { const nav = $('#modeNav'); if (nav && nav.parentNode !== document.body) document.body.appendChild(nav); } if (typeof next === 'function') next(); else G.showMenu(); }
+  function save(){
+    if (ui.session) { try { localStorage.setItem(ui.session.key, JSON.stringify({...ui.session.snapshot(), city:VC.serialize()})); ui.savedRev = VC.rev(); ui.navDirty = false; ui.saveFailAt = 0; } catch(e) { ui.saveFailAt = Date.now(); } return; }
+    try { const prev = localStorage.getItem(VC.KEY); if (prev) localStorage.setItem(VC.KEY + '.backup', prev); const rv = VC.rev(); localStorage.setItem(VC.KEY, VC.serialize()); ui.savedRev = rv; ui.navDirty = false; if (ui.active && G.renderNav) G.renderNav('city');
       const S = VC.state, deltas = VC.factorDeltas(), old = (G.profile.city && G.profile.city.deltas) || [], d = VC.dateOf();
       G.profile.compEvents = G.profile.compEvents || [];
       for (const x of deltas) { const o = old.find(y => y.factor === x.factor), from = o ? o.delta : 0; if (Math.abs(x.delta - from) >= .1) G.profile.compEvents.push({factor:x.factor, from, to:x.delta, why:x.why, source:'city', year:d.year, month:d.month}); }
@@ -82,15 +90,19 @@
     traffic:{icon:'🚗', f:(tl, u, m) => tl.k === 'r' ? ramp(1 - Math.min(1.4, m.vc[u] || 0) / 1.4) : null}
   };
   const noRoad = tl => tl.needs && tl.needs.some(n => n.k === 'road' && !n.ok);
+  // A zoned parcel that has a connected road but no power: the only thing stopping it is electricity (shown with a ⚡ marker).
+  const needsPower = tl => tl.k === 'z' && tl.st < 4 && !!tl.needs && tl.needs.some(n => n.k === 'road' && n.ok) && tl.needs.some(n => n.k === 'power' && !n.ok);
   const ramp = v => v > .66 ? [.35,.85,.45] : v > .45 ? [.75,.9,.4] : v > .3 ? [1,.78,.3] : [.95,.35,.3];
   function render(){
     const S = VC.state, m = S.m;
     const stopTiles = new Set(S.routes.flatMap(r => r.stops));
-    const tiles = S.tiles.map((tl, u) => ({k:tl.k, zone:tl.zone, st:tl.st, lv:tl.lv, style:tl.seedN, art:tl.art, avenue:tl.avenue, bridge:tl.bridge, rail:tl.rail, fac:tl.fac, inactive:tl.inactive || (tl.fac === 'terminal' && !tl.railLinked), opened:tl.fac === 'invest' && S.invest && S.invest.opened, stop:stopTiles.has(u), mix:tl.mix}));
+    const tiles = S.tiles.map((tl, u) => ({k:tl.k, zone:tl.zone, st:tl.st, lv:tl.lv, style:tl.seedN, art:tl.art, avenue:tl.avenue, bridge:tl.bridge, rail:tl.rail, fac:tl.fac, inactive:tl.inactive || (tl.fac === 'terminal' && !tl.railLinked), opened:tl.fac === 'invest' && S.invest && S.invest.opened, stop:stopTiles.has(u), mix:tl.mix,
+      nopow:needsPower(tl), pow:!!tl.pow, occ:tl.occ || 0, park:!!(tl.cov && tl.cov.park)}));
     const ov = ui.overlay ? S.tiles.map((tl, u) => OVERLAYS[ui.overlay].f(tl, u, m)) : null;
     const preview = [];
     if (ui.pending && ui.pending.p.tiles) for (const [i, j] of ui.pending.p.tiles) preview.push({i, j, ok:ui.pending.p.ok && !(ui.pending.p.bad || []).some(b => b[0] === i && b[1] === j)});
     for (const s of ui.stops) preview.push({i:s % N, j:(s / N) | 0, ok:true});
+    if (ui.hint && !ui.pending) for (const [i, j] of ui.hint) preview.push({i, j, ok:true, hint:true});   // a suggested placement (tutorial), drawn in gold
     const routes = S.routes.map(r => ({path:r.path, color:r.crowded ? [1,.45,.3] : [1,.85,.2]}));
     if (ui.overlay === 'power' || ui.overlay === 'water') {   // show the utility network actually carrying supply along the roads
       const col = ui.overlay === 'power' ? [1,.86,.2] : [.35,.7,1], key = ui.overlay === 'power' ? 'pow' : 'wat';
@@ -110,11 +122,18 @@
       for (const [a, b] of segs) ov.push({a, b, color:v > 1 ? [1,.45,.3] : v > .7 ? [1,.85,.4] : [.98,.97,.92], flow:true, noLine:true, both:true, n:Math.min(5, Math.max(1, Math.round(v * 3 * rush))), speed:Math.max(.12, .9 - v * .4), size:2.6, y:W.ground + .016}); }
     for (const r of S.routes) { for (let k = 1; k < r.path.length; k++) { const a = center(r.path[k - 1]), b = center(r.path[k]); if (k % 3 === 0) ov.push({a, b, color:[1,.8,.15], flow:true, noLine:true, n:1, speed:.5 + r.freq * .04, size:4.8, y:W.ground + .02}); }
       const perStop = (r.riders || 0) / Math.max(1, r.stops.length); for (const s of r.stops) { const c = center(s); for (let q = 0; q < Math.min(8, Math.round(perStop / 6)); q++) ents.push({x:c[0] + ((q % 3) - 1) * grid.ts * .15, z:c[1] + grid.ts * .35, y:W.ground + .016, color:[.95,.9,.8], size:2.4}); } }
-    for (let u = 0; u < N * N; u++) { const tl = S.tiles[u]; if (tl.k === 'z' && tl.st === 3 && tl.occ > .2 && (u * 7) % 3 === 0) { const c = center(u); lights.push([c[0], c[1], 2.4 + tl.lv * .8]); } if (tl.k === 'r' && (u % 3 === 0) && !tl.art) { const c = center(u); lights.push([c[0], c[1], 1.6]); } }
+    // Night lights follow the simulation: windows glow only in occupied buildings that have power, and street lamps only
+    // on streets beside a powered parcel. An unpowered neighbourhood stays dark.
+    const lit = (i, j) => i >= 0 && j >= 0 && i < N && j < N && S.tiles[j * N + i].pow && S.tiles[j * N + i].k !== 'r';
+    for (let u = 0; u < N * N; u++) { const tl = S.tiles[u], i = u % N, j = (u / N) | 0;
+      if (tl.k === 'z' && tl.st === 3 && tl.pow && tl.occ > .1) { const c = center(u); lights.push([c[0], c[1], 3 + tl.lv * 1.6 + tl.occ * 2]); }
+      if (tl.k === 'f' && tl.pow && !tl.inactive && tl.fac !== 'solar' && tl.fac !== 'park') { const c = center(u); lights.push([c[0], c[1], 2.6]); }
+      if (tl.k === 'r' && !tl.art && (i + j) % 2 === 0 && (lit(i - 1, j) || lit(i + 1, j) || lit(i, j - 1) || lit(i, j + 1))) { const c = center(u); lights.push([c[0] + grid.ts * .38, c[1] + grid.ts * .38, 1.3]); } }
     // services come alive with the people they serve
     for (let u = 0; u < N * N; u++) { const tl = S.tiles[u]; if (tl.k !== 'f' || !tl.load || tl.inactive) continue; const c = center(u), day = ui.dayT > .28 && ui.dayT < .75; const n = Math.round(Math.min(8, tl.load * 8) * (day ? 1 : .3)); for (let q = 0; q < n; q++) ents.push({x:c[0] + Math.cos(q * 2.3) * grid.ts * .45, z:c[1] + Math.sin(q * 2.3) * grid.ts * .45, y:W.ground + .016, color:[[1,.9,.75],[.8,.9,1],[1,.8,.6]][q % 3], size:2.2}); }
     W.setOverlay(ov); W.setEntities(ents); W.setMissionLights(lights);
     const labs = [];
+    let pw = 0; for (let u = 0; u < N * N && pw < 8; u++) if (needsPower(S.tiles[u])) { const c = center(u); labs.push({id:'cp' + u, text:'⚡', x:c[0], z:c[1], y:W.ground + .02, cls:'city-lab nopow'}); pw++; }   // parcels waiting only for power
     for (let u = 0; u < N * N; u++) { const tl = S.tiles[u]; if (tl.k === 'a' && tl.name) { const c = center(u); labs.push({id:'ca' + u, text:tl.nameL ? t(tl.nameL) : tl.name, x:c[0], z:c[1], cls:'city-lab'}); } if (tl.k === 'f' && (tl.fac === 'invest' || tl.fac === 'terminal')) { const c = center(u); labs.push({id:'cf' + u, text:t(VC.FAC[tl.fac].name), x:c[0], z:c[1], cls:'city-lab sm'}); } }
     W.setDynamicLabels(labs);
     if (S.weather && S.weather.type === 'dust' && !G.profile.reduced) { const c = [grid.x0 + N * grid.ts / 2, grid.z0 + N * grid.ts / 2]; W.setHazard({x:c[0], z:c[1], r:N * grid.ts * .6, type:'dust', intensity:.55}); } else W.setHazard(null);
@@ -144,6 +163,7 @@
     $('#cExit').onclick = () => leaveCity();
     $('#cKingdom').onclick = () => { if (ui.kingdom) { ui.kingdom = false; const c = [grid.x0 + N * grid.ts / 2, grid.z0 + N * grid.ts / 2]; W.cam(.35, .82, 1.7, c[0], c[1], .5); } else { ui.kingdom = true; const K = W.place(45.3, 23.7); W.cam(.1, 1.05, 14, K[0], K[1], .45); } };
     renderTools(); renderMissionCard();
+    if (G.afterCityHUD) G.afterCityHUD();
   }
   const TOOLS = [
     {id:'select', icon:'👆', grp:0}, {id:'road', icon:'🛣️', cost:VC.COST.road, grp:1}, {id:'avenue', icon:'🚦', cost:VC.COST.avenue, cap:'avenue', grp:1}, {id:'remove', icon:'🧹', grp:1},
@@ -163,6 +183,7 @@
       + `<button class="ctool" id="cUndo" ${VC.canUndo() ? '' : 'disabled'}><span>↶</span><small>${esc(t('undo'))}</small></button>`;
     $$('#cTools [data-tool]').forEach(b => b.onclick = () => selectTool(b.dataset.tool));
     $$('#cTools [data-dens]').forEach(b => b.onclick = () => { ui.density = +b.dataset.dens; renderTools(); });
+    if (G.afterCityHUD) G.afterCityHUD();
     $('#cUndo').onclick = () => { if (VC.doUndo()) { G.sfx('click'); say(t('undone'), 'info'); render(); renderHUD(); refreshPanel(); } };
   }
   function selectTool(id){ ui.tool = id; ui.pending = null; ui.stops = []; $('#cConfirm').classList.add('hidden'); G.sfx('click');
@@ -355,6 +376,7 @@
     requestAnimationFrame(loop);
   }
   function handleEvents(ev){
+    if (ui.session && ui.session.events) ev = ui.session.events(ev);   // an isolated session (the tutorial) holds back unrelated challenges and weather
     let pause = false;
     for (const e of ev) {
       if (e.type === 'milestone') { say('🏅 ' + t(e.text), 'good'); G.sfx('medal'); if (!G.profile.reduced) { const c = [grid.x0 + N * grid.ts / 2, grid.z0 + N * grid.ts / 2]; W.burst(c[0], c[1]); } }

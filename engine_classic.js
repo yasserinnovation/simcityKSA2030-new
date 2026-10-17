@@ -1452,9 +1452,9 @@
   function setDynLabels(list){
     const keep=new Set();
     for (const d of list) { keep.add(d.id); let L=dynLabels.get(d.id);
-      if (!L) { L=makeLabel(d.text,'dyn '+(d.cls||''),d.x,G+.12,d.z,12); dynLabels.set(d.id,L); }
+      if (!L) { L=makeLabel(d.text,'dyn '+(d.cls||''),d.x,d.y??G+.12,d.z,12); dynLabels.set(d.id,L); }
       if (L.el.textContent!==d.text) { L.el.textContent=d.text; L.w=0; }
-      L.el.className='map-label dyn '+(d.cls||''); L.x=d.x; L.z=d.z; }
+      L.el.className='map-label dyn '+(d.cls||''); L.x=d.x; L.z=d.z; if (d.y!=null) L.y=d.y; }
     for (const [id,L] of dynLabels) if (!keep.has(id)) { L.el.remove(); labels.splice(labels.indexOf(L),1); dynLabels.delete(id); }
   }
   function project(p){const v=M4.transform(vp,p);if(v[3]<=0.01)return null;const nx=v[0]/v[3],ny=v[1]/v[3];return [(nx*.5+.5)*width/dpr,(-ny*.5+.5)*height/dpr,v[2]/v[3]];}
