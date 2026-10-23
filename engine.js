@@ -40,7 +40,7 @@
   { const [x, z] = LY.R(.03, -.06); Object.assign(D.regions.riyadh, {x, z, az:0, el:1.02, dist:3.35, fitWidth:true}); }
   // Every regional plan is framed north-up the same way (regions.js cameras).
   for (const [k, v] of Object.entries(LY.REGION_VIEWS || {})) if (D.regions[k]) Object.assign(D.regions[k], {x:v.camera.x, z:v.camera.z, az:0, el:1.02, dist:v.camera.dist, fitWidth:true, phoneFit:v.camera.phoneFit || 1.5});
-  Object.assign(D.regions.kingdom,{el:1.02,az:.15,dist:14.4,nationalFit:true});
+  Object.assign(D.regions.kingdom,{el:1.02,az:.15,dist:11.2,nationalFit:true}); D.regions.kingdom.z-=.4;   // V21: framed like the reference map (was 14.4, centred .4 further south)
   const P = id => D.projects.find(p => p.id === id);
   const C = name => cityByName[name];
   const pt = w => typeof w === 'string' ? [C(w).x, C(w).z] : geo(w[0], w[1]);
@@ -230,9 +230,10 @@
       float national=smoothstep(6.0,7.0,uDist);
       float exposure=.25+.75*smoothstep(-.2,.5,sin(vWorld.z*2.7+vWorld.x*1.5));
       c=mix(c,vec3(.97,.98,.96),clamp(foam,0.0,1.0)*mix(.58,.20*exposure,national));
-      vec3 calmReef=vec3(.44,.79,.76),calmShallow=vec3(.16,.59,.64),calmDeep=vec3(.075,.28,.40);
-      vec3 calm=mix(calmReef,calmShallow,smoothstep(0.0,.16,s));calm=mix(calm,calmDeep,smoothstep(.12,.85,s));
-      c=mix(c,calm*(.98+.02*w1*fade),national*.82);
+      // V21 national palette (reference map): bright turquoise shallows, vivid cyan-blue mid water, saturated deep blue
+      vec3 calmReef=vec3(.48,.90,.86),calmShallow=vec3(.10,.72,.80),calmMid=vec3(.07,.47,.76),calmDeep=vec3(.05,.29,.60);
+      vec3 calm=mix(calmReef,calmShallow,smoothstep(0.0,.10,s));calm=mix(calm,calmMid,smoothstep(.08,.30,s));calm=mix(calm,calmDeep,smoothstep(.32,.95,s));
+      c=mix(c,calm*(.97+.05*w1*fade),national*.9); c=mix(c,vec3(.93,.99,.98),national*smoothstep(.022,.0,s)*.55);   // V21: soft white surf on every coast
       vec3 V=normalize(uEye-vWorld); vec3 H=normalize(uSun+V);
       float spec=pow(max(dot(N,H),0.0),90.0)*fade; c+=vec3(1.0,.95,.82)*spec*0.5*(1.0+uHdr*1.4)*(1.0-uStorm);   // V20: sun glints are HDR emitters
       c*=mix(0.88,1.0,(cloudShade(vWorld.xz,t)-0.70)/0.30);
@@ -1978,7 +1979,7 @@
       if(L && L.spatialReady){const useCells=pass!=='depth' && camera.dist<SPATIAL_DIST;v=v && !!u.spatial===useCells;}
       o.frustumCulled=!!u.spatial && pass!=='depth';
       if (pass === 'depth') v = v && !!(L && L.cast); else if (pass === 'pick') v = v && !!(L && L.pick);
-      if (u.inst) v = v && o.count > 0; if(countryOverview&&camera.dist>6&&u.kind==='tree')v=false;
+      if (u.inst) v = v && o.count > 0; if(countryOverview&&camera.dist>6&&(u.kind==='tree'||u.kind==='ghaf'))v=false;   /* V21: the overview's palms and oases replace them */
       if(countryOverview&&camera.dist>6&&[LAYERS.rock,LAYERS.rockLo,LAYERS.dune,LAYERS.duneLo,LAYERS.cloud].includes(u.L))v=false;
       o.visible = v; if (v) o.material = u.mats[pass]; }
   }
@@ -2153,6 +2154,10 @@
   const roadLabels = LY.CITY_ROADS.filter(r => ROAD_LABEL_AT[r.id]).map(r => { const [x,z]=LY.R(...ROAD_LABEL_AT[r.id]); const L=makeLabel(r.name.en, 'road-name', x, G+.01, z, 1.2); L.road=true; return L; });
   // ★ Riyadh sits just above the split-top tower (never over its silhouette) and selects the downtown place.
   { const L=labels.find(q => q.base==='Riyadh' && q.el.classList.contains('city')); if (L) { L.x=C('Riyadh').x+KC.dx; L.z=C('Riyadh').z+KC.dz; L.y=G+KC.h+.03; /* just above the tip: clear of the tower, not drifting over districts to the north */ L.el.dataset.pid=CORE_ID; } }
+  // V21: Kingdom-map badges (kingdom-landmarks.js), national overview only; a click opens the badge's regional view.
+  for (const b of window.VisionKingdomBadges || []) { const c = b.city && (LY.cityDisplay[b.city] || (q => q && [q.x, q.z])(C(b.city))), p = b.project && P(b.project), at = c || (p && [p.x, p.z]); if (!at) continue;
+    const L = makeLabel('', 'badge badge-' + b.style, at[0] + (b.dx || 0), G + .16, at[1] + (b.dz || 0), 26); L.base = null; L.badge = b; L.el.innerHTML = window.VisionKingdomIcon(b.icon, b.color) + '<span></span>';
+    if (b.region) L.el.dataset.region = b.region; else L.el.classList.add('static'); }
   const clusterLabels = clusters.map(cl => { const L=makeLabel(cl.anchor+' · '+cl.ids.length+' projects', 'cluster', cl.x, G+.34, cl.z, 9.5); L.cluster=true; return L; });
   // Project name labels hold a full and a short variant (each translated once by the Arabic layer); the placer picks the
   // variant that fits, anchors the label just above the model's real top, and lets the player click it.
@@ -2196,7 +2201,10 @@
     for (const L of labels) {
       let show = true, x=L.x, y=L.y, z=L.z, pri=L.priority;
       if(L.scenic){const text=document.documentElement.dir==='rtl'?L.scenic.ar:L.scenic.name;if(L.el.textContent!==text){L.el.textContent=text;L.w=0;}}
-      if (L===projLabel) { const p=focus&&P(focus); if(!p||!projLabelsOn){show=false;} else { const k=Math.min(6,(projectState[p.id]||{}).done||0), key=p.id+':'+k; if (L.key!==key) { L.key=key; L.el.innerHTML=''; const b=document.createElement('b'); b.textContent=mapName(p); const m=document.createElement('small'); m.className='pl-metric'; m.textContent=k+'/6'; L.el.append(b, m); L.w=0; } L.el.dataset.pid=p.id; x=p.x; z=p.z; y=topY[p.id]+.035; } }
+      const overview = !!countryOverview && far > 6;
+      if (L.badge) { show = overview; const t=document.documentElement.dir==='rtl'?L.badge.ar:L.badge.en, sp=L.el.lastChild; if (sp.textContent!==t) { sp.textContent=t; L.w=0; } }
+      else if (overview && (L.region || L.cluster || L.district || L.el.classList.contains('city') || L.el.classList.contains('place'))) show = false;   // V21: the badges replace them
+      else if (L===projLabel) { const p=focus&&P(focus); if(!p||!projLabelsOn){show=false;} else { const k=Math.min(6,(projectState[p.id]||{}).done||0), key=p.id+':'+k; if (L.key!==key) { L.key=key; L.el.innerHTML=''; const b=document.createElement('b'); b.textContent=mapName(p); const m=document.createElement('small'); m.className='pl-metric'; m.textContent=k+'/6'; L.el.append(b, m); L.w=0; } L.el.dataset.pid=p.id; x=p.x; z=p.z; y=topY[p.id]+.035; } }
       else if ((L.cluster||L.small) && !projLabelsOn) show = false;
       else if (L.cluster) show = far > CLUSTER_DIST && !(countryOverview&&far>6);
       else if (L.region) show = far > 9;
@@ -2224,7 +2232,7 @@
     const coversOther = (r, pid) => anchors.some(([id, x, y]) => id !== pid && x > r.x - 4 && x < r.x + r.w + 4 && y > r.y - 4 && y < r.y + r.h + 4);
     for (const {L, s} of cand) {
       if(countryOverview&&far>6)L.w=0; measure(L); if (L===projLabel) { L.w=L.el.offsetWidth; L.h=L.el.offsetHeight; }
-      const lift = L.el.classList.contains('city')||L===projLabel||L.cluster ? 18 : L.small ? 8 : 0;
+      const lift = L.badge ? 26 : L.el.classList.contains('city')||L===projLabel||L.cluster ? 18 : L.small ? 8 : 0;
       const at = w => ({x:Math.max(6, Math.min(innerWidth - w - 6, s[0]-w/2+(far>7?L.dx:0))), y:s[1]-L.h/2-lift+(far>7?L.dy:0), w, h:L.h});   // every label stays fully on screen
       // Decorative names (seas, countries, headings, corridors, the plan note) never sit over any landmark: they give way first.
       const deco = L.decor ?? (L.decor = !!(L.heading || L.note || L.road || L.el.classList.contains('sea') || L.el.classList.contains('country')));
@@ -2305,7 +2313,9 @@
     // 2) Scene: sky clear, sea, meshes, lines, points
     const sky=[(.60+storm*.18)*(1-night)+.07*night,(.82-storm*.26)*(1-night)+.10*night,(.94-storm*.44)*(1-night)+.22*night];
     const out = postOn ? post.begin(width,height) : null;   // V20: the premium tiers draw the frame into an HDR target
-    renderer.setRenderTarget(out); renderer.setClearColor(clearCol.setRGB(sky[0],sky[1],sky[2]), 1); renderer.clear();
+    // V21: on the Kingdom map, beyond the world's edge reads as open ocean (the haze keeps the sky colour)
+    const edge=countryOverview&&camera.dist>6?[.05*(1-night)+.03*night,.30*(1-night)+.07*night,.60*(1-night)+.18*night]:sky;
+    renderer.setRenderTarget(out); renderer.setClearColor(clearCol.setRGB(edge[0],edge[1],edge[2]), 1); renderer.clear();
     POINT_MAT.uniforms.uScale.value=dpr;
     buildDynLines(t); syncLines(dynLinesObj, dynLines);
     dynamicPoints(t);

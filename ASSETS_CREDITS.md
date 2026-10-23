@@ -34,3 +34,5 @@ NEOM clay pass: original local procedural geometry in neom-clay.js and cosmetic 
 Kingdom diorama: original local procedural scenery and post-processing in kingdom-diorama.js, with original terrain/water shader updates in engine.js. User-provided reference informed the art direction; no reference image is embedded as a runtime asset.
 
 V19 country overview: original procedural terrain, dune heightfields, merged destination silhouettes, route resurfacing and instanced regional groves. No newly downloaded or generated external assets. Existing data and assets retain their original attribution.
+
+V21 Kingdom map: original procedural geometry in `kingdom-landmarks.js` (landmark clusters, badge icons as inline SVG) and `country-overview.js` (neighbour terrain, oases, palms, mesas, clouds from a generated canvas texture). The user-supplied `refrence.png` guided the art direction; none of its pixels are shipped.

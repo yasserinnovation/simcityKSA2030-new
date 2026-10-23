@@ -1,0 +1,23 @@
+{
+  "phase": "before",
+  "errors": [],
+  "perf": {
+    "high": {
+      "meanMs": 21.72,
+      "p95Ms": 25.3
+    },
+    "medium": {
+      "meanMs": 15.55,
+      "p95Ms": 18.7
+    },
+    "low": {
+      "meanMs": 9.53,
+      "p95Ms": 12.4
+    }
+  },
+  "badgeClick": 3.506479077821036,
+  "phonePerf": {
+    "meanMs": 18.99,
+    "p95Ms": 25.9
+  }
+}

@@ -22,7 +22,7 @@
     'start':'ابدأ', 'start now':'ابدأ الآن', 'pause & release crews':'أوقف وحرّر الأطقم', 'national view':'العرض الوطني', 'suggested':'مقترح', 'waiting on prerequisites':'بانتظار المتطلبات',
     'strategic timeline':'الخط الزمني الاستراتيجي', 'waiting':'بانتظار', 'blocked':'متعثر', 'idle':'خامل', 'maintenance, gateways and grid':'الصيانة والبوابات والشبكة', 'show or hide the timeline':'إظهار الخط الزمني أو إخفاؤه',
     'drag to orbit · right-drag or wasd to pan · scroll to zoom · click to inspect · space to pause':'اسحب للتدوير · اسحب بالزر الأيمن أو WASD للتحريك · مرّر للتكبير · انقر للفحص · المسافة للإيقاف', 'layers':'الطبقات', 'logistics':'اللوجستيات', 'grid':'الشبكة', 'dependencies':'الاعتمادات',
-    'kingdom':'المملكة', 'riyadh':'الرياض', 'west':'الغرب', 'neom':'نيوم', 'east':'الشرقية', 'south':'الجنوب',
+    'kingdom':'المملكة', 'riyadh':'الرياض', 'west':'الغرب', 'makkah & west':'مكة والغرب', 'neom & northwest':'نيوم والشمال الغربي', 'eastern':'الشرقية', 'aseer & south':'عسير والجنوب', 'neom':'نيوم', 'east':'الشرقية', 'south':'الجنوب',
     'kingdom motion':'حراك المملكة', 'first step':'الخطوة الأولى', 'planning pause':'توقف للتخطيط', 'in motion':'قيد التنفيذ', 'complete':'مكتمل', 'cause chain':'سلسلة الأسباب',
     'early signal':'إشارة مبكرة', 'advisory':'تنبيه', 'national challenge':'تحدٍّ وطني', 'capacity':'السعة', 'mandate':'الولاية', 'opportunity':'فرصة', 'performance':'الأداء', 'dispatch':'إرسال', 'readiness':'الجاهزية', 'field view':'العرض الميداني',
     'mandate transition':'انتقال الولاية', 'your leadership mandate has concluded.':'انتهت ولايتك القيادية.', 'saudi arabia’s transformation continues.':'تحوّل المملكة العربية السعودية مستمر.',

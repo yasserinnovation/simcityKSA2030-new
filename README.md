@@ -1,4 +1,4 @@
-# Vision Nexus 2030 — The Kingdom in Motion (build V20 — premium render)
+# Vision Nexus 2030 — The Kingdom in Motion (build V21 — Kingdom map)
 
 The build label is shown in the bottom corner of the screen. If you see a "Strategic Actions" panel, "Path to 2030" or a calendar past 2030, you are running an older copy of the files.
 
@@ -10,7 +10,9 @@ The game runs from a tiny local web server, because browsers block the ES module
 - **macOS / Linux:** run `./launch.sh` (same fallbacks).
 - **Any system with Node:** `npm start`, then open http://127.0.0.1:8123.
 - **Renderers:** http://127.0.0.1:8123/index.html uses the three.js renderer; add `?renderer=classic` for the original hand-written WebGL renderer (kept for comparison). Opening `index.html` directly from disk still works and uses the classic renderer. Add `?debug=1` for the frame-time counter.
-- **Tests:** `npm test` (game logic, headless) and `npm install && npm run test:render` (Playwright smoke test against your installed Chrome or Edge).
+- **Updating an existing copy:** replace the whole `VisionNexus2030` folder (new files such as `kingdom-landmarks.js`, `premium.js`, `assets.js`, `assets/models/` and `vendor/three/addons/` must all be present), then reload the page with Ctrl+F5 so the browser drops cached scripts. The badge in the bottom corner should read **build V21 (Kingdom map)**. Saves are kept: they live in the browser, not in the folder.
+- **Development install (tests only, the game itself needs nothing):** Node.js 18 or newer, then `npm install` once in this folder. It installs only `playwright-core`, which drives your installed Chrome or Edge; no browser is downloaded.
+- **Tests:** `npm test` (game logic, headless), `npm run test:render` (both renderers), `npm run test:tutorial` (tutorial and City Builder, desktop and phone, English and Arabic) and `npm run test:premium` (graphics presets, GLB models, phone). Visual captures: `npm run check:premium` and `node tools/check-kingdom-map.js after`.
 
 ## Renderer upgrade (build V8)
 The 3D world is drawn by **three.js** (vendored in `vendor/three`). The upgrade toward a cinematic, Unreal-like look happens in phases; each phase has notes and comparison screenshots in `docs/`.
@@ -436,4 +438,16 @@ Model handling:
 - **Supported files:** Draco, Meshopt and KTX2 (Basis) compressed files, and files with GPU instancing.
 
 The shipped guide is regenerated with `npm run assets:character`.
+
+## Kingdom map (build V21)
+
+The National Simulation's Kingdom view now follows the illustrated reference map:
+- turquoise seas and mountainous neighbouring countries;
+- a gold-rimmed golden desert with oases, palm groves and white highways;
+- landmark clusters for every major city: Kingdom Centre, Jeddah Tower and port, the Haram and Kaaba, the Prophet's Mosque, Dammam's refinery and harbour, The Line;
+- clouds round the edges;
+- icon badges in English and Arabic (click to open a region);
+- a glossy six-button region bar.
+
+Regional and city views are unchanged. See `docs/kingdom-map-v21/NOTES.md`, and `node tools/check-kingdom-map.js after` for captures.
 
