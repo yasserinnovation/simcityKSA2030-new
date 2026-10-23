@@ -1,0 +1,112 @@
+{
+  "phase": "after",
+  "errors": [],
+  "perf": {
+    "ultra": {
+      "meanMs": 44.65,
+      "p95Ms": 50.6,
+      "calls": 84,
+      "triangles": 2031877
+    },
+    "high": {
+      "meanMs": 26.23,
+      "p95Ms": 29.8,
+      "calls": 84,
+      "triangles": 2031877
+    },
+    "medium": {
+      "meanMs": 17.26,
+      "p95Ms": 20.7,
+      "calls": 84,
+      "triangles": 2031877
+    },
+    "low": {
+      "meanMs": 12.66,
+      "p95Ms": 14.9,
+      "calls": 84,
+      "triangles": 1883881
+    }
+  },
+  "tiers": [
+    "ultra",
+    "high",
+    "medium",
+    "low"
+  ],
+  "phonePerf": {
+    "meanMs": 18.05,
+    "p95Ms": 21.4,
+    "calls": 48,
+    "triangles": 1982601
+  },
+  "assets": {
+    "manifest": {
+      "version": 1,
+      "note": "GLB models drawn by assets.js. Add Meshy (or any glTF 2.0) exports here; see README 'GLB models'. Heights, footprints and y (floor above the ground plane) are in world units: a Riyadh street is about 0.006 wide, landmark plazas sit 0.0035-0.007 above the ground.",
+      "showBelow": 1.6,
+      "models": {
+        "guide": {
+          "url": "assets/models/vn_guide.glb",
+          "kind": "character",
+          "height": 0.0036,
+          "clips": {
+            "idle": "Idle",
+            "walk": "Walk",
+            "cheer": "Cheer"
+          }
+        }
+      },
+      "placements": [
+        {
+          "model": "guide",
+          "at": "expo",
+          "count": 6,
+          "radius": 0.78,
+          "y": 0.0037,
+          "behavior": "promenade"
+        },
+        {
+          "model": "guide",
+          "at": "newmurabba",
+          "count": 4,
+          "radius": 1.05,
+          "y": 0.007,
+          "behavior": "promenade"
+        },
+        {
+          "model": "guide",
+          "at": "roshn",
+          "count": 4,
+          "radius": 0.55,
+          "y": 0.0037,
+          "behavior": "promenade"
+        },
+        {
+          "model": "guide",
+          "at": "park",
+          "count": 4,
+          "radius": 0.8,
+          "y": 0.0045,
+          "behavior": "promenade"
+        },
+        {
+          "model": "guide",
+          "at": "sports",
+          "count": 3,
+          "radius": 0.7,
+          "y": 0.0056,
+          "behavior": "promenade"
+        }
+      ]
+    },
+    "loaded": [
+      "guide"
+    ],
+    "failed": [],
+    "agents": 21,
+    "props": 0,
+    "visibleAgents": 0,
+    "state": "ready",
+    "textureLimit": 2048
+  }
+}

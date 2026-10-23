@@ -167,7 +167,8 @@ window.VisionCosmetics = function(T, scene, D, LY, ground) {
       m.compose(new T.Vector3(fx+Math.cos(angle)*spread+phase*phase*.008,-.19+Math.sin(phase*Math.PI)*.17,fz+Math.sin(angle)*spread),q,v);fountain.setMatrixAt(i,m);
     }fountain.instanceMatrix.needsUpdate=true;
     ships.forEach(({ship,x,z},i)=>{ship.visible=dist>.65;ship.position.set(x+Math.cos(time*.06+i*2)*.28,ground+.20+Math.sin(time*.5+i)*.01,z+Math.sin(time*.06+i*2)*.20);ship.rotation.y=-time*.06-i*2;});
-    root.traverse(o=>{if(o.material?.color){o.userData.baseColour??=o.material.color.clone();o.material.color.copy(o.userData.baseColour).multiplyScalar(1-night*.45);}});
+    // V20: the world shader's cool night grade (display .34/.40/.66), applied in linear space so the sRGB output keeps it
+    const nk=[.34,.40,.66].map(v=>Math.pow(1-night+night*v,2.2));root.traverse(o=>{if(o.material?.color){o.userData.baseColour??=o.material.color.clone();o.material.color.copy(o.userData.baseColour);o.material.color.r*=nk[0];o.material.color.g*=nk[1];o.material.color.b*=nk[2];}});
     // Vertex-coloured architecture uses white as its material multiplier.
   }};
 };

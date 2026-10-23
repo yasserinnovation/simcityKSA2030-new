@@ -363,7 +363,7 @@
       <label class="set-row"><span>${esc(G.t('name'))}</span><input id="setName" maxlength="24" value="${esc(p.name)}" /></label>
       <div class="set-row"><span>${esc(G.t('language'))}</span><div class="seg"><button data-lang="en" class="${G.lang() === 'en' ? 'on' : ''}">English</button><button data-lang="ar" class="${G.lang() === 'ar' ? 'on' : ''}">العربية</button></div></div>
       <label class="set-row"><span>${esc(G.t('sound'))}</span><input type="checkbox" id="setSound" ${p.sound ? 'checked' : ''} /></label>
-      <label class="set-row"><span>${esc(G.t('graphics'))}</span><select id="setQuality">${['high','medium','low'].map(q => `<option value="${q}" ${(p.reduced ? 'low' : p.quality || 'high') === q ? 'selected' : ''}>${esc(G.t('gfx_' + q))}</option>`).join('')}</select></label>
+      <label class="set-row"><span>${esc(G.t('graphics'))}</span><select id="setQuality">${['ultra','high','medium','low'].map(q => `<option value="${q}" ${(p.reduced ? 'low' : p.quality || 'high') === q ? 'selected' : ''}>${esc(G.t('gfx_' + q))}</option>`).join('')}</select></label>
       <div class="set-row"><button class="secondary sm" id="setIntro">${esc(G.t('replayIntro'))}</button><button class="link danger" id="setReset">${esc(G.t('resetProgress'))}</button></div></div>`;
     $('#setClose').onclick = () => { $('#settingsPanel').classList.add('hidden'); if (!$('#menu').classList.contains('hidden')) G.showMenu(); };
     $('#setName').onchange = e => { p.name = e.target.value.trim(); G.saveProfile(); $('#profileChip').innerHTML = G.profileChip(); };

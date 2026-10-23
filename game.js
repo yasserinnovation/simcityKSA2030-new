@@ -511,9 +511,10 @@
   $$('[data-region]').forEach(b => b.onclick = () => { ui.selected = null; W.focusRegion(b.dataset.region); $$('[data-region]').forEach(x => x.classList.toggle('active', x === b)); renderDock(); renderNavigator(); });
   function syncSpeed(){ $$('[data-speed]').forEach(x => x.classList.toggle('active', +x.dataset.speed === ui.speed)); }
   $$('[data-speed]').forEach(b => b.onclick = () => { ui.speed = +b.dataset.speed; syncSpeed(); });
-  const syncQuality = () => { const hi = W.getQuality() === 'high'; $('#qualityBtn').textContent = hi ? 'HD' : 'LITE'; $('#qualityBtn').setAttribute('aria-pressed', String(hi)); };
-  $('#qualityBtn').onclick = () => { W.setQuality(W.getQuality() === 'high' ? 'low' : 'high'); syncQuality(); };
-  addEventListener('vision-quality', e => { syncQuality(); if (e.detail.auto) setMessage('Graphics switched to LITE for smoother play on this device. Press HD to restore shadows.', 'PERFORMANCE'); });
+  const hdOn = () => ['high', 'ultra'].includes(W.getQuality());   // V20: Ultra counts as HD
+  const syncQuality = () => { const hi = hdOn(); $('#qualityBtn').textContent = hi ? 'HD' : 'LITE'; $('#qualityBtn').setAttribute('aria-pressed', String(hi)); };
+  $('#qualityBtn').onclick = () => { W.setQuality(hdOn() ? 'low' : 'high'); syncQuality(); };
+  addEventListener('vision-quality', e => { syncQuality(); if (e.detail.auto) setMessage(e.detail.quality === 'low' ? 'Graphics switched to LITE for smoother play on this device. Press HD to restore shadows.' : 'Graphics stepped down from Ultra to High for smoother play on this device.', 'PERFORMANCE'); });
   $('#saveBtn').onclick = () => { if (autosave()) setMessage(`Mandate saved at ${SIM.dateOf(S().month)}. It also saves automatically every month and when you switch mode.`, 'SAVE'); else setMessage('Saving is not available in this browser mode.', 'SAVE'); };
 
   /* ============================ MODE SWITCH ============================ */

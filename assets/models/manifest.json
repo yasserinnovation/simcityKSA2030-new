@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "note": "GLB models drawn by assets.js. Add Meshy (or any glTF 2.0) exports here; see README 'GLB models'. Heights and footprints are in world units; characters find their floor automatically (an optional y, floor above the ground plane, overrides it): a Riyadh street is about 0.006 wide, landmark plazas sit 0.0035-0.007 above the ground.",
+  "showBelow": 1.6,
+  "models": {
+    "guide": {
+      "url": "assets/models/vn_guide.glb",
+      "kind": "character",
+      "height": 0.0036,
+      "clips": {"idle": "Idle", "walk": "Walk", "cheer": "Cheer"}
+    }
+  },
+  "placements": [
+    {"model": "guide", "at": "expo", "count": 6, "radius": 0.78, "behavior": "promenade"},
+    {"model": "guide", "at": "newmurabba", "count": 4, "radius": 1.05, "behavior": "promenade"},
+    {"model": "guide", "at": "roshn", "count": 4, "radius": 0.55, "behavior": "promenade"},
+    {"model": "guide", "at": "park", "count": 4, "radius": 0.8, "behavior": "promenade"},
+    {"model": "guide", "at": "sports", "count": 3, "radius": 0.7, "behavior": "promenade"}
+  ]
+}

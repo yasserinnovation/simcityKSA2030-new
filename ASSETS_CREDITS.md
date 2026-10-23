@@ -7,9 +7,15 @@ Every third-party file shipped with Vision Nexus 2030, with its source and licen
 | three.js r186 (core) | `vendor/three/three.module.js`, `vendor/three/three.core.js` | npm `three@0.186.1` (https://threejs.org) | MIT (`vendor/three/LICENSE`) | 2.07 MB |
 | Tajawal (400/500/700/800, Arabic + Latin subsets) | `vendor/fonts/Tajawal-*.woff2` | Google Fonts (Boutros Fonts) | SIL Open Font License 1.1 | 0.08 MB |
 | IBM Plex Sans Arabic (400/500/600/700, Arabic + Latin subsets) | `vendor/fonts/IBMPlexSansArabic-*.woff2` | Google Fonts (IBM) | SIL Open Font License 1.1 | 0.25 MB |
+| three.js r186 add-ons: GLTFLoader, DRACOLoader, KTX2Loader, SkeletonUtils, BufferGeometryUtils, WorkerPool, ColorSpaces, RoomEnvironment | `vendor/three/addons/` | npm `three@0.186.1` (`examples/jsm`) | MIT (`vendor/three/addons/LICENSE`) | 0.25 MB |
+| Draco decoder (WASM) | `vendor/three/addons/libs/draco/gltf/` | Google Draco, via npm `three@0.186.1` | Apache-2.0 | 0.6 MB |
+| Basis Universal transcoder (WASM) | `vendor/three/addons/libs/basis/` | Binomial Basis Universal, via npm `three@0.186.1` | Apache-2.0 | 0.6 MB |
+| meshoptimizer decoder, ktx-parse, zstddec | `vendor/three/addons/libs/` | via npm `three@0.186.1` | MIT | 0.1 MB |
+| Vision Guide character (rigged, Idle/Walk/Cheer) | `assets/models/vn_guide.glb` (source: `tools/character/make-guide.js`) | Made for this project (procedural) | Project's own | 27 KB |
+| Solar shade canopy (test fixture prop + LOD) | `assets/models/vn_shade.glb`, `vn_shade_lod1.glb` | Made for this project (procedural) | Project's own | 33 KB |
 | Landmark models (104 low-poly assets) | `models.js` (source: `VN2030_Assets.blend`, scripts in `tools/blender/`) | Made for this project | Project's own | 1.76 MB |
 
-Development only, not shipped with the game: `playwright-core` (Apache-2.0), used by `tests/render.smoke.js`.
+Development only, not shipped with the game: `playwright-core` (Apache-2.0), used by `tests/render.smoke.js`; `@gltf-transform/cli` (MIT, fetched by npx in `tools/optimize-glb.js`); three.js `GLTFExporter` (MIT, `tools/character/`).
 
 V16 airport and park detail geometry in `visual-details.js` was authored locally for this project. It adds no external assets, official logos or ride branding. The existing Blender source was retained unchanged; this pass exports no new GLB assets.
 

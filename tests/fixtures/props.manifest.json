@@ -1,0 +1,11 @@
+{
+  "note": "Test fixture (tests/premium.smoke.js): the instanced static-prop path with one LOD file.",
+  "models": {
+    "shade": {"url": "assets/models/vn_shade.glb", "kind": "prop", "footprint": 0.012,
+              "lods": [{"url": "assets/models/vn_shade_lod1.glb", "from": 0.6}]}
+  },
+  "placements": [
+    {"model": "shade", "at": "expo", "y": 0.0037, "showBelow": 2.5, "instances": [
+      {"dx": 0.028, "dz": 0.0}, {"dx": -0.028, "dz": 0.0}, {"dx": 0.0, "dz": 0.028, "yaw": 30}, {"dx": 0.0, "dz": -0.028, "yaw": 60}]}
+  ]
+}

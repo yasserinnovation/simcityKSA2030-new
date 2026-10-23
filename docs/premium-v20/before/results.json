@@ -1,0 +1,36 @@
+{
+  "phase": "before",
+  "errors": [],
+  "perf": {
+    "high": {
+      "meanMs": 23.18,
+      "p95Ms": 27.2,
+      "calls": 84,
+      "triangles": 2031877
+    },
+    "medium": {
+      "meanMs": 15.94,
+      "p95Ms": 20.3,
+      "calls": 84,
+      "triangles": 2031877
+    },
+    "low": {
+      "meanMs": 13.76,
+      "p95Ms": 17.3,
+      "calls": 84,
+      "triangles": 1883881
+    }
+  },
+  "tiers": [
+    "high",
+    "medium",
+    "low"
+  ],
+  "phonePerf": {
+    "meanMs": 18.68,
+    "p95Ms": 23.2,
+    "calls": 48,
+    "triangles": 1982601
+  },
+  "assets": null
+}

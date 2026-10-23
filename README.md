@@ -1,4 +1,4 @@
-# Vision Nexus 2030 — The Kingdom in Motion (build V19 — country overview)
+# Vision Nexus 2030 — The Kingdom in Motion (build V20 — premium render)
 
 The build label is shown in the bottom corner of the screen. If you see a "Strategic Actions" panel, "Path to 2030" or a calendar past 2030, you are running an older copy of the files.
 
@@ -381,7 +381,7 @@ The other regions (West, NEOM, East, South and Beyond 2030) remain a visible pro
 | `tests/missions.test.js` | `node tests/missions.test.js` runs 54 checks covering all 18 missions (including custom routes): each mission has multiple winning strategies, careless play fails, and rewind, save and board switching work |
 
 ## Still a prototype
-- Art is procedural low-poly, upgraded in place; there are no authored GLTF models or elevation terrain yet.
+- Art is procedural low-poly, upgraded in place. GLB models load through `assets.js` (V20), but only the original Vision Guide ships so far, and there is no elevation terrain yet.
 - All six chapters are playable. Regional chapters have two missions each; more missions per region would deepen them.
 - The national simulation's fixed labels, projects, packages, statuses and common messages are in Arabic (`national_ar.js`, mirrored layout). Some long generated sentences, such as project descriptions and rare log lines, stay in English.
 - Sound effects are simple synthesised tones.
@@ -391,3 +391,49 @@ The other regions (West, NEOM, East, South and Beyond 2030) remain a visible pro
 ## Country overview V19
 
 Country-only procedural landscape, continuous dunes, connected western highlands, concentrated groves, existing destination silhouettes and routes, responsive navy/gold overview UI. City detail scenes, project IDs and save state are preserved. See [review](docs/country-v19/review.html) and [verification, changed files and remaining gaps](docs/country-v19/NOTES.md). Local preview: http://127.0.0.1:8016/index.html?style=country-v19. The reference remains an artistic direction; this is a stylized three.js implementation with simplified geography, without photorealistic GI or volumetric clouds. Observed performance is recorded without guarantees.
+
+
+## Premium render pass (build V20)
+
+The three.js renderer gains post-processing, softer lighting and a GLB model pipeline. Gameplay, missions, controls, saves and the classic renderer are unchanged. Notes, measurements and before/after captures are in `docs/premium-v20/`.
+
+- **Graphics presets** (Settings → Graphics):
+  - **Ultra:** 4096 soft shadows, HDR bloom by day and night, full haze. For discrete GPUs; it steps down to High by itself below ~35 fps.
+  - **High:** soft shadows, night bloom, haze.
+  - **Medium:** no shadows, light bloom, 80% resolution.
+  - **Reduced:** the original look, at the lowest cost.
+  - The HD button switches between High and Reduced, as before.
+- **Post-processing** (`premium.js`): selective bloom, aerial perspective, a filmic highlight shoulder, a restrained colour grade, a vignette and a dither. Reduced skips it entirely.
+- **Lighting** (`engine.js` shaders): rotated Poisson soft shadows, wrap lighting, cool-tinted shadows and a sky rim on walls. Long region flights rise in a gentle camera arc.
+
+### GLB models (Meshy and other glTF 2.0 exports)
+
+`assets/models/manifest.json` lists the models and where they appear. Models load only when the camera first comes close (Medium and up), are never pickable, and never touch the simulation or saves.
+
+1. Export from Meshy as **GLB**. For characters, use a rigged export with its animations: Meshy's per-animation GLBs from the same rig can be listed under `"animations"`.
+2. Optimise the file. This command:
+   - compresses geometry with Meshopt;
+   - converts textures to WebP and resizes them to the budget;
+   - writes optional simplified LOD files;
+   - prints the manifest entry to paste.
+
+   ```
+   node tools/optimize-glb.js path/to/meshy_export.glb my_model --height 0.0036            (character)
+   node tools/optimize-glb.js path/to/meshy_export.glb my_prop --footprint 0.02 --lod 0.3  (prop with one LOD)
+   ```
+3. Add a placement. The fields:
+   - `at`: a project id or `[x, z]`;
+   - `y` (optional): floor height above the ground plane. Characters find their floor automatically; props default to the ground plane, and landmark plazas sit at about 0.003–0.007;
+   - `count`, `radius` and `behavior: "promenade"`: for characters;
+   - `instances`: for props, each with `dx`, `dz`, `yaw` and `scale`;
+   - `showBelow` and `minQuality`: when the placement appears.
+4. Check it: `node tests/premium.smoke.js` and `node tools/check-premium.js after`.
+
+Model handling:
+- **Scale:** normalised from the model's bounds, whatever the export scale.
+- **Clips:** matched by name, case-insensitive (Idle / Walk / Walking / Cheer).
+- **Lighting:** materials receive the world's sun shadows and follow day, dusk and night.
+- **Supported files:** Draco, Meshopt and KTX2 (Basis) compressed files, and files with GPU instancing.
+
+The shipped guide is regenerated with `npm run assets:character`.
+

@@ -140,6 +140,7 @@
   const MESH_FS = PREC + `
     uniform sampler2D uShadow; uniform vec3 uSun; uniform vec3 uEye; uniform float uStorm; uniform float uDist;
     uniform float uShadowOn; uniform float uTexel; uniform float uGlow; uniform float uGround; uniform float uTime;
+    uniform float uFx; uniform float uSoft; uniform float uHdr;   // V20 premium tier: stylized lighting, soft shadows, HDR emitters
     varying vec3 vColor; varying vec3 vNormal; varying vec3 vWorld; varying vec4 vLight; varying float vW; varying float vRoughness;
     ` + FOG + `
     float unpack(vec4 c){ return dot(c, vec4(1.0, 1.0/255.0, 1.0/65025.0, 1.0/16581375.0)); }
@@ -147,6 +148,14 @@
       vec3 s=vLight.xyz/vLight.w*0.5+0.5;
       if(uShadowOn<0.5||s.x<0.0||s.x>1.0||s.y<0.0||s.y>1.0||s.z>1.0) return 1.0;
       float bias=0.0012+0.0025*(1.0-ndl), sum=0.0;
+      if(uSoft>0.5){
+        // V20: rotated Poisson disc (12 taps, 16 on Ultra): wider, noise-free penumbrae instead of the 3×3 grid's stair steps
+        float a=6.2832*fract(52.9829189*fract(dot(gl_FragCoord.xy,vec2(.06711056,.00583715)))), ca=cos(a), sa=sin(a), rad=uTexel*(uSoft>1.5?3.4:2.4);
+        #define PTAP(x,y) { vec2 o=vec2(x*ca-y*sa, x*sa+y*ca)*rad; sum += (s.z-bias>unpack(texture2D(uShadow, s.xy+o))) ? 0.0 : 1.0; }
+        PTAP(-.94,-.40) PTAP(.95,-.77) PTAP(-.09,-.93) PTAP(.34,.29) PTAP(-.92,.46) PTAP(-.82,-.15) PTAP(-.38,.28) PTAP(-.20,.98) PTAP(.81,.50) PTAP(.16,-.25) PTAP(.48,-.58) PTAP(.55,.88)
+        if(uSoft>1.5){ PTAP(-.62,-.78) PTAP(.98,.02) PTAP(-.50,.78) PTAP(.07,.58) return sum/16.0; }
+        return sum/12.0;
+      }
       // 3×3 PCF, unrolled (a texture fetch inside a loop warns on Direct3D/ANGLE)
       #define TAP(i,j) sum += (s.z-bias>unpack(texture2D(uShadow, s.xy+vec2(i,j)*uTexel*1.3))) ? 0.0 : 1.0;
       TAP(-1.,-1.) TAP(-1.,0.) TAP(-1.,1.) TAP(0.,-1.) TAP(0.,0.) TAP(0.,1.) TAP(1.,-1.) TAP(1.,0.) TAP(1.,1.)
@@ -159,7 +168,12 @@
       float ao = N.y>0.8 ? 1.0 : mix(0.66,1.0,clamp((vWorld.y-uGround)/0.06,0.0,1.0));   // contact darkening grounds buildings
       vec3 sunCol=vec3(1.0,.86,.65);                                       // warm golden-hour palette
       float cl=uGlow>0.3?1.0:cloudShade(vWorld.xz,uTime);
-      vec3 c=vColor*(hemi*(0.57+uGlow)*ao + sunCol*ndl*mix(0.36,1.0,sh)*0.83*cl);   // V11: warm light, softer readable shadows
+      // V20 (Medium and up): a little wrap on the sun term softens the terminator on rounded clay forms
+      float ndlS=mix(ndl, clamp((dot(N,uSun)+.12)/1.12,0.0,1.0), uFx);
+      vec3 c=vColor*(hemi*(0.57+uGlow)*ao + sunCol*ndlS*mix(0.36,1.0,sh)*0.83*cl);   // V11: warm light, softer readable shadows
+      // V20: shadowed sunlit faces take the cool sky colour (stylized coloured shadows) and walls catch a soft sky rim
+      c*=mix(vec3(1.0), vec3(.90,.95,1.07), uFx*(1.0-sh)*smoothstep(.05,.5,ndl));
+      c+=vColor*vec3(.80,.88,1.0)*pow(1.0-max(dot(N,V),0.0),3.0)*.16*uFx*(1.0-smoothstep(.55,.9,N.y))*(1.0-uNight*.7)*(1.0-uStorm);
       // Dielectric GGX response replaces the same shiny highlight on every surface.
       // Authored palette materials define roughness; unnamed terrain/foliage defaults to matte.
       c*=.96;
@@ -182,7 +196,8 @@
       c=min(c,vec3(.78))+highlight/(vec3(1.0)+highlight/.22); // soft exposure shoulder preserves pale roof detail
       // dusk to night in two stages: a warm golden-violet desert dusk first, then the cool night (lights read against both)
       vec3 duskC=c*vec3(.78,.60,.60)+vec3(.03,.012,.004), nightC=c*vec3(.26,.32,.58)+vec3(.012,.018,.05);
-      c=mix(c, mix(duskC,nightC,smoothstep(.35,1.0,uNight)), smoothstep(0.0,.5,uNight)) + vColor*uGlow*.6*uNight;
+      // V20: with the HDR target, lit facades (glow layers above .5) shine past 1.0, so only they feed the bloom at night
+      c=mix(c, mix(duskC,nightC,smoothstep(.35,1.0,uNight)), smoothstep(0.0,.5,uNight)) + vColor*uGlow*.6*uNight*(uGlow>.5?1.0+uHdr*1.6:1.0);
       gl_FragColor=vec4(applyAtmos(c,vW),1.0);
     }`;
   // Depth-only pass for the sun shadow map (packed into RGBA).
@@ -195,7 +210,7 @@
     varying vec3 vWorld; varying float vShore; varying float vW;
     void main(){ vec4 p=uVP*vec4(position,1.0); gl_Position=p; vW=p.w; vWorld=position; vShore=aShore; }`;
   const WATER_FS = PREC + `
-    uniform float uTime; uniform vec3 uSun; uniform vec3 uEye; uniform float uStorm; uniform float uDist;
+    uniform float uTime; uniform vec3 uSun; uniform vec3 uEye; uniform float uStorm; uniform float uDist; uniform float uHdr;
     varying vec3 vWorld; varying float vShore; varying float vW;
     ` + FOG + `
     void main(){
@@ -219,7 +234,7 @@
       vec3 calm=mix(calmReef,calmShallow,smoothstep(0.0,.16,s));calm=mix(calm,calmDeep,smoothstep(.12,.85,s));
       c=mix(c,calm*(.98+.02*w1*fade),national*.82);
       vec3 V=normalize(uEye-vWorld); vec3 H=normalize(uSun+V);
-      float spec=pow(max(dot(N,H),0.0),90.0)*fade; c+=vec3(1.0,.95,.82)*spec*0.5*(1.0-uStorm);
+      float spec=pow(max(dot(N,H),0.0),90.0)*fade; c+=vec3(1.0,.95,.82)*spec*0.5*(1.0+uHdr*1.4)*(1.0-uStorm);   // V20: sun glints are HDR emitters
       c*=mix(0.88,1.0,(cloudShade(vWorld.xz,t)-0.70)/0.30);
       float fres=pow(1.0-max(dot(N,V),0.0),4.0); c=mix(c,vec3(.74,.90,.96),fres*0.22);
       c=mix(c, c*vec3(.22,.30,.55)+vec3(.0,.02,.06), uNight);
@@ -231,8 +246,9 @@
   const PICK_FS = `precision mediump float; uniform float uOcc; varying vec3 vC; void main(){ gl_FragColor=vec4(uOcc>0.5?vec3(0.0):vC,1.0); }`;
   const POINT_VS = `precision highp float; attribute vec3 position; attribute vec3 color; attribute float aSize; uniform mat4 uVP; uniform float uScale; varying vec3 vColor;
     void main(){ vec4 p=uVP*vec4(position,1.0); gl_Position=p; gl_PointSize=aSize*uScale*clamp(13.0/p.w,0.55,2.4); vColor=color; }`;
-  const POINT_FS = `precision mediump float; varying vec3 vColor;
-    void main(){ vec2 q=gl_PointCoord-.5; float d=dot(q,q); if(d>.25)discard; gl_FragColor=vec4(vColor*(1.08-d*.9),smoothstep(.25,.12,d)); }`;
+  // uBoost (V20): beacons, city lights and flow dots become HDR emitters when the premium target is on (1.0 otherwise).
+  const POINT_FS = `precision mediump float; uniform float uBoost; varying vec3 vColor;
+    void main(){ vec2 q=gl_PointCoord-.5; float d=dot(q,q); if(d>.25)discard; gl_FragColor=vec4(vColor*(1.08-d*.9)*mix(1.0,uBoost,smoothstep(.2,.0,d)),smoothstep(.25,.12,d)); }`;
   const LINE_VS = `precision highp float; attribute vec3 position; attribute vec3 color; uniform mat4 uVP; varying vec3 vColor;
     void main(){ gl_Position=uVP*vec4(position,1.0); vColor=color; }`;
   const LINE_FS = `precision mediump float; varying vec3 vColor; void main(){ gl_FragColor=vec4(vColor,.9); }`;
@@ -1739,10 +1755,12 @@
   /* ---------------------------- shadow map -------------------------- */
   const SUN = norm3([-0.55, 1.0, 0.62]);
   let resScale = 1;
-  const SHADOW_SIZE = 2048;
+  const SHADOW_SIZE = 2048;   // Ultra (V20) doubles it at run time (shadowSize)
   const shadowsSupported = true;
   const ortho = (h, n, f) => new Float32Array([1/h,0,0,0, 0,1/h,0,0, 0,0,-2/(f-n),0, 0,0,-(f+n)/(f-n),1]);
-  let lightVP = new Float32Array(16), quality = 'high';
+  // quality drives every existing tier check (high / medium / low); fxTier is the preset the player picked, where Ultra
+  // (V20) is High plus the larger shadow map, 16-tap shadows and the full bloom chain.
+  let lightVP = new Float32Array(16), quality = 'high', fxTier = 'high', shadowSize = SHADOW_SIZE;
 
   renderer.setPixelRatio(1); renderer.autoClear = false;
   const scene3 = new THREE.Scene(), cam3 = new THREE.PerspectiveCamera(.5 * 180 / Math.PI, 1, .1, 140), clearCol = new THREE.Color();
@@ -1754,7 +1772,10 @@
   const shadowRT = new THREE.WebGLRenderTarget(SHADOW_SIZE, SHADOW_SIZE, nearest);
   // Uniforms shared by every material (the same values the original renderer set once per frame).
   const SU = {uVP:{value:new Float32Array(16)}, uLightVP:{value:lightVP}, uSun:{value:SUN}, uEye:{value:[0,0,0]}, uStorm:{value:0}, uDist:{value:1}, uTexel:{value:1/SHADOW_SIZE},
-    uGround:{value:G}, uTime:{value:0}, uTint:{value:[.80,.58,.32]}, uNight:{value:0}, uShadow:{value:shadowRT.texture}};
+    uGround:{value:G}, uTime:{value:0}, uTint:{value:[.80,.58,.32]}, uNight:{value:0}, uShadow:{value:shadowRT.texture},
+    uFx:{value:0}, uSoft:{value:0}, uHdr:{value:0}};   // V20 premium tier switches (0 on Reduced: the original shading)
+  // V20: post-processing (premium.js) and the GLB model pipeline (assets.js); both are optional.
+  const post = window.VisionPremium ? window.VisionPremium(THREE, renderer) : null;
   const RAW = (vs, fsrc, uniforms, o = {}) => new THREE.RawShaderMaterial(Object.assign({vertexShader:vs, fragmentShader:fsrc, uniforms, side:THREE.DoubleSide, blending:THREE.NoBlending, depthTest:true, depthWrite:true}, o));
   const depthU = {uLightVP:SU.uLightVP, uOffset:{value:[0,0,0]}};
   const DEPTH = [RAW(DEPTH_VS(0), DEPTH_FS, depthU), RAW(DEPTH_VS(1), DEPTH_FS, depthU)];
@@ -1885,7 +1906,7 @@
   const LINE_MAT = RAW(LINE_VS, LINE_FS, {uVP:SU.uVP}, {transparent:true, blending:THREE.NormalBlending});
   const lineObj = (order) => { const o = addObj(new THREE.LineSegments(new THREE.BufferGeometry(), LINE_MAT), {}); o.userData.mats = {main:LINE_MAT}; o.renderOrder = order; return o; };
   const linesObj = lineObj(10), stageLinesObj = lineObj(11), cityLinesObj = lineObj(12), missionLinesObj = lineObj(13), dynLinesObj = lineObj(14);
-  const POINT_MAT = RAW(POINT_VS, POINT_FS, {uVP:SU.uVP, uScale:{value:1}}, {transparent:true, blending:THREE.NormalBlending, depthWrite:false});
+  const POINT_MAT = RAW(POINT_VS, POINT_FS, {uVP:SU.uVP, uScale:{value:1}, uBoost:{value:1}}, {transparent:true, blending:THREE.NormalBlending, depthWrite:false});
   const pointsObj = addObj(new THREE.Points(new THREE.BufferGeometry(), POINT_MAT), {}); pointsObj.userData.mats = {main:POINT_MAT}; pointsObj.renderOrder = 20;
   const syncLines = (o, L) => fillDyn(o.geometry, L.p.length / 3, {position:[L.p, 3], color:[L.c, 3]});
 
@@ -1948,6 +1969,7 @@
     water:WATER.idx.length / 3, lines:lines.p.length / 6, instances:Object.values(mesh.inst).concat(Object.values(detailMesh.inst)).reduce((n, a) => n + a.length / 9, 0), renderer:'three'};
   // Each pass picks every object's material and visibility, mirroring what the original renderer drew in that pass.
   function renderPass(pass){
+    assets?.pass(pass);
     cosmetics?.pass(pass);
     kingdomDiorama?.pass(pass);
     countryOverview?.pass(pass);
@@ -1978,12 +2000,43 @@
     const k=1-Math.pow(.001,dt/1000*0.9*camSpeed);
     camera.az+=(camera.desired.az-camera.az)*k; camera.el+=(camera.desired.el-camera.el)*k; camera.dist+=(camera.desired.dist-camera.dist)*k;
     for (let i=0;i<3;i++) camera.target[i]+=(camera.desired.target[i]-camera.target[i])*k;
-    const ce=Math.cos(camera.el), ed=camera.dist*EYE;
+    // V20 cinematic move: a long region-to-region flight rises in a gentle arc (off on Reduced and with reduced motion).
+    // Only the drawn eye lifts; camera.dist and every saved or tested camera value are unchanged.
+    let lift=0; if (arc.d0) { const sep=Math.hypot(camera.desired.target[0]-camera.target[0], camera.desired.target[2]-camera.target[2]);
+      if (sep<.004) arc.d0=0; else if (quality!=='low' && !reducedMotion) lift=Math.sin(Math.PI*Math.min(1,Math.max(0,1-sep/arc.d0)))*Math.min(.22,arc.d0*.035); }
+    const ce=Math.cos(camera.el), ed=camera.dist*EYE*(1+lift);
     eye=[camera.target[0]+Math.sin(camera.az)*ce*ed, camera.target[1]+Math.sin(camera.el)*ed, camera.target[2]+Math.cos(camera.az)*ce*ed];
     vp=M4.multiply(M4.perspective(FOV,width/height,.1,140),M4.lookAt(eye,camera.target)); SU.uVP.value=vp; SU.uEye.value=eye;
     cam3.aspect=width/height; cam3.position.set(eye[0],eye[1],eye[2]); cam3.lookAt(camera.target[0],camera.target[1],camera.target[2]); cam3.updateProjectionMatrix(); cam3.updateMatrixWorld();
   }
-  function setDesired(az,el,dist,x,z,y=0){camera.desired={az,el,dist,target:[x,y,z]};}
+  function setDesired(az,el,dist,x,z,y=0){const d=Math.hypot(x-camera.target[0],z-camera.target[2]); arc.d0=d>.6?d:0; camera.desired={az,el,dist,target:[x,y,z]};}
+  let softOverride=null;   // debug.softShadows (perf checks)
+  const arc={d0:0}, reducedMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // V20: walking-surface heights for GLB characters. For each query point, the highest upward-facing triangle of the
+  // world and landmark geometry below cap (plazas, paths, lawns; roofs and canopies sit higher). One pass over the
+  // triangles for the whole batch, with the queries bucketed on a grid. Falls back to the ground plane.
+  const floorCache=new Map();
+  function floorAt(pts, cap=G+.0105){
+    const CELL=.01, key=(i,j)=>i*100003+j, grid=new Map(), out=pts.map(()=>G);
+    pts.forEach(([x,z],k)=>{ const g=key(Math.floor(x/CELL),Math.floor(z/CELL)); (grid.get(g)||grid.set(g,[]).get(g)).push(k); });
+    // Candidate triangles (upward, below the cap) are filtered once per geometry state and cached: later queries scan
+    // only those (a few percent of the world).
+    const cands=geo=>{ const c=floorCache.get(geo); if (c && c.n===geo.p.length && c.cap===cap) return c.t;
+      const P=geo.p, N=geo.n, t=[]; for (let i=0;i<P.length;i+=9) if (N[i+1]>=.9 && Math.max(P[i+1],P[i+4],P[i+7])<=cap) t.push(i);
+      floorCache.set(geo,{n:P.length,cap,t}); return t; };
+    const scan=geo=>{ const P=geo.p;
+      for (const t of cands(geo)) { const y0=P[t+1], y1=P[t+4], y2=P[t+7];
+        const ax=P[t],az=P[t+2],bx=P[t+3],bz=P[t+5],cx=P[t+6],cz=P[t+8];
+        const i0=Math.floor(Math.min(ax,bx,cx)/CELL), i1=Math.floor(Math.max(ax,bx,cx)/CELL), j0=Math.floor(Math.min(az,bz,cz)/CELL), j1=Math.floor(Math.max(az,bz,cz)/CELL);
+        if ((i1-i0+1)*(j1-j0+1)>400) continue;   // huge ground tiles: the plane fallback covers them
+        for (let i=i0;i<=i1;i++) for (let j=j0;j<=j1;j++) { const ks=grid.get(key(i,j)); if (!ks) continue;
+          const d=(bz-cz)*(ax-cx)+(cx-bx)*(az-cz); if (Math.abs(d)<1e-14) continue;
+          for (const k of ks) { const [x,z]=pts[k], l1=((bz-cz)*(x-cx)+(cx-bx)*(z-cz))/d, l2=((cz-az)*(x-cx)+(ax-cx)*(z-cz))/d, l3=1-l1-l2;
+            if (l1<-1e-6||l2<-1e-6||l3<-1e-6) continue; const y=l1*y0+l2*y1+l3*y2; if (y>out[k]) out[k]=y; } } } };
+    scan(mesh); scan(sigMesh); for (const sg of Object.values(SIG)) { if (sg.full) scan(sg.full); }
+    return out;
+  }
+  const assets = window.VisionAssets ? window.VisionAssets(THREE, scene3, {SU, G, D, LY, SUN, camera, renderer, floorAt:(pts, cap) => floorAt(pts, cap), quality:() => quality, depthFS:DEPTH_FS}) : null;
 
   /* -------------------------- dynamic points ------------------------ */
   const roadPaths = LY.intercity.concat(LY.CITY_ROADS.map(r => r.pts)), railPaths = LY.rails;
@@ -2202,7 +2255,7 @@
   const shadowsOn = () => shadowsSupported && quality==='high';
   const detailOn = () => camera.dist < DETAIL_DIST;
   function updateLight(){
-    const T=camera.target, h=Math.max(.9, Math.min(11, camera.dist*.62)), texel=2*h/SHADOW_SIZE;
+    const T=camera.target, h=Math.max(.9, Math.min(11, camera.dist*.62)), texel=2*h/shadowSize;
     const c=[Math.round(T[0]/texel)*texel, G, Math.round(T[2]/texel)*texel];
     const e=[c[0]+SUN[0]*30, c[1]+SUN[1]*30, c[2]+SUN[2]*30];
     lightVP = M4.multiply(ortho(h, 1, 60), M4.lookAt(e, c, [0,1,0]));
@@ -2216,9 +2269,10 @@
     const raw=t-lastT, dt=Math.min(100,raw); lastT=t;
     fpsStat.acc+=raw; fpsStat.n++;
     if (t-fpsStat.at>500 && fpsStat.n) { fpsStat.ms=fpsStat.acc/fpsStat.n; fpsStat.fps=1000/fpsStat.ms; fpsStat.acc=fpsStat.n=0; fpsStat.at=t;
-      if (fpsEl) fpsEl.textContent=`three.js · ${quality}\n${fpsStat.fps.toFixed(0)} fps · ${fpsStat.ms.toFixed(1)} ms\n${renderer.info.render.calls} calls · ${(renderer.info.render.triangles/1000).toFixed(0)}k tris`; }
+      if (fpsEl) fpsEl.textContent=`three.js · ${quality}\n${fpsStat.fps.toFixed(0)} fps · ${fpsStat.ms.toFixed(1)} ms\n${frameRenderStats.calls} calls · ${(frameRenderStats.triangles/1000).toFixed(0)}k tris`; }
     // Adaptive quality: drop shadows/tilt-shift automatically on slow machines.
-    if (quality==='high' && ++frames>90 && frames<400) { if (dt>45) slowFrames++; if (slowFrames>60) setQuality('low', true); }
+    // V20: Ultra steps down to High first (and may still drop to Reduced after a fresh window).
+    if (quality==='high' && ++frames>90 && frames<400) { if (dt>(fxTier==='ultra'?28:45)) slowFrames++; /* Ultra keeps ~35 fps or steps down */ if (slowFrames>60) { if (fxTier==='ultra') { frames=slowFrames=0; setQuality('high', true); } else setQuality('low', true); } }
     if(captureTime!==null) t=captureTime; // isolated visual check freezes decorative motion and weather lighting
     resize(); updateCamera(dt); if(camera.dist<SPATIAL_DIST)ensureSpatial(); let st=stormTarget;
     if (hazard) { const d=Math.hypot(camera.target[0]-hazard.x,camera.target[2]-hazard.z); st=Math.max(st,(hazard.plumes?.55:1)*hazard.intensity*Math.max(0,Math.min(1,1.7-d/(hazard.r*2.2)))*(hazard.type==='heat'?.45:1)); const tt=TINTS[hazard.type]||TINTS.dust; for(let i=0;i<3;i++) tint[i]+=(tt[i]-tint[i])*.05; }
@@ -2237,6 +2291,10 @@
     SU.uStorm.value=storm; SU.uDist.value=camera.dist*EYE; SU.uTime.value=t*.001; SU.uTint.value=tint; SU.uNight.value=night; SU.uEye.value=eye; SU.uVP.value=vp;
     for (const L of Object.values(LAYERS)) L.own.uShadowOn.value = L.cast && shadowsOn() ? 1 : 0;
     LAYERS.cloud.own.uOffset.value=[Math.sin(t*.00005)*.25,0,0];
+    const postOn=!!(post && post.active), hdrOn=postOn && post.hdr;
+    SU.uFx.value=quality==='low'?0:1; SU.uSoft.value=softOverride!=null?softOverride:fxTier==='ultra'?2:quality==='high'?1:0; SU.uHdr.value=hdrOn?1:0;
+    POINT_MAT.uniforms.uBoost.value=hdrOn?1.15+night*1.5:1;
+    assets?.update(t,dt,{night,storm,shadows:shadowsOn(),still:captureTime!==null});
 
     // 1) Shadow map from the sun
     if (shadowsOn()) {
@@ -2246,15 +2304,17 @@
     }
     // 2) Scene: sky clear, sea, meshes, lines, points
     const sky=[(.60+storm*.18)*(1-night)+.07*night,(.82-storm*.26)*(1-night)+.10*night,(.94-storm*.44)*(1-night)+.22*night];
-    renderer.setRenderTarget(null); renderer.setClearColor(clearCol.setRGB(sky[0],sky[1],sky[2]), 1); renderer.clear();
+    const out = postOn ? post.begin(width,height) : null;   // V20: the premium tiers draw the frame into an HDR target
+    renderer.setRenderTarget(out); renderer.setClearColor(clearCol.setRGB(sky[0],sky[1],sky[2]), 1); renderer.clear();
     POINT_MAT.uniforms.uScale.value=dpr;
     buildDynLines(t); syncLines(dynLinesObj, dynLines);
     dynamicPoints(t);
     kingdomDiorama?.begin(renderer,width,height,dpr,camera.dist);
     renderPass('main'); renderer.render(scene3, cam3);
     frameRenderStats.calls=renderer.info.render.calls;frameRenderStats.triangles=renderer.info.render.triangles;
-    kingdomDiorama?.finish(renderer);
+    kingdomDiorama?.finish(renderer, out);
     if(kingdomDiorama&&!countryOverview&&camera.dist>6){frameRenderStats.calls+=renderer.info.render.calls;frameRenderStats.triangles+=renderer.info.render.triangles;}
+    if (postOn) post.end({night, storm, sky, focus:camera.dist*EYE, time:t*.001, still:captureTime!==null});
     updateLabels(); keyPan(dt);
     if (pendingHover && performance.now() - pendingHover.t > 90) { const h = pendingHover; pendingHover = null; runHover(h.x, h.y, h.touch); }   // hover picks only once the pointer rests
     requestAnimationFrame(render);
@@ -2277,9 +2337,13 @@
     lineTarget=lines;
   }
   function setQuality(q, auto){
-    quality = q==='low' ? 'low' : q==='medium' ? 'medium' : 'high';
+    fxTier = ['ultra','high','medium','low'].includes(q) ? q : 'high';
+    quality = fxTier==='ultra' ? 'high' : fxTier;
+    post?.setTier(fxTier);
+    const ss = fxTier==='ultra' ? SHADOW_SIZE*2 : SHADOW_SIZE;   // V20: Ultra's 4096 sun shadow map
+    if (ss!==shadowSize) { shadowSize=ss; shadowRT.setSize(ss,ss); SU.uTexel.value=1/ss; }
     document.body.classList.toggle('gfx-low', quality==='low'); document.body.classList.toggle('gfx-medium', quality==='medium'); resScale = quality==='high' ? 1 : quality==='medium' ? .8 : .65; resize();
-    dispatchEvent(new CustomEvent('vision-quality', {detail:{quality, auto:!!auto}}));
+    dispatchEvent(new CustomEvent('vision-quality', {detail:{quality:fxTier, auto:!!auto}}));
     if (cityDesc) buildCity();   // parcel dressing depends on the tier
   }
 
@@ -2426,7 +2490,7 @@
     camSpeed(k){ camSpeed=k; },
     setNight(v, instant){ nightTarget=Math.max(0,Math.min(1,v)); if(instant) night=nightTarget; },
     getNight(){ return night; },
-    burst(x, z){ bursts.push({x, z, t0:performance.now()}); },
+    burst(x, z){ bursts.push({x, z, t0:performance.now()}); assets?.celebrate(x, z); },   // V20: nearby GLB characters cheer
     setMissionScene(sc){ missionScene=sc; buildMission(); },
     setMissionLights(list){ missionLights=list||[]; },
     setBeacons(v){ beaconsOn=!!v; },
@@ -2442,7 +2506,9 @@
       if (prev.done!==next.done || prev.active!==next.active || Math.abs((prev.progress||0)-(next.progress||0))>.08 || prev.health!==next.health) buildStageMesh(); },
     clearSelection(){ selectedId=null; },
     setQuality(q){ setQuality(q); },
-    getQuality(){ return quality; },
+    getQuality(){ return fxTier; },   // 'ultra' | 'high' | 'medium' | 'low'
+    qualityTiers(){ return ['ultra','high','medium','low']; },
+    assets:assets?.api || null,   // V20 GLB pipeline (assets.js)
     onSelect(fn){ onSelect=fn; },
     onPlace(fn){ onPlace=fn; },
     onRegion(fn){ onRegion=fn; },   // a click on a region name on the national view   // a click on the downtown skyline (a place, not a project)
@@ -2466,7 +2532,10 @@
       previewComplete(v){ previewDone=!!v; buildStageMesh(); return previewDone; },
       holdQuality(){ frames=400; },   // V15 (tests): ends the adaptive-quality window, so captures keep the quality they set
       state:() => ({dist:camera.dist,az:camera.az,el:camera.el,target:[...camera.target], selectable, hoverId, selectedId, detail:detailOn()}),
-      frameStats:() => ({fps:fpsStat.fps, ms:fpsStat.ms, quality, renderer:'three', calls:frameRenderStats.calls, triangles:frameRenderStats.triangles})
+      postInfo:() => post ? post.info() : null,
+      postTier(t){ post?.setTier(t); return post?.info(); },   // V20 (perf checks): post-processing tier independent of the shading tier
+      softShadows(v){ softOverride=v; },
+      frameStats:() => ({fps:fpsStat.fps, ms:fpsStat.ms, quality:fxTier, renderer:'three', calls:frameRenderStats.calls, triangles:frameRenderStats.triangles})
     }
   };
   requestAnimationFrame(render);
