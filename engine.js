@@ -249,11 +249,16 @@
       float exposure=.25+.75*smoothstep(-.2,.5,sin(vWorld.z*2.7+vWorld.x*1.5));
       c=mix(c,vec3(.97,.98,.96),clamp(foam,0.0,1.0)*mix(.58,.20*exposure,national));
       // V21 national palette (reference map): bright turquoise shallows, vivid cyan-blue mid water, saturated deep blue
-      vec3 calmReef=vec3(.43,.88,.78),calmShallow=vec3(.06,.73,.77),calmMid=vec3(.025,.48,.65),calmDeep=vec3(.025,.30,.49);
+      vec3 calmReef=vec3(.47,.90,.81),calmShallow=vec3(.04,.75,.78),calmMid=vec3(.015,.46,.66),calmDeep=vec3(.012,.24,.46);
       float sn=s*(.75+.5*(.5+.5*sin(vWorld.x*5.3+sin(vWorld.z*3.1)*2.0)*sin(vWorld.z*4.7+vWorld.x*1.3)));   // V22: broken, narrower shallows
       vec3 calm=mix(calmReef,calmShallow,smoothstep(0.0,.045,sn));calm=mix(calm,calmMid,smoothstep(.07,.23,sn));calm=mix(calm,calmDeep,smoothstep(.23,.7,sn));
       calm=mix(calm,vec3(.20,.60,.60),smoothstep(.35,.8,coral)*(1.0-smoothstep(.03,.11,sn))*smoothstep(.008,.025,sn)*.5);   // reef patches
-      c=mix(c,calm*(.97+.05*w1*fade),national*.9); c=mix(c,vec3(.93,.99,.98),national*smoothstep(.022,.0,s)*.55);   // V21: soft white surf on every coast
+      float swell=sin(vWorld.x*37.+vWorld.z*23.+t*.8+sin(vWorld.z*5.))*sin(vWorld.x*17.-vWorld.z*46.-t*.65);
+      float lace=smoothstep(.76,.96,swell)*smoothstep(.06,.18,s)*(1.-smoothstep(.45,.9,s));
+      calm+=vec3(.10,.18,.18)*lace*.28;
+      c=mix(c,calm*(.98+.035*w1*fade),national*.96);
+      float surf=(.55+.45*sin(vWorld.x*76.+vWorld.z*59.+t))*smoothstep(.032,.0,s);
+      c=mix(c,vec3(.93,.99,.98),national*surf*.66);   // V21: soft white surf on every coast
       vec3 V=normalize(uEye-vWorld); vec3 H=normalize(uSun+V);
       float spec=pow(max(dot(N,H),0.0),90.0)*fade; c+=vec3(1.0,.95,.82)*spec*0.5*(1.0+uHdr*1.4)*(1.0-uStorm);   // V20: sun glints are HDR emitters
       c*=mix(0.88,1.0,(cloudShade(vWorld.xz,t)-0.70)/0.30);
@@ -1795,7 +1800,7 @@
   const idOf = (x, z) => { const id=LY.footprintAt(x,z); return id ? PIDX[id] : 0; };
 
   /* ---------------------------- shadow map -------------------------- */
-  const SUN = norm3([-0.55, 1.0, 0.62]);
+  const SUN = norm3([0.65, 1.0, -0.42]);
   let resScale = 1;
   const SHADOW_SIZE = 2048;   // Ultra (V20) doubles it at run time (shadowSize)
   const shadowsSupported = true;

@@ -1,6 +1,6 @@
 @echo off
 setlocal
-title Vision Nexus 2030 - V27 Kingdom Atlas
+title Vision Nexus 2030 - V28 Living Kingdom
 cd /d "%~dp0"
 where node >nul 2>nul
 if %errorlevel%==0 (

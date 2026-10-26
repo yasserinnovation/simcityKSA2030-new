@@ -12,7 +12,7 @@ const {chromium}=require('playwright-core'),root=path.resolve(__dirname,'..');
     page.setDefaultTimeout(90000);
     page.on('pageerror',e=>errors.push(String(e)));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
     page.on('response',r=>{if(r.status()>=400)missing.push(r.url());});
-    const boot=async()=>{await page.goto(`http://127.0.0.1:${server.address().port}/index.html?tutorial=off&short`);await page.waitForFunction(()=>{document.querySelector('#skipBtn')?.click();return window.VNP&&!document.querySelector('#menu').classList.contains('hidden');},null,{polling:250});};
+    const boot=async()=>{await page.goto(`http://127.0.0.1:${server.address().port}/index.html?tutorial=off&short&showcase=0`);await page.waitForFunction(()=>{document.querySelector('#skipBtn')?.click();return window.VNP&&!document.querySelector('#menu').classList.contains('hidden');},null,{polling:250});};
     await boot();await page.waitForSelector('#bootStatus',{state:'detached'});console.log('PASS loading screen completes');
     await page.evaluate(()=>{VisionWorld.debug.holdQuality();VisionWorld.setQuality('low');VNP.showSettings();});
     await page.locator('#setVolume').evaluate(e=>{e.value='31';e.dispatchEvent(new Event('input',{bubbles:true}));});
@@ -49,7 +49,7 @@ const {chromium}=require('playwright-core'),root=path.resolve(__dirname,'..');
     assert.ok(boxes.every(r=>r.x>=0&&r.y>=0&&r.right<=390&&r.bottom<=844),JSON.stringify(boxes));
     await page.evaluate(()=>{const c=VisionLayout.RIYADH_CORE;VisionWorld.debug.captureView(c.x,c.z,.8,.7);});
     await page.locator('#setName').focus();const prior=await st();await page.keyboard.type('wasd');await page.waitForTimeout(400);const after=await st();assert.ok(Math.abs(after.az-prior.az)<.001);
-    const out=path.join(root,'docs/cinematic-v24/after');fs.mkdirSync(out,{recursive:true});await page.screenshot({path:path.join(out,'mobile-settings.jpg'),quality:90});
+    const out=path.join(root,'docs/country-v28/after');fs.mkdirSync(out,{recursive:true});await page.screenshot({path:path.join(out,'mobile-settings.jpg'),quality:90});
     console.log('PASS phone RTL settings fit, typing does not move the camera');
     assert.deepEqual(missing,[]);assert.deepEqual(errors,[]);console.log('PASS no missing files or browser errors');
   }finally{await browser?.close();await new Promise(r=>server.close(r));}

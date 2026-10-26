@@ -1,4 +1,4 @@
-// V27 national art, both AlUla entrances, camera navigation and RTL regression.
+// V28 national art, both AlUla entrances, camera navigation and RTL regression.
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const {chromium}=require('playwright-core');
 (async()=>{
@@ -12,11 +12,28 @@ const {chromium}=require('playwright-core');
   await page.goto('http://127.0.0.1:8123/index.html?tutorial=off&short');
   await page.waitForFunction(()=>{document.querySelector('#skipBtn')?.click();return window.VNP?.cityRender&&!document.querySelector('#menu').classList.contains('hidden');},null,{polling:300});
   await page.evaluate(()=>{VisionWorld.debug.holdQuality();VisionWorld.setQuality('low');});
+  await page.waitForFunction(()=>window.VisionShowcase?.active);
+  await page.waitForTimeout(3000);
+  assert.equal(await page.locator('#showcaseControls').evaluate(e=>getComputedStyle(e).opacity),'0');
+  for(const id of ['menu','modeNav','mapLabels']){const e=page.locator('#'+id);if(await e.count())assert.equal(await e.evaluate(e=>getComputedStyle(e).visibility),'hidden',id);}
+  await page.screenshot({path:path.join(__dirname,'../docs/country-v28/after/showcase-default.jpg'),quality:90});
+  const start=await page.evaluate(()=>VisionWorld.debug.state());await page.mouse.move(800,400);await page.mouse.wheel(0,-90);
+  await page.waitForFunction(d=>VisionWorld.debug.state().dist<d-.15,start.dist,{polling:250});
+  await page.mouse.move(640,780);await page.click('[data-showcase="kingdom"]');
+  await page.waitForFunction(d=>Math.abs(VisionWorld.debug.state().dist-d)<.05,start.dist,{polling:250});
+  await page.keyboard.press('Escape');assert.equal(await page.evaluate(()=>VisionShowcase.active),false);
+  assert.ok(await page.locator('#menu').isVisible());
+  await page.keyboard.press('h');assert.equal(await page.evaluate(()=>VisionShowcase.active),true);
+  await page.mouse.move(640,780);await page.click('[data-showcase="alula"]');
+  await page.waitForFunction(()=>VisionWorld.debug.state().dist<1.9,null,{polling:250});
+  assert.equal(await page.evaluate(()=>VisionShowcase.active),false);
+  await page.evaluate(()=>VisionWorld.debug.regionView('kingdom'));
+  console.log('PASS default cinematic view hides all UI, wheel zoom works, Escape/H restore controls and the AlUla action opens its scene');
   const info=await page.evaluate(()=>window.__visionCountryOverview);
-  assert.equal(await page.locator('.build-badge').getAttribute('data-build'),'v27-atlas');assert.ok(await page.locator('.build-badge').isVisible());
-  assert.ok(info.duneGroups>0&&info.buttresses>30&&info.terraces>0&&info.waterRoutes>0,JSON.stringify(info));
+  assert.equal(await page.locator('.build-badge').getAttribute('data-build'),'v28-showcase');assert.ok(await page.locator('.build-badge').isVisible());
+  assert.ok(info.continuousDunes&&info.buttresses>30&&info.terraces>0&&info.waterRoutes>0,JSON.stringify(info));
   console.log('PASS dunes, western rocks, terraces and navigable water routes are populated');
-  assert.equal(info.version,27);assert.ok(info.atlas.buildings>140&&info.atlas.districts===11&&info.atlas.ports===3&&info.traffic===33);assert.ok(info.sculpted.facades===2&&info.sculpted.houses>=15&&info.sculpted.rocks>30);
+  assert.equal(info.version,28);assert.ok(info.atlas.buildings>500&&info.atlas.districts===11&&info.atlas.ports===3&&info.traffic===33);assert.ok(info.sculpted.facades===2&&info.sculpted.houses>=15&&info.sculpted.rocks>=17&&info.sculpted.elephantRock===1);
   await page.locator('[data-scenic="alula"]').click();
   await page.waitForFunction(()=>VisionWorld.debug.state().dist<1.9,null,{polling:300});
   assert.ok(await page.evaluate(()=>Math.hypot(VisionWorld.debug.state().target[0]-VisionLayout.cityDisplay.AlUla[0],VisionWorld.debug.state().target[2]-VisionLayout.cityDisplay.AlUla[1])<.3));
@@ -31,7 +48,7 @@ const {chromium}=require('playwright-core');
   assert.ok(await page.evaluate(()=>Math.hypot(VisionWorld.debug.state().target[0]-VisionLayout.cityDisplay.AlUla[0],VisionWorld.debug.state().target[2]-VisionLayout.cityDisplay.AlUla[1]-.08)<.03));
   assert.ok(await page.locator('#dock').isVisible());
   await page.evaluate(()=>{VisionNational.save();VisionWorld.debug.captureMode(true);});
-  await page.screenshot({path:path.join(__dirname,'../docs/atlas-v27/after/alula-project.jpg'),quality:90});
+  await page.screenshot({path:path.join(__dirname,'../docs/country-v28/after/alula-project.jpg'),quality:90});
   const saved=await page.evaluate(()=>({slot:VisionSim.state.slot,data:VisionSim.serialize()}));
   await page.click('#modeNav [data-go="home"]');await page.click('#modeNav [data-go="national"]');
   assert.equal(await page.evaluate(()=>VisionSim.serialize()),saved.data,'mode switching must preserve the national save');
@@ -55,7 +72,7 @@ const {chromium}=require('playwright-core');
   await page.waitForFunction(()=>{const d=VISION_DATA.regions.kingdom.dist*Math.min(2.8,Math.max(1,Math.pow(1.75/(innerWidth/innerHeight),.66)))*1.3;return Math.abs(VisionWorld.debug.state().dist-d)<.15;},null,{polling:300});
   const boxes=await page.locator('#menuRegions [data-mregion]').evaluateAll(es=>es.map(e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,right:r.right,bottom:r.bottom,text:e.innerText};}));
   assert.equal(boxes.length,6);assert.ok(boxes.every(r=>r.x>=0&&r.right<=390&&r.y>=0&&r.bottom<=844&&r.text.trim()),JSON.stringify(boxes));
-  const out=path.join(__dirname,'../docs/atlas-v27/after');fs.mkdirSync(out,{recursive:true});await page.screenshot({path:path.join(out,'phone-ar.jpg'),quality:90});
+  const out=path.join(__dirname,'../docs/country-v28/after');fs.mkdirSync(out,{recursive:true});await page.screenshot({path:path.join(out,'phone-ar.jpg'),quality:90});
   console.log('PASS all six labelled navigation controls fit on an Arabic phone screen');
   const startDist=await page.evaluate(()=>VisionWorld.debug.state().dist),cdp=await page.context().newCDPSession(page);
   await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:100,y:500},{x:280,y:500}]});

@@ -42,14 +42,14 @@ window.VisionSculptedWorld=function({T,stamp,S,G,geo,LY,onLand,height,clearance,
  box(x,G+.004,z+.28,.46,.003,.23,0xdcb07b);
  for(let row=0;row<4;row++)box(x,G+.007,z+.19+row*.058,.46,.0008,.008,0xf1ce97);
  box(x+.015,G+.006,z+.12,.055,.001,.18,0xf1ce97);
- tomb(x-.10,z+.08,.17,.25);tomb(x+.13,z+.025,.105,.16);
+ tomb(x-.12,z+.12,.25,.35);tomb(x+.16,z+.045,.14,.21);
+ // Elephant Rock's arch is open geometry, not a dark decal. An original stylized silhouette.
+ {const a=new T.Shape();a.moveTo(-.065,0);a.lineTo(-.012,0);a.lineTo(.004,.062);a.bezierCurveTo(.012,.16,.080,.15,.083,.06);a.lineTo(.087,0);a.lineTo(.115,0);a.lineTo(.112,.145);a.bezierCurveTo(.14,.23,.05,.28,-.045,.25);a.bezierCurveTo(-.10,.23,-.085,.06,-.065,0);a.closePath();
+  const g=new T.ExtrudeGeometry(a,{depth:.07,bevelEnabled:true,bevelThickness:.008,bevelSize:.008,bevelSegments:2,steps:1,curveSegments:12});stamp(g,x+.34,G+.008,z-.09,1.2,1.2,1.2,0xc98149,.84);g.dispose();parts.elephantRock=1;}
+
  for(let i=0;i<15;i++){const a=2.2+i*.25,px=x+Math.cos(a)*(.20+R()*.16),pz=z+Math.sin(a)*(.16+R()*.17);if(onLand(px,pz))rock(px,pz,.055+R()*.045,.045+R()*.035,.18+R()*.23,300+i,G+.006);}
  for(let row=0;row<3;row++)for(let col=0;col<6;col++){const px=x-.19+col*.065,pz=z+.22+row*.058;if(!onLand(px,pz))continue;house(px,pz,.038+R()*.012,.028+R()*.035,[0xd3a06c,0xb98553,0xe0b17e][(row+col)%3]);}
  for(let i=0;i<26;i++){const px=x-.27+R()*.58,pz=z+.18+R()*.26;if(onLand(px,pz)&&LY.roadDist(px,pz)>.035)palm(px,pz,.065+R()*.05);}
- // The west's mountain spine gets large, legible cliff faces instead of scattered pebbles.
- for(let i=1;i<spine.length;i++){const a=spine[i-1],b=spine[i],l=Math.hypot(b[0]-a[0],b[1]-a[1]);for(let t=.05;t<l;t+=.13){const f=t/l,px=a[0]+(b[0]-a[0])*f,pz=a[1]+(b[1]-a[1])*f;
-  if(!onLand(px,pz)||clearance(px,pz)<.95||Math.hypot(px-x,pz-z)<.48)continue;
-  rock(px,pz,.09+R()*.06,.07+R()*.05,.10+R()*.15,700+parts.rocks,G+height(px,pz)*.55);
- }}
+ // V28: national western terrain is continuous; these sculpted rocks belong only to AlUla.
  for(const g of owned)g.dispose();return parts;
 };

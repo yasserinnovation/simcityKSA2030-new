@@ -1,0 +1,198 @@
+{
+  "build": "v28-showcase",
+  "baselineCommit": "d9bf87dee991b1cc69a80193a17f2158b63e09c7",
+  "environment": {
+    "os": "Linux",
+    "browser": "131.0.6778.204",
+    "viewport": [
+      1280,
+      800
+    ],
+    "renderer": "SwiftShader software renderer; not device GPU performance",
+    "sampleFrames": 18,
+    "warmupFrames": 6,
+    "phoneTesting": "390 px viewport and emulated touch; not a physical device"
+  },
+  "tests": [
+    {
+      "command": "npm test",
+      "status": "passed",
+      "coverage": "8 simulation, layout, saves, challenges and tutorial logic suites"
+    },
+    {
+      "command": "npm run test:compatibility",
+      "status": "passed",
+      "checks": 2,
+      "coverage": "Actual V27-format campaign and city fixtures load identically and match three further months of V27 simulation"
+    },
+    {
+      "command": "npm run test:launcher",
+      "status": "passed",
+      "checks": 3,
+      "coverage": "Node/Python server selection, same-origin reuse, old-copy refusal, malformed URLs and path traversal"
+    },
+    {
+      "command": "npm run test:render",
+      "status": "passed",
+      "checks": 8,
+      "coverage": "Three.js and classic renderer boot and nonblank country/City Builder frames"
+    },
+    {
+      "command": "npm run test:cinematic",
+      "status": "passed",
+      "browserChecks": 8,
+      "coverage": "Geometry/stages/quality, audio mute and volume, camera, picking and phone RTL"
+    },
+    {
+      "command": "npm run test:showcase",
+      "status": "passed",
+      "checks": 9,
+      "coverage": "Real cinematic mode, H/Escape/zoom, AlUla, six region controls, national save roundtrip, menus/tutorial and Arabic phone navigation"
+    },
+    {
+      "command": "npm run test:tutorial",
+      "status": "passed",
+      "checks": 57,
+      "coverage": "45 tutorial checks plus 12 City Builder consequence checks; road/zone/service placement, growth, resource updates, completion feedback, transit, saves and Arabic touch UI"
+    },
+    {
+      "command": "node tests/atlas.smoke.js --phone",
+      "status": "passed",
+      "checks": 8,
+      "coverage": "Final-art rerun: cinematic controls, AlUla, National Simulation save roundtrip, menus, Arabic phone navigation, pinch, no browser errors or missing assets"
+    }
+  ],
+  "unchangedAuthorityFiles": [
+    "data.js",
+    "sim.js",
+    "saves.js",
+    "city.js",
+    "layout.js",
+    "regions.js",
+    "mission.js"
+  ],
+  "captures": {
+    "baseline": "before/results.json",
+    "candidate": "after/results.json",
+    "browserErrors": [],
+    "failedRequests": [],
+    "matchingCamera": "before/kingdom-matched.jpg and after/kingdom-matched.jpg",
+    "realPresentationMode": "after/showcase.jpg"
+  },
+  "performance": {
+    "baseline": {
+      "high": {
+        "meanMs": 587.1222222221809,
+        "p95Ms": 1053,
+        "fps": 1.8185124568103244,
+        "ms": 549.9000000000015,
+        "quality": "high",
+        "renderer": "three",
+        "calls": 107,
+        "triangles": 537272
+      },
+      "low": {
+        "meanMs": 216.7111111111525,
+        "p95Ms": 534.5,
+        "fps": 7.742934572202996,
+        "ms": 129.14999999999782,
+        "quality": "low",
+        "renderer": "three",
+        "calls": 107,
+        "triangles": 381900
+      }
+    },
+    "candidate": {
+      "high": {
+        "meanMs": 547.5888888889717,
+        "p95Ms": 953.9000000022352,
+        "fps": 1.9353590090961983,
+        "ms": 516.6999999999971,
+        "quality": "high",
+        "renderer": "three",
+        "calls": 108,
+        "triangles": 870424
+      },
+      "low": {
+        "meanMs": 247.2111111111525,
+        "p95Ms": 978.1000000014901,
+        "fps": 5.000833472245422,
+        "ms": 199.96666666666474,
+        "quality": "low",
+        "renderer": "three",
+        "calls": 104,
+        "triangles": 497472
+      }
+    },
+    "interpretation": "Short software-renderer diagnostic only. High mean 587.1 to 547.6 ms; Low mean 216.7 to 247.2 ms. No sustained physical-GPU or mobile frame rate has been established."
+  },
+  "scene": {
+    "version": 28,
+    "continuousDunes": true,
+    "life": {
+      "reefs": 70,
+      "islets": 54,
+      "pylons": 4,
+      "arcades": 64,
+      "clouds": 8,
+      "fountainParticles": 160,
+      "cloudTriangles": 4980
+    },
+    "atlas": {
+      "districts": 11,
+      "buildings": 522,
+      "streets": 44,
+      "terraces": 20,
+      "ports": 3,
+      "cliffs": 0
+    },
+    "traffic": 33,
+    "sculpted": {
+      "rocks": 17,
+      "facades": 2,
+      "houses": 18,
+      "palms": 24,
+      "elephantRock": 1
+    },
+    "buttresses": 48,
+    "terraces": 4,
+    "waterRoutes": 7,
+    "scarp": 1,
+    "farms": 51,
+    "belts": 0,
+    "railSegments": 68,
+    "airports": 4,
+    "islands": 31,
+    "mesas": 20,
+    "camels": 7,
+    "solar": 38,
+    "oases": 16,
+    "palms": 710,
+    "clusters": 69,
+    "groveTrees": 1328,
+    "duneGroups": 0,
+    "boats": 21,
+    "roadSegments": 254,
+    "terrainTriangles": 85310,
+    "neighTriangles": 50640,
+    "palette": {
+      "sand": 15910775,
+      "crest": 16769177,
+      "sandstone": 11560512,
+      "highland": 4880955,
+      "shallow": 7853519,
+      "deep": 1525349,
+      "road": 6780020,
+      "settlement": 15325624,
+      "navy": 1520716,
+      "gold": 15186788
+    },
+    "quality": "high"
+  },
+  "limitations": [
+    "Architectural detail and materials are simpler than the generated concept.",
+    "Underlying geographic/coastal polygon and regional planning close-ups are mostly retained.",
+    "Windows batch entry reviewed; server behavior tested using Linux Node/Python processes.",
+    "No physical GPU or phone performance measurement."
+  ]
+}
