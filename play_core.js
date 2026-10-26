@@ -11,13 +11,13 @@
 
   /* ============================ PROFILE ============================== */
   const STORE = 'visionNexus2030.profile.v4', RUN = 'visionNexus2030.run.v4';
-  const blank = () => ({v:4, name:'', lang:'en', sound:true, reduced:false, seenIntro:false, points:0, upgrades:[], missions:{}, legacy:{}, daily:{}, weekly:{}});
+  const blank = () => ({v:4, name:'', lang:'en', sound:true, volume:.55, ambience:true, reduced:false, seenIntro:false, points:0, upgrades:[], missions:{}, legacy:{}, daily:{}, weekly:{}});
   function loadProfile(){
     try { const raw = localStorage.getItem(STORE); const p = JSON.parse(raw);
       if (p && p.v === 4) { if (!p.build6) { try { localStorage.setItem(STORE + '.backup-v5', raw); } catch(e) {} p.build6 = true; p.city = p.city || null; } return Object.assign(blank(), p); } } catch(e) { try { const b = JSON.parse(localStorage.getItem(STORE + '.backup-v5')); if (b && b.v === 4) return Object.assign(blank(), b); } catch(e2) {} }
     return blank(); }
   G.profile = loadProfile();
-  G.saveProfile = () => { try { localStorage.setItem(STORE, JSON.stringify(G.profile)); } catch(e) {} };
+  G.saveProfile = () => { G.audio?.sync(); try { localStorage.setItem(STORE, JSON.stringify(G.profile)); } catch(e) {} };
   G.saveRun = () => { try { const S = VM.state; if (S && !S.done) localStorage.setItem(RUN, JSON.stringify({ui:G.runMeta || {}, s:VM.serialize()})); else localStorage.removeItem(RUN); } catch(e) {} };
   G.loadRun = () => { try { return JSON.parse(localStorage.getItem(RUN)); } catch(e) { return null; } };
   G.clearRun = () => { try { localStorage.removeItem(RUN); } catch(e) {} };
@@ -56,11 +56,12 @@
   G.month = (m, y) => `${I.months[G.lang()][((m % 12) + 12) % 12]} ${y + Math.floor(m / 12)}`;
 
   /* ============================== AUDIO ============================== */
+  G.audio = window.VisionSoundscape?.(() => G.profile);
   const AudioFx = { ctx:null,
     play(type){
       if (!G.profile.sound) return;
       try {
-        this.ctx = this.ctx || new (window.AudioContext || window.webkitAudioContext)(); const c = this.ctx; if (c.state === 'suspended') c.resume();
+        this.ctx = G.audio ? G.audio.ensure() : (this.ctx || new (window.AudioContext || window.webkitAudioContext)()); const c = this.ctx; if (c.state === 'suspended') c.resume();
         const seq = {click:[[660,.04]], select:[[520,.05],[780,.07]], commit:[[392,.08],[523,.12]], complete:[[523,.09],[659,.09],[784,.18]],
           medal:[[523,.11],[659,.11],[784,.11],[1047,.35]], warn:[[294,.12],[247,.18]], turn:[[440,.05],[554,.08]], storm:[[110,.6]]}[type] || [[600,.05]];
         let t0 = c.currentTime + .01;
@@ -68,7 +69,7 @@
           const o = c.createOscillator(), g = c.createGain(); o.type = type === 'storm' ? 'sawtooth' : 'triangle'; o.frequency.value = f;
           g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(type === 'storm' ? .04 : .12, t0 + .01); g.gain.exponentialRampToValueAtTime(.001, t0 + d);
           if (type === 'storm') { const fl = c.createBiquadFilter(); fl.type = 'lowpass'; fl.frequency.value = 400; o.connect(fl); fl.connect(g); } else o.connect(g);
-          g.connect(c.destination); o.start(t0); o.stop(t0 + d + .02); t0 += d * .8;
+          g.connect(G.audio?.output || c.destination); o.start(t0); o.stop(t0 + d + .02); t0 += d * .8;
         }
       } catch(e) {}
     }
@@ -297,8 +298,8 @@
     const slot = G.mode === 'national' && !$('#hud').classList.contains('hidden') ? $('#hudNavSlot') : G.mode === 'city' && G.cityActive && G.cityActive() ? $('#cNavSlot') : null;
     if (slot && nav.parentNode !== slot) slot.appendChild(nav); else if (!slot && nav.parentNode !== document.body) document.body.appendChild(nav);
     nav.classList.toggle('docked', !!slot);
-    nav.innerHTML = `<div class="mn-row" role="tablist">${MODES.map(([id, ic, k]) => `<button role="tab" data-go="${id}" class="${G.mode === id ? 'on' : ''}" aria-selected="${G.mode === id}" aria-label="${esc(G.t(k))}" title="${esc(G.t(k))}">${ic} <span class="mn-t">${esc(G.t(k))}</span></button>`).join('')}</div>
-      <small class="mn-save" title="${esc(G.t('savePolicy'))}" aria-label="${esc(saveStatus(G.mode))}"><span class="mn-save-ic" aria-hidden="true">💾</span><span class="mn-save-t">${esc(saveStatus(G.mode))}</span></small>`;
+    nav.innerHTML = `<div class="mn-row" role="tablist">${MODES.map(([id, ic, k]) => `<button role="tab" data-go="${id}" class="${G.mode === id ? 'on' : ''}" aria-selected="${G.mode === id}" aria-label="${esc(G.t(k))}" title="${esc(G.t(k))}">${window.VisionIcon?VisionIcon(id):ic} <span class="mn-t">${esc(G.t(k))}</span></button>`).join('')}</div>
+      <small class="mn-save" title="${esc(G.t('savePolicy'))}" aria-label="${esc(saveStatus(G.mode))}"><span class="mn-save-ic" aria-hidden="true">${window.VisionIcon?VisionIcon('save'):'💾'}</span><span class="mn-save-t">${esc(saveStatus(G.mode))}</span></small>`;
     $$('#modeNav [data-go]').forEach(b => b.onclick = () => G.go(b.dataset.go));
   };
   // Leave whatever is on screen, saving it first. `next` runs once the current mode has been put away.
@@ -375,12 +376,16 @@
       <label class="set-row"><span>${esc(G.t('name'))}</span><input id="setName" maxlength="24" value="${esc(p.name)}" /></label>
       <div class="set-row"><span>${esc(G.t('language'))}</span><div class="seg"><button data-lang="en" class="${G.lang() === 'en' ? 'on' : ''}">English</button><button data-lang="ar" class="${G.lang() === 'ar' ? 'on' : ''}">العربية</button></div></div>
       <label class="set-row"><span>${esc(G.t('sound'))}</span><input type="checkbox" id="setSound" ${p.sound ? 'checked' : ''} /></label>
+      <label class="set-row"><span>${G.lang()==='ar'?'مستوى الصوت':'Master volume'}</span><input type="range" id="setVolume" min="0" max="100" value="${Math.round((G.audio?.info().volume??.55)*100)}" /><output id="volumeValue" for="setVolume">${Math.round((G.audio?.info().volume??.55)*100)}%</output></label>
+      <label class="set-row"><span>${G.lang()==='ar'?'أجواء الرياح الهادئة':'Gentle wind ambience'}</span><input type="checkbox" id="setAmbience" ${p.ambience!==false?'checked':''} /></label>
       <label class="set-row"><span>${esc(G.t('graphics'))}</span><select id="setQuality">${['ultra','high','medium','low'].map(q => `<option value="${q}" ${(p.reduced ? 'low' : p.quality || 'high') === q ? 'selected' : ''}>${esc(G.t('gfx_' + q))}</option>`).join('')}</select></label>
       <div class="set-row"><button class="secondary sm" id="setIntro">${esc(G.t('replayIntro'))}</button><button class="link danger" id="setReset">${esc(G.t('resetProgress'))}</button></div></div>`;
     $('#setClose').onclick = () => { $('#settingsPanel').classList.add('hidden'); if (!$('#menu').classList.contains('hidden')) G.showMenu(); };
     $('#setName').onchange = e => { p.name = e.target.value.trim(); G.saveProfile(); $('#profileChip').innerHTML = G.profileChip(); };
     $$('#settingsPanel [data-lang]').forEach(b => b.onclick = () => { p.lang = b.dataset.lang; G.saveProfile(); G.applyLang(); G.showSettings(); if (!$('#menu').classList.contains('hidden')) G.showMenu(), G.showSettings(); if (G.refreshHud) G.refreshHud(); });
     $('#setSound').onchange = e => { p.sound = e.target.checked; G.saveProfile(); G.sfx('click'); };
+    $('#setVolume').oninput = e => { p.volume=Number(e.target.value)/100; $('#volumeValue').value=e.target.value+'%'; G.saveProfile(); };
+    $('#setAmbience').onchange = e => { p.ambience=e.target.checked; G.saveProfile(); };
     $('#setQuality').onchange = e => { p.quality = e.target.value; p.reduced = e.target.value === 'low'; G.saveProfile(); G.applyReduced(); };
     $('#setIntro').onclick = () => { $('#settingsPanel').classList.add('hidden'); G.hideAll(); G.cinematic(G.showMenu, false); };
     $('#setReset').onclick = () => { if (confirm(G.t('confirmReset'))) { const lang = p.lang; G.profile = blank(); G.profile.lang = lang; G.profile.seenIntro = true; G.saveProfile(); G.clearRun(); G.showMenu(); $('#settingsPanel').classList.add('hidden'); } };

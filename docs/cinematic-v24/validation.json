@@ -1,0 +1,40 @@
+{
+  "date": "2026-10-26",
+  "base_commit": "202b6871d95482e91348a94cb6fa23229c5f7f86",
+  "browser": "Chrome headless shell 131.0.6778.204",
+  "renderer": "ANGLE/SwiftShader software rendering",
+  "checks": {
+    "logic": {
+      "passed": 305,
+      "failed": 0,
+      "failures": []
+    },
+    "render": {
+      "passed": 8,
+      "failed": 0,
+      "failures": []
+    },
+    "cinematic": {
+      "passed": 8,
+      "failed": 0,
+      "failures": [],
+      "geometry": "Passed: 15 zone/density variants; 13 service types; unfinished stages; power; quality; deterministic output; read-only parcel state."
+    },
+    "tutorial_and_city": {
+      "passed": 57,
+      "failed": 0,
+      "failures": []
+    },
+    "premium": {
+      "passed": 25,
+      "failed": 1,
+      "failures": [
+        "FAIL  [phone] City Builder keeps an interactive frame rate                     263.7 ms"
+      ]
+    }
+  },
+  "limitations": [
+    "The premium suite has one failing performance threshold: phone emulation 263.7 ms/frame versus a required <50 ms. All functional premium assertions passed.",
+    "No physical phone or desktop GPU was available; hardware FPS is unverified."
+  ]
+}

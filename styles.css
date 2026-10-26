@@ -1350,3 +1350,55 @@ body.country-overview .tiltshift{display:none}   /* V21: the Kingdom map stays c
 @media (max-width:1560px){#menu .menu-card.collapsed{bottom:100px}}
 @media (max-width:780px){#menu .menu-card.collapsed{bottom:118px}}
 @media (max-width:780px){#menu .menu-card.collapsed :is(.eyebrow,.menu-title){display:none}#menu .menu-card.collapsed{padding:10px 12px}#menu .menu-card.collapsed .menu-expand{margin:0 0 6px 6px}}
+
+/* V24 · limestone, deep petrol and brushed gold. Keep play surfaces crisp. */
+:root{--navy:#152f34;--navy-2:#23434a;--navy-3:#10262b;--teal:#286d68;--gold:#d9b676;--gold-soft:#f2e8d5;--ink:#1b3336;--muted:#586c6b;--paper:rgba(247,244,235,.97);--shadow:0 8px 24px rgba(10,28,32,.14)}
+.tiltshift{display:none}
+.sun-glow{background:radial-gradient(ellipse at 85% 0%,rgba(255,234,192,.07),transparent 40%);pointer-events:none}
+.topbar,.ctop,.bottombar,.action-bar,.ctools{background:linear-gradient(120deg,#142d32,#23454b)!important;border-color:rgba(220,204,163,.28)!important;box-shadow:0 8px 24px rgba(10,28,32,.20)!important;border-radius:12px}
+.glass{border-color:rgba(135,128,108,.25)}
+.menu-card{border-top:3px solid #d9b676;box-shadow:0 16px 50px rgba(8,30,36,.22)}
+.menu-title{letter-spacing:-.045em}.menu-title span{color:#286d68}
+.primary,.end-turn{background:linear-gradient(#e7ca93,#cfab68);color:#172f32;border:1px solid #b79355;box-shadow:0 2px 5px rgba(28,35,27,.13);border-radius:8px}
+.primary:hover:not(:disabled),.end-turn:hover:not(:disabled){background:#ebd3a5;box-shadow:0 4px 10px rgba(28,35,27,.16)}
+.vn-icon{width:22px;height:22px;display:inline-block;vertical-align:middle;flex-shrink:0}
+.mn-row button{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:36px}
+.mn-row .vn-icon{width:19px;height:19px}.mn-save .vn-icon{width:16px;height:16px}
+.ctool{border-radius:8px;min-width:64px;gap:3px;box-shadow:none;padding:6px 5px;background:#f5f1e7}
+.ctool .ci{display:grid;place-items:center;height:24px;color:#3a5757}.ctool small{font-size:10px;font-weight:650}.ctool em{font-weight:500}
+.ctool.on,.act.sel{background:#f0e1c3;box-shadow:inset 0 -3px 0 #c8a261;border:1px solid #d9b676}
+.ctool.on .ci{color:#7b581f}.ctool.locked{opacity:.65}
+.ctop .ct-stat{border-radius:8px;background:rgba(255,255,255,.045);border-color:rgba(255,255,255,.10)}
+.ctop .ct-stat small{color:#c4d1cf;line-height:1.1;flex-shrink:0}.ctop .ct-stat b{color:#fff8e9;flex-shrink:0}.ctop .ct-stat em{line-height:1.1;flex-shrink:0}
+.ctop .icon-btn .vn-icon{width:19px;height:19px}
+.bottombar .region-nav button{background:rgba(255,255,255,.04);border:1px solid rgba(220,221,208,.20);box-shadow:none;border-radius:8px}
+.bottombar .region-nav button.active{background:#6a5533;border:1px solid #dab879;box-shadow:inset 0 -2px #dab879}
+#mapLabels .map-label.badge{border:1px solid rgba(238,224,191,.75);box-shadow:0 4px 12px rgba(13,33,38,.22);font-size:13px;font-weight:650;border-radius:7px}
+.map-label.badge-blue{background:linear-gradient(#365e6c,#234755)}.map-label.badge-brown{background:linear-gradient(#877052,#604a31)}.map-label.badge-green{background:linear-gradient(#49725a,#2e5240)}
+.build-badge{font-size:9px;opacity:.72;text-shadow:0 1px 2px #143038}
+.set-row input[type=range]{width:120px;max-width:30vw;accent-color:#286d68}.set-row output{font-variant-numeric:tabular-nums;min-width:36px;font-size:12px}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #b8792c;outline-offset:3px}
+.boot-status{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:24px;background:radial-gradient(ellipse at 50% 40%,#294c50,#11292e 68%);color:#f3e9d5;font-family:inherit;text-align:center}
+.boot-mark{width:82px;height:82px;border:1px solid #c5a974;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:26px;letter-spacing:.1em;color:#e0c18a;border-radius:18px}
+.boot-mark span{font-size:11px;letter-spacing:.25em}.boot-status b{display:block;font-size:19px;font-weight:500}.boot-status small{display:block;margin-top:9px;color:#aebfb8;font-size:12px}.boot-status progress{width:190px;height:4px;accent-color:#ddba77}
+@media(max-width:780px){.ctool{min-width:62px;min-height:65px}.mn-row button{min-height:38px}.set-row{font-size:12px}#mapLabels .map-label.badge{font-size:11px}}
+@media(prefers-reduced-motion:reduce){.menu-card,button{transition:none!important}}
+
+/* V25: compact sea-corner launcher; full mission and save tools remain in All options. */
+#menu .menu-card.collapsed{width:min(282px,calc(100vw - 24px));padding:10px 12px}
+#menu .menu-card.collapsed :is(.eyebrow,.menu-title,.next-card){display:none}
+#menu .menu-card.collapsed .menu-expand{margin:0 0 7px 6px}
+#menu .menu-card.collapsed .primary.big{width:100%;padding:8px 12px}
+#menu .menu-card.collapsed .menu-foot{margin-top:3px}
+#menu .menu-regions .region-nav button span{display:block;font-size:12px;white-space:normal;line-height:1.15}
+#menu .menu-regions{max-width:calc(100vw - 24px)}
+@media(max-width:780px){
+ #menu .menu-card.collapsed{bottom:100px;width:240px}
+ #menu .menu-regions{left:6px;right:6px;max-width:none;padding:6px 3px}
+ #menu .menu-regions .region-nav{display:flex;width:100%;gap:3px;overflow:visible}
+ #menu .menu-regions .region-nav button{flex:1;min-width:0;padding:5px 2px;flex-direction:column;gap:3px;min-height:64px}
+ #menu .menu-regions .region-nav button span{font-size:9px;max-width:65px}
+ #menu .menu-regions .region-nav button svg{width:23px;height:23px}
+}
+
+@media(min-width:781px){#menu .menu-regions{width:max-content}#menu .menu-regions .region-nav{max-width:none}}

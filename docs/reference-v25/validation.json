@@ -1,0 +1,90 @@
+{
+  "date": "2026-10-26",
+  "baseline": "8e4731817c69ae61349e264dce02e438220fe737",
+  "browser": "Chrome headless shell 131.0.6778.204",
+  "renderer": "ANGLE/SwiftShader software rendering",
+  "checks": {
+    "logic": {
+      "passed": 305,
+      "failed": 0,
+      "failures": []
+    },
+    "render": {
+      "passed": 8,
+      "failed": 0,
+      "failures": []
+    },
+    "cinematic": {
+      "passed": 8,
+      "failed": 0,
+      "failures": [],
+      "geometry": "Passed: zoning variants, services, unfinished stages, quality, power, deterministic/read-only parcel geometry."
+    },
+    "tutorial_and_city": {
+      "passed": 57,
+      "failed": 0,
+      "failures": []
+    },
+    "reference": {
+      "passed": 6,
+      "failed": 0,
+      "failures": []
+    },
+    "portrait_pinch_confirmation": {
+      "passed": 5,
+      "failed": 0,
+      "failures": []
+    }
+  },
+  "performance": {
+    "before": {
+      "high": {
+        "meanMs": 474.54444444448586,
+        "p95Ms": 922.0999999996275,
+        "fps": 1.0909884355225852,
+        "ms": 916.5999999999985,
+        "quality": "high",
+        "renderer": "three",
+        "calls": 170,
+        "triangles": 732876
+      },
+      "low": {
+        "meanMs": 297.0833333333333,
+        "p95Ms": 855.3000000007451,
+        "fps": 3.243067942273406,
+        "ms": 308.34999999999854,
+        "quality": "low",
+        "renderer": "three",
+        "calls": 170,
+        "triangles": 549184
+      }
+    },
+    "after": {
+      "high": {
+        "meanMs": 453.2166666666874,
+        "p95Ms": 545.9000000003725,
+        "fps": 1.8751171948246919,
+        "ms": 533.2999999999956,
+        "quality": "high",
+        "renderer": "three",
+        "calls": 170,
+        "triangles": 704416
+      },
+      "low": {
+        "meanMs": 289.01111111106974,
+        "p95Ms": 569.3999999994412,
+        "fps": 5.1422694549194246,
+        "ms": 194.46666666666715,
+        "quality": "low",
+        "renderer": "three",
+        "calls": 170,
+        "triangles": 558741
+      }
+    }
+  },
+  "limitations": [
+    "No physical GPU or phone was available; hardware frame rate remains unverified.",
+    "Software frame times are not smooth/interactive. The earlier V24 premium phone performance threshold failed; no claim that this threshold now passes.",
+    "National scenery is stylized and enlarged for legibility; its lighting is baked, with separate existing detailed regional scenes."
+  ]
+}

@@ -58,11 +58,28 @@
     const COMPOSITE = mat(`uniform sampler2D tScene, tBloom, tDepth; uniform float uBloom, uHaze, uGrade, uNight, uStorm, uNear, uFar, uFocus, uUseDepth, uTime;
       uniform vec3 uSky; uniform vec2 uRes; varying vec2 vUv;
       float lin(float d){ float z = d * 2. - 1.; return 2. * uNear * uFar / (uFar + uNear - z * (uFar - uNear)); }
+      vec3 viewPos(vec2 uv,float z){return vec3((uv*2.-1.)*vec2(uRes.x/uRes.y,1.)*z*.2553419,-z);}
+      // V24: eight fixed view-space samples ground buildings without a noisy temporal filter.
+      // Radius is limited in pixels, rejected at depth discontinuities, and absent on Medium/Reduced.
+      float contactAO(float depth){
+        vec3 p=viewPos(vUv,lin(depth));
+        vec3 n=normalize(cross(dFdx(p),dFdy(p)));if(n.z<0.)n=-n;
+        float radius=clamp(uFocus*.025,.008,.12),sum=0.;
+        vec2 px=vec2(clamp(radius/max(-p.z,.1)/.5106838*uRes.y,2.,8.))/uRes;
+        for(int i=0;i<8;i++){
+          float a=float(i)*2.3999632;vec2 uv=vUv+vec2(cos(a),sin(a))*px*(.35+.65*float(i+1)/8.);
+          float d=texture2D(tDepth,clamp(uv,vec2(.001),vec2(.999))).r;
+          vec3 delta=viewPos(uv,lin(d))-p;float l=length(delta);
+          float horizon=max(0.,dot(n,delta/max(l,.00001))-.12);
+          sum+=horizon*(1.-smoothstep(radius*.25,radius*2.,l))*step(d,.99999);
+        }
+        return 1.-min(.18,sum*.11);
+      }
       void main(){
         vec3 c = texture2D(tScene, vUv).rgb;
         if (uUseDepth > .5) { float d = texture2D(tDepth, vUv).r;   // aerial perspective: distance past the focus blends toward the sky
           // absolute distance past the focus, so close miniature views stay crisp and the national view gains depth
-          if (d < .99999) { float z = lin(d), z0 = uFocus * 1.05 + .35, f = smoothstep(z0, z0 + max(3., uFocus * 2.2), z) * uHaze * (.2 + .1 * uStorm); c = mix(c, uSky, f); } }
+          if (d < .99999) { c*=contactAO(d); float z = lin(d), z0 = uFocus * 1.05 + .35, f = smoothstep(z0, z0 + max(3., uFocus * 2.2), z) * uHaze * (.2 + .1 * uStorm); c = mix(c, uSky, f); } }
         c += texture2D(tBloom, vUv).rgb * uBloom;
         vec3 x = max(c - .86, 0.); c = min(c, .86) + .14 * x / (x + .14);   // filmic shoulder for HDR emitters only (base colours stay put)
         float l = dot(c, vec3(.2126, .7152, .0722));
@@ -124,7 +141,7 @@
         U.uSky.value.setRGB(o.sky[0], o.sky[1], o.sky[2]); U.uRes.value.set(W, H);
         draw(COMPOSITE, null);
       },
-      info(){ return {tier, active:!!cfg.on, hdr:isHdr(), hdrCapable:hdr, samples:maxSamples, size:[W, H], bloomLevels:cfg.on ? cfg.levels : 0, haze:!!(cfg.on && cfg.haze)}; }
+      info(){ return {tier, active:!!cfg.on, hdr:isHdr(), hdrCapable:hdr, samples:maxSamples, size:[W, H], bloomLevels:cfg.on ? cfg.levels : 0, haze:!!(cfg.on && cfg.haze), contactAO:!!(cfg.on && cfg.haze)}; }
     };
   };
 })();
