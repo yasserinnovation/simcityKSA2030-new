@@ -20,7 +20,10 @@
     "check:sculpted": "node tools/check-sculpted.js after",
     "test:launcher": "node tests/launcher.test.js",
     "test:atlas": "node tests/atlas.smoke.js",
-    "check:atlas": "node tools/check-atlas.js after"
+    "check:atlas": "node tools/check-atlas.js after",
+    "test:showcase": "node tests/atlas.smoke.js",
+    "check:showcase": "node tools/check-showcase.js after",
+    "test:compatibility": "node tests/save-compatibility.test.js"
   },
   "devDependencies": {
     "playwright-core": "1.64.1"

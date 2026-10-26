@@ -21,7 +21,7 @@ const TKEY = 'visionNexus2030.tutorial.v1', PKEY = 'visionNexus2030.profile.v4';
     page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); }); page.on('pageerror', e => errors.push(String(e)));
     if (init) await page.addInitScript(init, null);
     return {ctx, page, errors}; };
-  const boot = async page => { await page.goto(base + '?short'); await page.waitForFunction(() => window.VNP && window.VisionTutorial, null, {timeout:60000}); };
+  const boot = async page => { await page.goto(base + '?short&showcase=0'); await page.waitForFunction(() => window.VNP && window.VisionTutorial, null, {timeout:60000}); };
   const stepIs = (page, id, timeout = 20000) => page.waitForFunction(id => window.VisionTutorial.state().step === id && window.VisionTutorial.state().active, id, {timeout, polling:200})
     .catch(async e => { const st = await page.evaluate(() => ({t:window.VisionTutorial.state(), conf:document.querySelector('#cConfirm').textContent.slice(0, 160), month:window.VisionCity.state.month})).catch(() => null); throw new Error(`waiting for step ${id}: ${JSON.stringify(st)}`); });
   const settle = page => page.waitForTimeout(2600);   // camera flights between steps

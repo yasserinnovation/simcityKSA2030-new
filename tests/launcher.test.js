@@ -12,7 +12,7 @@ const get=(port,url)=>new Promise((resolve,reject)=>{http.get({hostname:'127.0.0
 const ready=p=>new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(new Error('Launch timeout '+JSON.stringify(p.output()))),5000);p.child.stdout.on('data',()=>{if(p.output().stdout.includes('Ctrl+C to stop')){clearTimeout(timer);resolve();}});p.child.once('close',()=>{clearTimeout(timer);reject(new Error(JSON.stringify(p.output())));});});
 (async()=>{
   // Simulate both a pre-V27 server (no identity endpoint) and a different extracted directory.
-  for(const identity of [null,{service:'vision-nexus-2030',build:'v27-atlas',rootId:'another-folder'}]){
+  for(const identity of [null,{service:'vision-nexus-2030',build:'v28-showcase',rootId:'another-folder'}]){
     const old=http.createServer((req,res)=>{res.end(identity?JSON.stringify(identity):'old game');}),port=await listen(old);
     try{for(const program of ['node','python3']){const result=await launch(program,[String(port),'--open']).done;
       assert.equal(result.code,1,result.stderr);assert.match(result.stderr,/NOT opened/);assert.doesNotMatch(result.stdout,/Opening verified/);}}
@@ -22,14 +22,14 @@ const ready=p=>new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(
   for(const program of ['node','python3']){
     const probe=http.createServer(),port=await listen(probe);await close(probe);
     const running=launch(program,[String(port),'--open']);
-    try{await ready(running);const identity=await get(port,'/__vision_build');assert.equal(JSON.parse(identity.data).build,'v27-atlas');
-      const page=await get(port,'/index.html');assert.equal(page.status,200);assert.match(page.data,/V27 · Kingdom Atlas/);assert.match(page.headers['cache-control'],/no-cache/);
+    try{await ready(running);const identity=await get(port,'/__vision_build');assert.equal(JSON.parse(identity.data).build,'v28-showcase');
+      const page=await get(port,'/index.html');assert.equal(page.status,200);assert.match(page.data,/V28 · Living Kingdom/);assert.match(page.headers['cache-control'],/no-cache/);
       assert.equal((await get(port,'/kingdom-atlas.js')).status,200);
       const reuse=await launch(program,[String(port),'--open']).done;assert.equal(reuse.code,0,reuse.stderr);assert.match(reuse.stdout,/Already running this copy/);assert.match(reuse.stdout,/Opening verified/);
       assert.match(running.output().stdout,/Opening verified/);
     }finally{running.child.kill();await running.done;}
   }
-  console.log('PASS both launchers serve V27 and safely reuse the identical running copy');
+  console.log('PASS both launchers serve V28 and safely reuse the identical running copy');
   const probe=http.createServer(),port=await listen(probe);await close(probe);const running=launch('node',[String(port)]);
   try{await ready(running);assert.equal((await get(port,'/%zz')).status,400);assert.equal((await get(port,'/%2e%2e%2fboot.js')).status,403);assert.equal((await get(port,'/index.html')).status,200);}
   finally{running.child.kill();await running.done;}

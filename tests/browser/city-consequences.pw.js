@@ -11,7 +11,7 @@ function serve(){ const root = path.resolve(__dirname, '..', '..');
 let fails = 0; const ok = (label, cond, info = '') => { if (!cond) fails++; console.log(`${cond ? 'PASS' : 'FAIL'}  ${label.padEnd(84)} ${info}`); };
 
 (async () => {
-  const server = await serve(), base = `http://127.0.0.1:${server.address().port}/index.html?tutorial=off&short`;
+  const server = await serve(), base = `http://127.0.0.1:${server.address().port}/index.html?tutorial=off&short&showcase=0`;
   const browser = await chromium.launch(process.env.CHROME_PATH ? {executablePath:process.env.CHROME_PATH} : {channel:'chrome'}).catch(() => chromium.launch({channel:'msedge'}));
   const ctx = await browser.newContext({viewport:{width:1440, height:900}}), page = await ctx.newPage(), errors = [];
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); }); page.on('pageerror', e => errors.push(String(e)));

@@ -1,45 +1,65 @@
-# Vision Nexus 2030 — V27 Kingdom Atlas
+# Vision Nexus 2030 — V28 Living Kingdom
 
-A Saudi city-building and strategy game for the browser, using the existing Three.js/WebGL engine. This is the complete cumulative project; no build step or asset downloads are required to play.
+The complete Saudi city-building and strategy game, with an upgraded, playable Three.js country view. All required assets are bundled; playing needs no build step or asset download.
 
-**V27 focuses on the whole-country view.** It adds planned settlement districts, a broader western mountain belt, more sculpted dune fields, terraced southern greenery, port infrastructure, smaller regional palms and brighter blue/turquoise water. The Kingdom Centre has a new tapered, open-crown silhouette. Animated national traffic follows the displayed roads and rail routes. The regional plans, game modes, project IDs, progression, controls and save formats are retained.
+V28 replaces the separate oval dune stamps with continuous wind-shaped relief, sculpts the surrounding countries, expands the urban districts, and adds coral shelves, islands, sculpted cloud volumes, a moving Jeddah fountain and more shipping. AlUla has larger rock-cut facades and an open Elephant Rock arch. Roads bend across the terrain and their vehicles follow the displayed paths. The simulation, project IDs, controls, progression and save format are retained.
 
-[Before/after screenshots and verification](docs/atlas-v27/NOTES.md) · [Visual comparison gallery](docs/atlas-v27/review.html)
+[Actual before/after screenshots and testing](docs/country-v28/NOTES.md) · [Comparison gallery](docs/country-v28/review.html)
 
-## Start on Windows
+## Run on Windows
 
-1. Extract the complete ZIP. Enter the folder containing **package.json** and **Launch_Prototype.bat**. If there is another folder with the same name inside, enter that inner folder.
-2. **Close the old game server window first** (press Ctrl+C in it). An older copy can otherwise keep serving the old game at the same address.
-3. Double-click **Launch_Prototype.bat**. Keep its terminal window open while playing. It opens the browser only after verifying the running server.
-4. Look for the **V27 · Kingdom Atlas** badge near the upper-right corner. The address is **http://127.0.0.1:8123**.
+1. Close the previous game server with **Ctrl+C**.
+2. Extract the complete ZIP. Open the folder containing **package.json** and **Launch_Prototype.bat**. If extraction creates an extra nested folder, enter that folder.
+3. Double-click **Launch_Prototype.bat** and keep its terminal open. It opens the browser only after verifying that this copy is serving the game.
+4. Open **http://127.0.0.1:8123** if your browser does not open automatically. Press **Escape** to reveal the **V28 · Living Kingdom** badge and normal game controls.
 
-Or open a terminal in that folder and run:
+Alternatively, in the folder containing `package.json`, run:
 
 ```sh
 npm start
 ```
 
-Then open **http://127.0.0.1:8123**. No `npm install` is needed to play. Node.js or Python 3 is required for the launcher; all game assets and fonts are included.
+No `npm install` is needed to play. The launcher needs Node.js or Python 3. macOS/Linux users can run `./launch.sh`.
 
-If the launcher says **“Port 8123 is serving another copy or application”**, it deliberately does not open that old copy. Close the previous server and run the launcher again. It never kills another process or silently switches ports. If the identical current folder is already serving V27, it safely reuses it.
+**Keep existing saves:** use the same browser and **http://127.0.0.1:8123**. Changing to `localhost`, another port or another browser uses different browser storage. V28 does not reset saves or change their storage keys. After starting the correct server, use Ctrl+F5 if necessary.
 
-**Saves:** keep using the same browser and **http://127.0.0.1:8123**. Browser storage belongs to that origin; switching to `localhost` or another port appears to have different saves. V27 does not change storage keys or migrate/reset existing worlds. Refresh with Ctrl+F5 after the correct server is running.
+If you see **“Port 8123 is serving another copy or application”**, close the old server and relaunch this folder. The launcher does not stop other applications or silently change the save origin.
 
-## Find the AlUla scene
+## Explore the country
 
-Click **AlUla / العُلا** on the Kingdom map. Both that map label and **Journey Through Time · AlUla** in the National Simulation project list now use the same camera framing. The sandstone tomb facades, village and oasis stay visible when you zoom closer. Use **Kingdom** in the bottom navigation to return to the national view.
+The home country view opens in **cinematic mode**, with labels, menus and HUD hidden. Its bottom controls fade away after a few seconds. Move the pointer to the bottom edge, tap the map on a touchscreen, or press Tab to reveal them.
 
-The six bottom controls still open Kingdom, Riyadh, Makkah & West, NEOM & Northwest, Eastern, and Aseer & South. Drag to orbit; right-drag or WASD to pan; scroll or pinch to zoom. Existing menus and the Arabic interface remain available.
+- **Escape or H:** restore all game controls. Press **H** or the camera button to enter cinematic mode again.
+- **Explore AlUla:** opens the actual heritage scene. With the normal interface visible, the AlUla map badge and the National Simulation project list also open it.
+- **Kingdom:** return to the country framing. The normal interface retains all six region-navigation buttons.
+- **Drag:** orbit. **Right-drag / WASD / arrow keys:** pan. **Wheel / pinch:** zoom. **Q / E:** rotate.
+- Entering a regional view, another game mode or a modal restores the appropriate interface automatically.
+- Append `?showcase=0` to the URL if you prefer to start with the normal interface visible.
 
-## Other launch options and verification
+The artwork remains actual geometry during navigation. The concept image is not used as the map background. Construction and resource updates still come from the existing simulation; decorative districts do not generate resources.
 
-- macOS/Linux: run `./launch.sh`. It verifies startup using Node or the included Python 3 fallback.
-- Use the launcher or HTTP address for the new scenery. Opening `index.html` as a file uses the original classic renderer, which does not contain the new national art. Its badge explicitly reads **V27 · Classic renderer**.
-- Development tests require `npm install` and an installed Chrome/Edge, or `CHROME_PATH` pointing to a browser executable. Run `npm test`, `npm run test:launcher`, `npm run test:atlas`, `npm run test:render`, `npm run test:cinematic`, and `npm run test:tutorial`.
-- `npm run check:atlas` records actual browser screenshots and a short rendering-timing sample. `node tools/check-atlas.js before` also needs the V26 Git history for baseline source files. Neither history nor test dependencies are needed to play the ZIP.
-- Reduced, Medium, High and Ultra remain in Settings. Measured software-rendering results and limitations are in the verification report; physical-device frame rate has not been benchmarked.
+## Quality and verification
 
-The country map is still a stylized miniature using the existing illustrative geography. It is not a survey map or a finished match for the painted reference. Regional close-up planning views retain their previous assets, except the persistent AlUla scene. The newly composed settlements are existing-world scenery; project construction status remains driven by the original simulation.
+Reduced, Medium, High and Ultra are available in Settings. High adds the detailed terrain and sun shadows; Reduced uses coarser relief, less vegetation and fewer clouds. Auto-quality still responds to slow rendering.
+
+Opening `index.html` directly as a file uses the older classic renderer. Use the launcher for the V28 scenery; the fallback badge says **V28 · Classic renderer**.
+
+Development checks require `npm install` and Chrome/Edge, or `CHROME_PATH` pointing to an installed browser:
+
+```sh
+npm test
+npm run test:launcher
+npm run test:compatibility
+npm run test:showcase
+npm run test:render
+npm run test:cinematic
+npm run test:tutorial
+npm run check:showcase
+```
+
+`node tools/check-showcase.js before` also needs the V27 Git commit in the local history. Git history and development dependencies are not required to play a downloaded ZIP. The verification report records software-renderer timings; physical GPU and phone frame rates have not been measured.
+
+This is a stylized implementation of the cinematic concept. Materials and architectural models remain simpler than the generated artwork. Regional planning close-ups retain their existing art, apart from the persistent AlUla scene. The map uses the game's established illustrative geographic layout.
 
 ## Renderer upgrade (build V8)
 The 3D world is drawn by **three.js** (vendored in `vendor/three`). The upgrade toward a cinematic, Unreal-like look happens in phases; each phase has notes and comparison screenshots in `docs/`.

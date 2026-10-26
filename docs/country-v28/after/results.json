@@ -1,0 +1,97 @@
+{
+  "phase": "after",
+  "browser": "131.0.6778.204",
+  "viewport": [
+    1280,
+    800
+  ],
+  "gpu": "SwiftShader software renderer; not device GPU performance",
+  "errors": [],
+  "failed": [],
+  "readyMs": 9048,
+  "overview": {
+    "version": 28,
+    "continuousDunes": true,
+    "life": {
+      "reefs": 70,
+      "islets": 54,
+      "pylons": 4,
+      "arcades": 64,
+      "clouds": 8,
+      "fountainParticles": 160,
+      "cloudTriangles": 4980
+    },
+    "atlas": {
+      "districts": 11,
+      "buildings": 522,
+      "streets": 44,
+      "terraces": 20,
+      "ports": 3,
+      "cliffs": 0
+    },
+    "traffic": 33,
+    "sculpted": {
+      "rocks": 17,
+      "facades": 2,
+      "houses": 18,
+      "palms": 24,
+      "elephantRock": 1
+    },
+    "buttresses": 48,
+    "terraces": 4,
+    "waterRoutes": 7,
+    "scarp": 1,
+    "farms": 51,
+    "belts": 0,
+    "railSegments": 68,
+    "airports": 4,
+    "islands": 31,
+    "mesas": 20,
+    "camels": 7,
+    "solar": 38,
+    "oases": 16,
+    "palms": 710,
+    "clusters": 69,
+    "groveTrees": 1328,
+    "duneGroups": 0,
+    "boats": 21,
+    "roadSegments": 254,
+    "terrainTriangles": 85310,
+    "neighTriangles": 50640,
+    "palette": {
+      "sand": 15910775,
+      "crest": 16769177,
+      "sandstone": 11560512,
+      "highland": 4880955,
+      "shallow": 7853519,
+      "deep": 1525349,
+      "road": 6780020,
+      "settlement": 15325624,
+      "navy": 1520716,
+      "gold": 15186788
+    },
+    "quality": "high"
+  },
+  "performance": {
+    "high": {
+      "meanMs": 547.5888888889717,
+      "p95Ms": 953.9000000022352,
+      "fps": 1.9353590090961983,
+      "ms": 516.6999999999971,
+      "quality": "high",
+      "renderer": "three",
+      "calls": 108,
+      "triangles": 870424
+    },
+    "low": {
+      "meanMs": 247.2111111111525,
+      "p95Ms": 978.1000000014901,
+      "fps": 5.000833472245422,
+      "ms": 199.96666666666474,
+      "quality": "low",
+      "renderer": "three",
+      "calls": 104,
+      "triangles": 497472
+    }
+  }
+}

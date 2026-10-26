@@ -1417,3 +1417,18 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
 /* Keep the original tutorial entry available in the compact launcher. */
 #menu .menu-card.collapsed .menu-foot{display:flex;justify-content:center;margin-top:4px}
 #menu .menu-card.collapsed #tutBtn{font-size:11px;padding:3px 2px;line-height:1.3;min-height:24px}
+
+/* V28: reversible, UI-free country showcase. Focus and touch controls remain available. */
+#showcaseEntry{position:fixed;top:16px;left:16px;width:42px;height:42px;z-index:45;border:1px solid #dfc17d88;border-radius:12px;background:#102d40e8;color:#efdfb3;box-shadow:0 5px 22px #081d2d33;cursor:pointer}
+#showcaseEntry svg{width:22px;fill:none;stroke:currentColor;stroke-width:1.5}
+#showcaseEntry[hidden]{display:none}
+#showcaseControls{position:fixed;bottom:18px;left:50%;transform:translate(-50%,16px);z-index:100;display:none;gap:4px;padding:5px;max-width:calc(100vw - 24px);border-radius:14px;border:1px solid #c3aa7180;background:#102d40eb;box-shadow:0 8px 40px #05172466;opacity:0;transition:opacity .3s,transform .3s;pointer-events:none;backdrop-filter:blur(12px)}
+#showcaseControls button{color:#f2e5c6;border:0;background:none;padding:11px 16px;border-radius:9px;font:600 12px/1.3 system-ui;white-space:nowrap;cursor:pointer}
+#showcaseControls button:hover,#showcaseControls button:focus-visible{background:#c5a25730;outline:1px solid #dfc17d}
+#showcaseControls kbd{font:10px system-ui;color:#d4bc88;margin-inline-start:8px}
+body.country-showcase>*:not(#world):not(#showcaseControls):not(script):not(style){visibility:hidden!important;pointer-events:none!important}
+body.country-showcase #showcaseControls{display:flex;visibility:visible}
+body.country-showcase.showcase-awake #showcaseControls,body.country-showcase #showcaseControls:focus-within{opacity:1;transform:translate(-50%,0);pointer-events:auto}
+body.country-showcase #world{cursor:grab}
+@media(max-width:520px){#showcaseControls button{padding:11px 9px;font-size:11px}#showcaseControls kbd{display:none}#showcaseEntry{top:10px;left:10px;width:36px;height:36px}}
+@media(prefers-reduced-motion:reduce){#showcaseControls{transition:none}}

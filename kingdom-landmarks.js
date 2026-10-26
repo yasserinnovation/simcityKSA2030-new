@@ -6,11 +6,11 @@ window.VisionKingdomLandmarks = function(ctx){
   const {S, G, onLand, geo, D, LY, R} = ctx;
   // Illustrated-map exaggeration about each city's anchor: footprints grow by SZ, heights by SY, their spread by OFF
   // (V22: the reference draws its skylines about three times the V21 size). Sea objects keep their water level.
-  const SZ = 2.5, SY = 3.0, OFF = 2.2; let ax = 0, az = 0; const at = (x, z) => { ax = x; az = z; };
+  const SZ = 2.5, SY = 2.55, OFF = 2.2; let ax = 0, az = 0; const at = (x, z) => { ax = x; az = z; };
   const stamp = (shape, x, y, z, sx, sy, sz, hex, bottom) => ctx.stamp(shape, ax + (x - ax) * OFF, y < G ? y : G + (y - G) * SY, az + (z - az) * OFF, sx * SZ, sy * SY, sz * SZ, hex, bottom);
   const city = n => LY.cityDisplay[n] || (c => [c.x, c.z])(D.cities.find(c => c.name === n));
   const proj = id => { const p = D.projects.find(q => q.id === id); return p ? [p.x, p.z] : null; };
-  const GLASS = [0x7fb3cf, 0x93c4dc, 0x6aa1c4, 0xa9d2e4, 0x5d8fb5], STONE = [0xe8d3ac, 0xdcc196, 0xf0dfbf], MUD = [0xc79a68, 0xb98a5b, 0xd1a875];
+  const GLASS = [0x46839e, 0x91bdcb, 0x36728b, 0xb5d2d4, 0x537d96], STONE = [0xe8d3ac, 0xdcc196, 0xf0dfbf], MUD = [0xc79a68, 0xb98a5b, 0xd1a875];
   const pick = a => a[Math.floor(R() * a.length)];
   // coast finder: step from a city toward the sea until the land ends
   const coastFrom = (x, z, dx, dz) => { for (let k = 0; k < 60; k++) { const px = x + dx * k * .01, pz = z + dz * k * .01; if (!onLand(px, pz)) return [px, pz]; } return [x + dx * .3, z + dz * .3]; };
@@ -18,7 +18,8 @@ window.VisionKingdomLandmarks = function(ctx){
 
   // A glass tower: shaft with lit floor bands, a cap and sometimes a spire.
   function tower(x, z, w, h, col, spire){ stamp(S.cube, x, G + h / 2, z, w, h, w * .9, col, .78);
-    for (let k = 1; k < Math.min(9, h / .02); k++) stamp(S.cube, x, G + h * k / Math.min(9, h / .02), z, w * 1.04, .0016, w * .94, 0xe9f2f4);
+    for(const side of[-1,1])for(const dx of[-.27,0,.27])stamp(S.cube,x+dx*w,G+h*.48,z+side*w*.452,w*.035,h*.92,.0008,0xd9e5de);
+    for (let k = 1; k < Math.min(12, h / .015); k++) stamp(S.cube, x, G + h * k / Math.min(12, h / .015), z, w * 1.04, .0016, w * .94, 0xe9f2f4);
     stamp(S.cube, x, G + h + .003, z, w * .8, .006, w * .7, 0xdfe8ea); if (spire) stamp(S.cone, x, G + h + .02, z, w * .18, .04, w * .18, 0xeef3f4); out.towers++; }
   function lowBlock(x, z, w, h, col){ stamp(S.cube, x, G + h / 2, z, w, h, w * (.8 + R() * .4), col, .86); stamp(S.cube, x, G + h + .0015, z, w * 1.04, .003, w * 1.04, 0xf4e9d2);
     for(const dx of [-.27,.27]){stamp(S.cube,x+dx*w,G+h*.52,z+w*.51,w*.17,h*.28,.0015,0x365b69);stamp(S.cube,x+w*.51,G+h*.52,z+dx*w,.0015,h*.28,w*.17,0x365b69);}
@@ -39,8 +40,8 @@ window.VisionKingdomLandmarks = function(ctx){
      stamp(S.cube,kx,G+H*.865,kz,.025,.005,.029,0xe1eded);
     }
     stamp(S.cube, kx, G + .012, kz, .07, .024, .05, 0xdfe7e6);
-    const fx = x - .09, fz = z + .03; stamp(S.cone, fx, G + .13, fz, .032, .26, .032, 0x8fb1c2, .78); stamp(S.orb, fx, G + .195, fz, .012, .012, .012, 0xe6b04a); stamp(S.cone, fx, G + .27, fz, .004, .04, .004, 0xdbe3e5);
-    ring(x, z, .2, 26, (px, pz, i) => { if (Math.hypot(px - kx, pz - kz) < .045 || Math.hypot(px - fx, pz - fz) < .04) return; tower(px, pz, .016 + R() * .012, .06 + R() * .2 * (1 - Math.hypot(px - x, pz - z) / .3), pick(GLASS), R() < .3); });
+    const fx = x - .09, fz = z + .03; {const g=new ctx.T.ConeGeometry(1,1,4).rotateY(Math.PI/4);stamp(g, fx, G + .13, fz, .032, .26, .032, 0x8fb1c2, .78);g.dispose();} stamp(S.orb, fx, G + .195, fz, .012, .012, .012, 0xe6b04a); stamp(S.cone, fx, G + .27, fz, .004, .04, .004, 0xdbe3e5);
+    ring(x, z, .2, 36, (px, pz, i) => { if (Math.hypot(px - kx, pz - kz) < .045 || Math.hypot(px - fx, pz - fz) < .04) return; tower(px, pz, .016 + R() * .012, .06 + R() * .2 * (1 - Math.hypot(px - x, pz - z) / .3), pick(GLASS), R() < .3); });
     const px = x + .1, pz = z - .06, PH = .3;   // V22: PIF Tower (slim shaft, notched glass crown)
     stamp(S.cube, px, G + PH * .45, pz, .02, PH * .9, .02, 0x7fa9c4, .74); stamp(S.cube, px, G + PH * .93, pz, .015, PH * .1, .02, 0xa9d2e4, .85); stamp(S.cone3, px, G + PH + .012, pz, .008, .03, .008, 0xdbe6ea);
     { const mx = x - .05, mz = z + .1; stamp(S.cube, mx, G + .012, mz, .05, .024, .04, 0xc08d5c, .82);   // V22: Al Masmak fort (mud walls, round corner towers)
@@ -74,6 +75,7 @@ window.VisionKingdomLandmarks = function(ctx){
     stamp(S.cyl, x + .03, G + .03, z - .02, .022, .02, .022, 0xf3eee3); stamp(S.orb, x + .03, G + .042, z - .02, .021, .024, .021, 0x2f9a57);   // green dome
     for (const [dx, dz] of [[-.05, 0], [-.02, .03], [.06, .03]]) stamp(S.orb, x + dx, G + .028, z + dz, .012, .01, .012, 0xe9e3d3);
     for (const dx of [-.095, -.03, .03, .095]) for (const dz of [-.06, .06]) minaret(x + dx, z + dz, .11);
+    for(const dx of[-.095,.095])minaret(x+dx,z,.11);
     for (let i = 0; i < 10; i++) { const ux = x - .08 + (i % 5) * .04, uz = z + .085 + Math.floor(i / 5) * .03; stamp(S.cyl, ux, G + .012, uz, .0015, .022, .0015, 0xdcd6c8); stamp(S.cone, ux, G + .026, uz, .014, .008, .014, 0xf7f4ee); }
     ring(x, z, .24, 22, (px, pz) => { if (Math.abs(px - x) > .12 || Math.abs(pz - z) > .1) lowBlock(px, pz, .017, .012 + R() * .02, pick(STONE)); }); }
 

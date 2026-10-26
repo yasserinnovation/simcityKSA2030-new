@@ -36,15 +36,15 @@ window.VisionKingdomAtlas = function({T, S, stamp, G, LY, D, geo, onLand, height
     stats.buildings++;
   }
   // Small district plans around the hero skylines leave their central landmarks unobstructed.
-  const districts=[['Riyadh',.34,.77,'najdi'],['Dammam',.28,.52,'west'],['Madinah',.30,.56,'west'],
+  const districts=[['Riyadh',.34,.94,'najdi'],['Dammam',.28,.65,'west'],['Madinah',.30,.66,'west'],
     ['Hail',.16,.39,'najdi'],['Buraydah',.15,.40,'najdi'],['Sakakah',.15,.36,'najdi'],['Tabuk',.17,.40,'najdi'],
     ['Hofuf',.14,.34,'najdi'],['Najran',.14,.35,'najdi'],['Abha',.17,.43,'south'],['Jazan',.13,.29,'west']];
-  for(const[name,inner,outer,style]of districts){const q=LY.cityDisplay[name];if(!q)continue;const[x,z]=q,step=name==='Riyadh'?.10:.087;let count=0;
+  for(const[name,inner,outer,style]of districts){const q=LY.cityDisplay[name];if(!q)continue;const[x,z]=q,step=name==='Riyadh'?.073:.069;let count=0;
     for(let row=-Math.floor(outer/step);row<=outer/step;row++)for(let col=-Math.floor(outer/step);col<=outer/step;col++){
       const px=x+col*step,pz=z+row*step,r=Math.hypot(px-x,(pz-z)*1.12);
-      if(r<inner||r>outer||!groundFree(px,pz,.025)||R()<.13)continue;
-      if((Math.abs(col)%3===0||Math.abs(row)%3===0)&&R()<.65){trees.push([px,pz,.55+R()*.3]);continue;}
-      home(px,pz,.048+R()*.018,.038+R()*.055,style);count++;
+      if(r<inner||r>outer||!groundFree(px,pz,.025)||R()<.07)continue;
+      if((Math.abs(col)%3===0||Math.abs(row)%3===0)&&R()<.25){trees.push([px,pz,.55+R()*.3]);continue;}
+      home(px,pz,.041+R()*.012,.036+R()*.045,style);count++;
       if(count%4===0)palms.push([px+.032,pz+.02,.07+R()*.035,R()*6.28,0]);
     }
     for(const dx of[-outer*.7,outer*.7])street(x+dx,z,outer*1.35,.016,0);
@@ -76,29 +76,13 @@ window.VisionKingdomAtlas = function({T, S, stamp, G, LY, D, geo, onLand, height
     for(let k=0;k<3;k++){const zz=z-.08+k*.08;
       box(coast+side*.06,y-.02,zz,.15,.02,.024,0xabac99);
       for(let j=0;j<4;j++)box(x-side*.015,y+.005,zz-.025+j*.014,.026,.012,.011,[0xa94e40,0x346f81,0xe1bb58,0xe9ded0][j]);
-      const cx=coast+side*.01;for(const sd of[-1,1])box(cx,y,zz+sd*.012,.006,.09,.006,0xe8b653);
-      box(cx+side*.028,y+.085,zz,.105,.006,.006,0xf5d27b);box(cx+side*.065,y+.035,zz,.002,.051,.002,0x6a777a);
+      const cx=coast+side*.01;for(const sd of[-1,1])box(cx,y,zz+sd*.012,.006,.09,.006,0xd75d37);
+      box(cx+side*.028,y+.085,zz,.105,.006,.006,0xf69551);box(cx+side*.065,y+.035,zz,.002,.051,.002,0x6a777a);
     }
     for(let k=0;k<2;k++){const wx=x-side*.07,wz=z-.055+k*.11;if(valid(wx,wz,.03)){box(wx,y,wz,.06,.03,.074,0xd7c7a7);box(wx,y+.03,wz,.067,.005,.078,0x8dabae);}}
     waterObstacles.push({x0:coast-.16,x1:coast+.16,z0:z-.14,z1:z+.14});
     stats.ports++;
   }
-  // Broad, asymmetric ridge meshes give the western belt connected silhouettes, not stacks of cylinders.
-  // Local art exaggeration stays on Saudi land and clear of simulation footprints.
-  const ridges=[[36.0,28.45,.28,.16,.28],[36.8,27.55,.30,.18,.25],[37.5,26.65,.29,.15,.24],
-    [38.25,25.55,.25,.16,.23],[39.0,24.9,.29,.17,.27],[39.6,23.8,.28,.19,.29],
-    [40.15,22.8,.26,.19,.27],[40.65,21.65,.25,.19,.28],[41.35,20.6,.30,.20,.31],
-    [42.0,19.7,.31,.22,.30],[42.55,18.85,.30,.22,.32],[43.0,18.05,.26,.19,.24]];
-  for(const[lo,la,w,d,h]of ridges){let[x,z]=geo(lo,la);const site=[[x,z],[x+.14,z],[x+.28,z+.09],[x+.22,z-.12],[x-.1,z+.12]].find(q=>groundFree(q[0],q[1],.055));if(!site)continue;[x,z]=site;if(Math.hypot(x-LY.cityDisplay.AlUla[0],z-LY.cityDisplay.AlUla[1])<.6)continue;
-    const n=24,levels=8,rings=[],base=yAt(x,z)-.02;
-    const crown=Array.from({length:n},(_,j)=>.68+.15*Math.sin(j*.71+lo)+.13*Math.sin(j*1.72+la));
-    for(let k=0;k<=levels;k++){const f=k/levels,ring=[];for(let j=0;j<n;j++){const a=j/n*Math.PI*2,cleft=1-.14*Math.pow(.5+.5*Math.sin(j*1.9),3),rad=(1-f*.60+Math.sin(k*2.5)*.035)*cleft,px=x+Math.cos(a)*w*rad+f*.045,pz=z+Math.sin(a)*d*rad;
-      ring.push([px,k===0?yAt(px,pz)-.008:base+h*f*crown[j]*clearance(px,pz),pz]);}rings.push(ring);}
-    for(let k=0;k<levels;k++)for(let j=0;j<n;j++){const i=(j+1)%n,a=rings[k][j],b=rings[k][i],c=rings[k+1][j],e=rings[k+1][i];
-      if(!valid(a[0],a[2],.01)||!valid(b[0],b[2],.01))continue;
-      const bands=[0xc59165,0xc99466,0xd2a174,0xc08d60];poly([a,c,b],bands[k%4]);poly([b,c,e],bands[k%4]);
-    }
-    poly(rings[levels].slice().reverse(),0xe4ba89);stats.cliffs++;
-  }
+  // V28: continuous heightfield ranges replace the detached decorative plateau blocks.
   return {stats,palms,trees,waterObstacles};
 };
