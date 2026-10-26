@@ -11,11 +11,14 @@
   const classic = q.get('renderer') === 'classic' || fileMode;
   window.VN_RENDERER = classic ? 'classic' : 'three';
   window.VN_DEBUG = q.get('debug') === '1';
+  // Build stamp: every game script loads as name.js?v=BUILD, so a browser holding an older copy in its cache (the
+  // Python server sends no cache headers) can't mix old scripts into a new page. Bump it with each build.
+  const BUILD = 'v23h';
 
   const BEFORE = ['data.js', 'regions.js', 'layout.js', 'models.js', 'rocks.js', 'dunes.js', 'visual-details.js', 'scenic-landmarks.js', 'world-cosmetics.js', 'kingdom-diorama.js', 'kingdom-landmarks.js', 'country-overview.js', 'west-clay.js', 'east-clay.js', 'neom-clay.js', 'riyadh.js', 'premium.js', 'assets.js'];
   const AFTER = ['sim.js', 'saves.js', 'game.js', 'competitiveness.js', 'mission.js', 'i18n.js', 'play_core.js', 'play_mission.js', 'city.js', 'lens.js', 'city_ui.js', 'national_ar.js', 'help.js', 'tutorial.js'];
   const loadOne = src => new Promise((resolve, reject) => {
-    const s = document.createElement('script'); s.src = src; s.async = false;
+    const s = document.createElement('script'); s.src = src + '?v=' + BUILD; s.async = false;
     s.onload = resolve; s.onerror = () => reject(new Error('Could not load ' + src));
     document.body.appendChild(s);
   });

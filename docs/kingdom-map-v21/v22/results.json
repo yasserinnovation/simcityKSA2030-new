@@ -1,0 +1,23 @@
+{
+  "phase": "v22",
+  "errors": [],
+  "perf": {
+    "high": {
+      "meanMs": 28.47,
+      "p95Ms": 37.1
+    },
+    "medium": {
+      "meanMs": 19.35,
+      "p95Ms": 24.1
+    },
+    "low": {
+      "meanMs": 13.51,
+      "p95Ms": 16.7
+    }
+  },
+  "badgeClick": 3.3811141863032117,
+  "phonePerf": {
+    "meanMs": 22.8,
+    "p95Ms": 25.9
+  }
+}

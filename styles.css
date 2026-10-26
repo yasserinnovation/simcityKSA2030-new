@@ -1254,7 +1254,7 @@ body.country-overview button:focus-visible{outline:2px solid var(--country-gold)
 body.country-overview .map-label.city,body.country-overview .map-label.region-name{background:rgba(23,52,76,.95);color:#f8efd9;border:1px solid rgba(231,187,100,.52);border-radius:7px;font-size:11px;font-weight:650;padding:4px 9px;box-shadow:0 3px 8px rgba(16,35,48,.20)}
 body.country-overview .map-label.city::after{border-top-color:#17344c}
 body.country-overview .map-label.region-name:hover,body.country-overview .map-label.city:hover{background:#284a60;border-color:#efd295;color:#fff3d6}
-body.country-overview .map-label.country{color:#c7c7be;opacity:.65!important;font-size:10px;letter-spacing:.13em;text-shadow:0 1px 3px rgba(25,35,45,.5)}
+body.country-overview .map-label.country{color:#c7c7be;font-size:10px;letter-spacing:.13em;text-shadow:0 1px 3px rgba(25,35,45,.5)}
 body.country-overview .map-label.sea{color:#bbdde4;text-shadow:0 1px 4px rgba(13,48,71,.5);font-style:italic;font-size:16px}
 body.country-overview .map-label.hot{outline:2px solid #e7bb64;outline-offset:2px}
 @media(max-width:1100px){body.country-overview .bottombar .region-nav button{padding:7px 8px;gap:4px}body.country-overview .bottombar .region-nav button span{display:inline;font-size:10px}}
@@ -1300,10 +1300,10 @@ body.country-overview .map-label.hot{outline:2px solid #e7bb64;outline-offset:2p
 
 /* ===================== V21 Kingdom map (reference look) ===================== */
 /* Badges: glossy rounded chips with a white rim, an icon and a pointer, coloured by the place's character */
-#mapLabels .map-label.badge{display:flex;align-items:center;gap:6px;padding:4px 13px 4px 6px;border-radius:9px;font-size:14px;font-weight:700;letter-spacing:.01em;color:#fff;
+#mapLabels .map-label.badge{display:flex;align-items:center;gap:6px;padding:5px 14px 5px 7px;border-radius:10px;font-size:15px;font-weight:700;letter-spacing:.01em;color:#fff;
   border:1.5px solid rgba(255,255,255,.82);box-shadow:0 3px 10px rgba(20,24,40,.35),inset 0 1px 0 rgba(255,255,255,.35),inset 0 -2px 0 rgba(0,0,0,.18);pointer-events:auto;cursor:pointer;white-space:nowrap}
 #mapLabels .map-label.badge.static{cursor:default}
-#mapLabels .map-label.badge svg{width:21px;height:21px;flex:none;filter:drop-shadow(0 1px 1px rgba(0,0,0,.35))}
+#mapLabels .map-label.badge svg{width:23px;height:23px;flex:none;filter:drop-shadow(0 1px 1px rgba(0,0,0,.35))}
 #mapLabels .map-label.badge::after{content:"";position:absolute;left:50%;bottom:-6px;margin-left:-5px;border:5px solid transparent;border-bottom:0;border-top-color:inherit}
 .map-label.badge-blue{background:linear-gradient(180deg,#3b7fcb,#1c4f93);border-top-color:#1c4f93!important}
 .map-label.badge-brown{background:linear-gradient(180deg,#9a6438,#5f391c);color:#fff3da!important}
@@ -1328,3 +1328,25 @@ body.rtl.country-overview .map-label.sea{font-family:inherit;font-style:normal;l
 @media (max-width:780px){#mapLabels .map-label.badge{font-size:12px;padding:3px 9px 3px 4px}#mapLabels .map-label.badge svg{width:17px;height:17px}}
 body.country-overview .tiltshift{display:none}   /* V21: the Kingdom map stays crisp edge to edge, as in the reference */
 @media (max-width:780px){.bottombar .region-nav button span{display:block;font-size:10px;line-height:1.1;white-space:normal;text-align:center;max-width:64px}.bottombar .region-nav button{min-height:52px}}
+
+/* V22: larger illustrated region icons on wide screens */
+@media (min-width:1501px){body.country-overview .bottombar .region-nav button,.bottombar .region-nav button{min-height:54px;padding:6px 13px 6px 8px}body.country-overview .bottombar .region-nav button svg,.bottombar .region-nav button svg{width:34px;height:34px}}
+
+/* V22: menu drawer over the Kingdom map: docked under the header, a compact mission summary by default; the reference's region bar at the bottom */
+#menu .menu-card{top:84px;bottom:auto;max-height:calc(100dvh - 190px);overflow-y:auto;width:min(410px,calc(100vw - 24px));transition:width .25s}
+#menu .menu-card.collapsed{width:min(330px,calc(100vw - 24px));padding:12px 16px 14px}
+#menu .menu-card.collapsed :is(.menu-tag,.nc-body p,.mc-rec){display:none}
+#menu .menu-card.collapsed .menu-grid{display:block;margin:8px 0 0}#menu .menu-card.collapsed .menu-grid>.tile:not(#cityBtn){display:none}#menu .menu-card.collapsed #cityBtn{width:100%;padding:7px 12px;min-height:0}#menu .menu-card.collapsed #cityBtn small{display:none}
+#menu .menu-card.collapsed .menu-foot{margin-top:6px}#menu .menu-card.collapsed .menu-foot>:not(#tutBtn){display:none}
+#menu .menu-card.collapsed .menu-title{font-size:22px;margin:2px 0 8px}
+#menu .menu-card.collapsed .next-card{padding:8px 10px;margin-bottom:8px}
+#menu .menu-card.collapsed .primary.big{padding:10px 14px;font-size:15px}
+.menu-expand{float:inline-end;margin:-2px -4px 4px 8px;border:1px solid rgba(23,52,76,.18);background:rgba(255,255,255,.7);color:#17344c;border-radius:999px;padding:4px 11px;font:700 12px/1.4 inherit;cursor:pointer}
+.menu-expand:hover{background:#fff;border-color:#e7bb64}
+#menu .menu-regions{left:50%;right:auto;transform:translateX(-50%);width:auto;height:auto;bottom:12px;pointer-events:auto;padding:8px 10px}
+@media (max-width:780px){#menu .menu-regions{left:8px;right:8px;transform:none}#menu .menu-card{top:auto;bottom:118px;max-height:calc(100dvh - 260px)}}
+/* V23: the collapsed summary docks in the open-sea corner beside the region bar (Red Sea side in English, Arabian Sea in Arabic) */
+#menu .menu-card.collapsed{top:auto;bottom:16px}
+@media (max-width:1560px){#menu .menu-card.collapsed{bottom:100px}}
+@media (max-width:780px){#menu .menu-card.collapsed{bottom:118px}}
+@media (max-width:780px){#menu .menu-card.collapsed :is(.eyebrow,.menu-title){display:none}#menu .menu-card.collapsed{padding:10px 12px}#menu .menu-card.collapsed .menu-expand{margin:0 0 6px 6px}}

@@ -44,7 +44,7 @@
     W.onGroundClick(null); W.onGroundDrag(onDrag); W.onGroundHover(onHover);
     const c = [grid.x0 + N * grid.ts / 2, grid.z0 + N * grid.ts / 2], K = W.place(45.3, 23.7), core = W.place(46.68, 24.71, 'Riyadh');
     if (!G.profile.reduced) {   // one continuous move: Kingdom → Riyadh → the new district
-      W.cam(.1, 1.05, 12, K[0], K[1], .6); say(t('zoomKingdom'), 'info');
+      if (W.kingdomCam) W.kingdomCam(.6); else W.cam(.1, 1.05, 12, K[0], K[1], .6); say(t('zoomKingdom'), 'info');
       ui.cutFlight = false;   // a guided step (tutorial) that aims the camera itself ends the scripted flight
       setTimeout(() => { if (!ui.active || ui.cutFlight) return; W.cam(.3, .95, 4.2, core[0] + .3, core[1], .5); say(t('zoomRiyadh'), 'info'); }, 1300);
       setTimeout(() => { if (!ui.active || ui.cutFlight) return; W.cam(.35, .82, 1.9, c[0], c[1], .5); if (!session) say(loaded ? t('cityResumed') : t('cityWelcome'), 'info'); }, 2800);
@@ -165,7 +165,7 @@
     $$('#cTop [data-dem]').forEach(b => b.onclick = () => openPanel('demand:' + b.dataset.dem));
     $('#cLens').onclick = () => G.showLens('overview');
     $('#cExit').onclick = () => leaveCity();
-    $('#cKingdom').onclick = () => { if (ui.kingdom) { ui.kingdom = false; const c = [grid.x0 + N * grid.ts / 2, grid.z0 + N * grid.ts / 2]; W.cam(.35, .82, 1.7, c[0], c[1], .5); } else { ui.kingdom = true; const K = W.place(45.3, 23.7); W.cam(.1, 1.05, 14, K[0], K[1], .45); } };
+    $('#cKingdom').onclick = () => { if (ui.kingdom) { ui.kingdom = false; const c = [grid.x0 + N * grid.ts / 2, grid.z0 + N * grid.ts / 2]; W.cam(.35, .82, 1.7, c[0], c[1], .5); } else { ui.kingdom = true; const K = W.place(45.3, 23.7); if (W.kingdomCam) W.kingdomCam(.45); else W.cam(.1, 1.05, 14, K[0], K[1], .45); } };
     renderTools(); renderMissionCard();
     if (G.afterCityHUD) G.afterCityHUD();
   }

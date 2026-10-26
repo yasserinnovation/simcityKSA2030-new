@@ -183,7 +183,7 @@
     const at = (ms, f) => cineTimers.push(setTimeout(f, reduced ? Math.min(ms, 300) : ms));
     if (short || reduced) {
       const s = P(44.5, 23.2); W.snapCam(-.2, .95, 9, s[0], s[1]); W.setNight(.15, true); cap('cineComp', 'comp');
-      at(1400, () => { W.cam(.45, .72, 3.4, r[0], r[1], .5); cap('cine3'); W.setNight(.45); });
+      at(1400, () => { if (W.kingdomCam) W.kingdomCam(.5); else W.cam(.45, .72, 3.4, r[0], r[1], .5); cap('cine3'); W.setNight(.45); });   // V22: settle on the Kingdom map
       at(3000, finish);
     } else {
       const j = P(38.4, 21.2); W.snapCam(-1.1, .5, 7.5, j[0], j[1]); W.setNight(0, true);
@@ -218,7 +218,10 @@
     $('#profileChip').innerHTML = G.profileChip();
     const runM = run && run.s ? (() => { try { const s = JSON.parse(run.s); return s.done ? null : {m:VM.mission(s.mission), t:s.turn}; } catch(e) { return null; } })() : null;
     const dd = G.profile.daily[di.daily.key], wd = G.profile.weekly[di.weekly.key];
+    const ar = G.lang() === 'ar', open = !!G.menuOpen;   // V22: the menu is a drawer; the Kingdom map leads, a compact mission summary shows first
+    $('#menuCard').classList.toggle('collapsed', !open);
     $('#menuCard').innerHTML = `
+      <button class="menu-expand" id="menuExpand" aria-expanded="${open}" aria-controls="menuCard">${open ? (ar ? 'إخفاء ▴' : 'Less ▴') : (ar ? 'كل الخيارات ▾' : 'All options ▾')}</button>
       <p class="eyebrow">${esc(G.t(VM.CHAPTERS[0].name))}</p>
       <h1 class="menu-title">VISION <span>NEXUS</span> 2030</h1>
       <p class="menu-tag">${esc(G.t('tagline'))}</p>
@@ -247,8 +250,17 @@
     $('#compBtn').onclick = () => G.showLens && G.showLens('overview');
     $('#cityBtn').onclick = () => G.openCity && G.openCity(false);
     G.bindTutorialLink && G.bindTutorialLink();
-    const r = W.place(46.68, 24.71, 'Riyadh'); W.cam(.45, .7, 3.4, r[0] - .25, r[1], .6);
-    clearInterval(G.menuCycle); if (!G.profile.reduced) { let ph = 0; G.menuCycle = setInterval(() => { if ($('#menu').classList.contains('hidden')) { clearInterval(G.menuCycle); W.setNight(0); return; } ph += .05; W.setNight(Math.max(0, Math.sin(ph) * .62)); }, 1000); }
+    const r = W.place(46.68, 24.71, 'Riyadh');
+    // V22: the menu sits over the Kingdom map in steady daylight (the old day/night cycle greyed the map), with the reference's
+    // six-button region bar; the open drawer shifts the map away from its side instead of covering the east or west.
+    const frame = () => { const wide = innerWidth > 900, side = (ar ? 1 : -1) * (G.menuOpen && wide ? 1.35 : 0); if (W.kingdomCam) W.kingdomCam(.6, side, G.menuOpen && wide ? 1.12 : 1, innerWidth / innerHeight < .8 ? 4.4 : 0); /* phones: the map rises above the summary */ else W.cam(.45, .7, 3.4, r[0] - .25, r[1], .6); };
+    frame(); clearInterval(G.menuCycle); W.setNight(0, true);
+    $('#menuExpand').onclick = () => { G.menuOpen = !G.menuOpen; G.sfx && G.sfx('select'); G.showMenu(); };
+    let mr = $('#menuRegions'); if (!mr) { mr = document.createElement('div'); mr.id = 'menuRegions'; mr.className = 'bottombar menu-regions glass'; const nav = document.querySelector('#bottombar .region-nav').cloneNode(true);
+      nav.querySelectorAll('[data-region]').forEach(b => { b.dataset.mregion = b.dataset.region; delete b.dataset.region; }); mr.appendChild(nav); $('#menu').appendChild(mr);
+      mr.addEventListener('click', e => { const b = e.target.closest('[data-mregion]'); if (!b) return; mr.querySelectorAll('[data-mregion]').forEach(x => x.classList.toggle('active', x === b)); if (b.dataset.mregion === 'kingdom') frame(); else W.focusRegion(b.dataset.mregion); }); }
+    const AR = {kingdom:'المملكة', riyadh:'الرياض', west:'مكة والغرب', northwest:'نيوم والشمال الغربي', east:'الشرقية', south:'عسير والجنوب'}, EN = {kingdom:'Kingdom', riyadh:'Riyadh', west:'Makkah & West', northwest:'NEOM & Northwest', east:'Eastern', south:'Aseer & South'};
+    mr.querySelectorAll('[data-mregion]').forEach(b => { b.querySelector('span').textContent = (ar ? AR : EN)[b.dataset.mregion]; b.classList.toggle('active', b.dataset.mregion === 'kingdom'); });
     setTimeout(() => $('#playBtn') && $('#playBtn').focus(), 50);
   };
   // National Simulation: return to the session in memory, else restore the autosaved mandate, else show the setup screen.

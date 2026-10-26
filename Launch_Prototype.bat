@@ -6,6 +6,12 @@ cd /d "%~dp0"
 set PORT=8123
 set URL=http://127.0.0.1:%PORT%/index.html
 
+rem Node first: tools\serve.js sends Cache-Control: no-cache, so an update is never hidden by the browser cache.
+where node >nul 2>nul
+if %errorlevel%==0 (
+  start "Vision Nexus 2030 server" /min node tools\serve.js %PORT%
+  goto open
+)
 where python >nul 2>nul
 if %errorlevel%==0 (
   start "Vision Nexus 2030 server" /min python -m http.server %PORT% --bind 127.0.0.1
@@ -14,11 +20,6 @@ if %errorlevel%==0 (
 where py >nul 2>nul
 if %errorlevel%==0 (
   start "Vision Nexus 2030 server" /min py -3 -m http.server %PORT% --bind 127.0.0.1
-  goto open
-)
-where node >nul 2>nul
-if %errorlevel%==0 (
-  start "Vision Nexus 2030 server" /min node tools\serve.js %PORT%
   goto open
 )
 echo Python 3 or Node.js is needed to run the local server.

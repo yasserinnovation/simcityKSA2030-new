@@ -393,7 +393,7 @@
     G.sfx('medal'); W.burst(r[0], r[1]); W.setNight(.5);
     const cities = ({west:['Riyadh','Madinah','Taif','Tabuk','Abha'], neom:['Riyadh','Madinah','Jeddah','AlUla','Hail'], east:['Riyadh','Hofuf','Jeddah','Buraydah'], south:['Riyadh','Jeddah','Najran','Taif','Jazan'], kingdom:['Jeddah','Makkah','Dammam','Madinah','Tabuk','Abha','Jazan','Hail']}[VM.board] || ['Jeddah','Makkah','Dammam','Madinah','Tabuk','Abha']).map(n => G.D.cities.find(c => c.name === n)).filter(Boolean);
     W.setOverlay(G.flows(S()).concat(cities.map(c => ({a:[r[0], r[1]], b:[c.x, c.z], color:[1,.84,.35], flow:true, n:10, speed:2.4, size:4.5, thick:true}))));
-    W.cam(.1, 1.0, 13, K[0], K[1], .45);
+    if (W.kingdomCam) W.kingdomCam(.45); else W.cam(.1, 1.0, 13, K[0], K[1], .45);
     setTimeout(() => { W.setNight(0); done(); }, 3200);
   }
   function measureRows(ms){ return Object.entries(ms).map(([k, v]) => `<div class="rs-row ${v < 50 ? 'low' : ''}"><span>${esc(t(k === 'objective' ? 'objectiveM' : k === 'budget' ? 'budgetM' : k))}</span><i style="--v:${Math.max(2, v)}%"></i><b>${Math.round(v)}</b></div>`).join(''); }

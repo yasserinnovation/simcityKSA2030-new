@@ -4,9 +4,10 @@
 // here is pickable or simulated.
 window.VisionKingdomLandmarks = function(ctx){
   const {S, G, onLand, geo, D, LY, R} = ctx;
-  // Illustrated-map exaggeration about each city's anchor: shapes grow by SZ, their spread by OFF.
-  const SZ = 1.75, OFF = 1.35; let ax = 0, az = 0; const at = (x, z) => { ax = x; az = z; };
-  const stamp = (shape, x, y, z, sx, sy, sz, hex, bottom) => ctx.stamp(shape, ax + (x - ax) * OFF, G + (y - G) * SZ, az + (z - az) * OFF, sx * SZ, sy * SZ, sz * SZ, hex, bottom);
+  // Illustrated-map exaggeration about each city's anchor: footprints grow by SZ, heights by SY, their spread by OFF
+  // (V22: the reference draws its skylines about three times the V21 size). Sea objects keep their water level.
+  const SZ = 2.5, SY = 3.3, OFF = 2.2; let ax = 0, az = 0; const at = (x, z) => { ax = x; az = z; };
+  const stamp = (shape, x, y, z, sx, sy, sz, hex, bottom) => ctx.stamp(shape, ax + (x - ax) * OFF, y < G ? y : G + (y - G) * SY, az + (z - az) * OFF, sx * SZ, sy * SY, sz * SZ, hex, bottom);
   const city = n => LY.cityDisplay[n] || (c => [c.x, c.z])(D.cities.find(c => c.name === n));
   const proj = id => { const p = D.projects.find(q => q.id === id); return p ? [p.x, p.z] : null; };
   const GLASS = [0x7fb3cf, 0x93c4dc, 0x6aa1c4, 0xa9d2e4, 0x5d8fb5], STONE = [0xe8d3ac, 0xdcc196, 0xf0dfbf], MUD = [0xc79a68, 0xb98a5b, 0xd1a875];
@@ -26,18 +27,22 @@ window.VisionKingdomLandmarks = function(ctx){
   const ring = (x, z, r, n, fn) => { for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2 + R() * .3, d = r * (.35 + .65 * Math.sqrt(R())); fn(x + Math.cos(a) * d, z + Math.sin(a) * d * .85, i); } };
 
   // ---- Riyadh: Kingdom Centre (twin-shaft "arch" crown), Al Faisaliah (tapered with a golden orb), glass skyline, Najdi quarter
-  { const [x, z] = city('Riyadh'), kx = x + .02, kz = z - .02, H = .5; at(x, z);
-    for (const s of [-1, 1]) { stamp(S.cube, kx + s * .016, G + H * .42, kz, .018, H * .84, .03, 0x8ab6c9, .74); stamp(S.cube, kx + s * .011, G + H * .9, kz, .008, H * .2, .022, 0x9cc4d4, .8); }
+  { const [x, z] = city('Riyadh'), kx = x + .02, kz = z - .02, H = .36; at(x, z);
+    for (const s of [-1, 1]) { stamp(S.cube, kx + s * .016, G + H * .42, kz, .022, H * .84, .034, 0x8ab6c9, .74); stamp(S.cube, kx + s * .011, G + H * .9, kz, .008, H * .2, .022, 0x9cc4d4, .8); }
     stamp(S.cube, kx, G + H * .78, kz, .04, .007, .03, 0xc9dde4);                                  // sky bridge
     stamp(S.cube, kx, G + .012, kz, .07, .024, .05, 0xdfe7e6);
-    const fx = x - .09, fz = z + .03; stamp(S.cone, fx, G + .18, fz, .03, .36, .03, 0x8fb1c2, .78); stamp(S.orb, fx, G + .27, fz, .014, .014, .014, 0xe6b04a); stamp(S.cone, fx, G + .375, fz, .004, .05, .004, 0xdbe3e5);
+    const fx = x - .09, fz = z + .03; stamp(S.cone, fx, G + .13, fz, .032, .26, .032, 0x8fb1c2, .78); stamp(S.orb, fx, G + .195, fz, .012, .012, .012, 0xe6b04a); stamp(S.cone, fx, G + .27, fz, .004, .04, .004, 0xdbe3e5);
     ring(x, z, .2, 26, (px, pz, i) => { if (Math.hypot(px - kx, pz - kz) < .045 || Math.hypot(px - fx, pz - fz) < .04) return; tower(px, pz, .016 + R() * .012, .06 + R() * .2 * (1 - Math.hypot(px - x, pz - z) / .3), pick(GLASS), R() < .3); });
+    const px = x + .1, pz = z - .06, PH = .3;   // V22: PIF Tower (slim shaft, notched glass crown)
+    stamp(S.cube, px, G + PH * .45, pz, .02, PH * .9, .02, 0x7fa9c4, .74); stamp(S.cube, px, G + PH * .93, pz, .015, PH * .1, .02, 0xa9d2e4, .85); stamp(S.cone3, px, G + PH + .012, pz, .008, .03, .008, 0xdbe6ea);
+    { const mx = x - .05, mz = z + .1; stamp(S.cube, mx, G + .012, mz, .05, .024, .04, 0xc08d5c, .82);   // V22: Al Masmak fort (mud walls, round corner towers)
+      for (const sx of [-1, 1]) for (const sz of [-1, 1]) { stamp(S.cyl, mx + sx * .025, G + .017, mz + sz * .02, .008, .034, .008, 0xb5814f, .8); stamp(S.cyl, mx + sx * .025, G + .035, mz + sz * .02, .0085, .003, .0085, 0xd4a774); } }
     ring(x - .12, z + .17, .09, 14, (px, pz) => najdi(px, pz, .02 + R() * .012, .012 + R() * .01));       // Diriyah-style mud quarter
     ring(x, z, .3, 22, (px, pz) => { if (Math.hypot(px - x, pz - z) > .2) lowBlock(px, pz, .016, .012 + R() * .014, pick(STONE)); }); }
 
   // ---- Jeddah: Jeddah Tower (tall three-sided spire), waterfront towers, port cranes and containers, ships
-  { const [x, z] = city('Jeddah'), [cx, cz] = coastFrom(x, z, -1, 0); at(x, z);
-    const tx = cx + .05, tz = z - .1; stamp(S.cone3, tx, G + .23, tz, .03, .46, .03, 0xd7e6ee, .76); stamp(S.cube, tx, G + .02, tz, .05, .04, .05, 0xe8eef0);
+  { const [x0, z] = city('Jeddah'), [cx, cz] = coastFrom(x0, z, -1, 0), x = cx + .06; at(cx + .02, z);   // V23: anchored on the coast, so the city spreads along the corniche, clear of Makkah
+    const tx = cx + .05, tz = z - .1; stamp(S.cone3, tx, G + .17, tz, .034, .34, .034, 0xd7e6ee, .76); stamp(S.cube, tx, G + .02, tz, .05, .04, .05, 0xe8eef0);
     for (let i = 0; i < 9; i++) { const pz = z - .14 + i * .03, px = cx + .03 + R() * .05; if (onLand(px, pz) && Math.hypot(px - tx, pz - tz) > .03) tower(px, pz, .015 + R() * .01, .07 + R() * .12, pick(GLASS), R() < .4); }
     ring(x + .04, z, .1, 14, (px, pz) => { if (onLand(px, pz)) lowBlock(px, pz, .016, .012 + R() * .016, pick(STONE)); });
     const py = cz + .07; for (let i = 0; i < 4; i++) { const qx = cx + .012, qz = py + i * .026; stamp(S.cube, qx, G + .03, qz, .004, .06, .004, 0xd8473a); stamp(S.cube, qx - .014, G + .058, qz, .03, .004, .004, 0xd8473a); }
@@ -45,7 +50,7 @@ window.VisionKingdomLandmarks = function(ctx){
     ship(cx - .07, py + .02, .2, true); ship(cx - .1, z - .05, -.4, false); ship(cx - .16, z + .2, .1, true); ship(cx - .06, z + .3, .5, false); }
 
   // ---- Makkah: the Haram (white courtyard, colonnade ring, minarets), the Kaaba (black, gold band), the clock tower
-  { const [x, z] = city('Makkah'); at(x, z);
+  { const [x0, z] = city('Makkah'), x = x0 + .14; at(x, z);   // V23: the Haram district sits inland in its valley, apart from Jeddah
     stamp(S.cyl, x, G + .004, z, .1, .008, .085, 0xf7f4ec, .95);                                       // courtyard
     for (let i = 0; i < 28; i++) { const a = i / 28 * Math.PI * 2; stamp(S.cube, x + Math.cos(a) * .1, G + .012, z + Math.sin(a) * .085, .026, .022, .022, 0xf1ece0, .9); }
     for (let i = 0; i < 9; i++) { const a = i / 9 * Math.PI * 2 + .3; minaret(x + Math.cos(a) * .115, z + Math.sin(a) * .1, .1); }
@@ -128,7 +133,7 @@ window.VisionKingdomLandmarks = function(ctx){
     {id:'sakakah', en:'Sakakah', ar:'سكاكا', style:'brown', icon:'oasis', color:Au, city:'Sakakah', region:null},
     {id:'madinah', en:'Madinah', ar:'المدينة المنورة', style:'green', icon:'mosque', color:W, city:'Madinah', region:'west'},
     {id:'jeddah', en:'Jeddah', ar:'جدة', style:'blue', icon:'ship', color:W, city:'Jeddah', region:'west', dx:-.16, dz:-.04},
-    {id:'makkah', en:'Makkah', ar:'مكة المكرمة', style:'black', icon:'kaaba', color:Au, city:'Makkah', region:'west', dx:.2, dz:.1},
+    {id:'makkah', en:'Makkah', ar:'مكة المكرمة', style:'black', icon:'kaaba', color:Au, city:'Makkah', region:'west', dx:.42, dz:.12},
     {id:'riyadh', en:'Riyadh', ar:'الرياض', style:'brown', icon:'tower', color:Au, city:'Riyadh', region:'riyadh'},
     {id:'dammam', en:'Dammam', ar:'الدمام', style:'blue', icon:'industry', color:W, city:'Dammam', region:'east'},
     {id:'aseer', en:'Aseer', ar:'عسير', style:'green', icon:'mountain', color:W, city:'Abha', region:'south'},

@@ -40,7 +40,7 @@
   { const [x, z] = LY.R(.03, -.06); Object.assign(D.regions.riyadh, {x, z, az:0, el:1.02, dist:3.35, fitWidth:true}); }
   // Every regional plan is framed north-up the same way (regions.js cameras).
   for (const [k, v] of Object.entries(LY.REGION_VIEWS || {})) if (D.regions[k]) Object.assign(D.regions[k], {x:v.camera.x, z:v.camera.z, az:0, el:1.02, dist:v.camera.dist, fitWidth:true, phoneFit:v.camera.phoneFit || 1.5});
-  Object.assign(D.regions.kingdom,{el:1.02,az:.15,dist:11.2,nationalFit:true}); D.regions.kingdom.z-=.4;   // V21: framed like the reference map (was 14.4, centred .4 further south)
+  Object.assign(D.regions.kingdom,{el:.82,az:.02,dist:9.0,nationalFit:true}); D.regions.kingdom.x+=.1; D.regions.kingdom.z+=.15;   // V22: the reference's tilted diorama framing (V21: el 1.02, dist 11.2; V19: dist 14.4)
   const P = id => D.projects.find(p => p.id === id);
   const C = name => cityByName[name];
   const pt = w => typeof w === 'string' ? [C(w).x, C(w).z] : geo(w[0], w[1]);
@@ -232,7 +232,9 @@
       c=mix(c,vec3(.97,.98,.96),clamp(foam,0.0,1.0)*mix(.58,.20*exposure,national));
       // V21 national palette (reference map): bright turquoise shallows, vivid cyan-blue mid water, saturated deep blue
       vec3 calmReef=vec3(.48,.90,.86),calmShallow=vec3(.10,.72,.80),calmMid=vec3(.07,.47,.76),calmDeep=vec3(.05,.29,.60);
-      vec3 calm=mix(calmReef,calmShallow,smoothstep(0.0,.10,s));calm=mix(calm,calmMid,smoothstep(.08,.30,s));calm=mix(calm,calmDeep,smoothstep(.32,.95,s));
+      float sn=s*(.75+.5*(.5+.5*sin(vWorld.x*5.3+sin(vWorld.z*3.1)*2.0)*sin(vWorld.z*4.7+vWorld.x*1.3)));   // V22: broken, narrower shallows
+      vec3 calm=mix(calmReef,calmShallow,smoothstep(0.0,.045,sn));calm=mix(calm,calmMid,smoothstep(.05,.15,sn));calm=mix(calm,calmDeep,smoothstep(.15,.5,sn));
+      calm=mix(calm,vec3(.20,.60,.60),smoothstep(.35,.8,coral)*(1.0-smoothstep(.03,.11,sn))*smoothstep(.008,.025,sn)*.5);   // reef patches
       c=mix(c,calm*(.97+.05*w1*fade),national*.9); c=mix(c,vec3(.93,.99,.98),national*smoothstep(.022,.0,s)*.55);   // V21: soft white surf on every coast
       vec3 V=normalize(uEye-vWorld); vec3 H=normalize(uSun+V);
       float spec=pow(max(dot(N,H),0.0),90.0)*fade; c+=vec3(1.0,.95,.82)*spec*0.5*(1.0+uHdr*1.4)*(1.0-uStorm);   // V20: sun glints are HDR emitters
@@ -1474,7 +1476,7 @@
 
   // Clouds framing the diorama (drawn lit, but they cast no shadows)
   target = cloudGeo;
-  for (const [x,z,k] of [[-1.47,2.70,.09],[-1.02,2.83,.08],[-1.34,3.24,.07]]) addCloud(x,G+.2,z,k);   // light mist on the Aseer hills (clear of Abha and Soudah)
+  { const prev = target; target = detailMesh; for (const [x,z,k] of [[-1.47,2.70,.09],[-1.02,2.83,.08],[-1.34,3.24,.07]]) addCloud(x,G+.2,z,k); target = prev; }   // light mist on the Aseer hills (clear of Abha and Soudah); V22: detail layer, so the Kingdom map's taller Aseer doesn't cut through it
   target = mesh;
 
   /* ------------------------------ sea ------------------------------- */
@@ -1996,7 +1998,7 @@
   let night=0, nightTarget=0, camSpeed=1, beaconsOn=true, bursts=[], missionScene=null, missionLights=[], captureTime=null;
   const bounds={minX:-7,maxX:8,minZ:-6,maxZ:7};
 
-  function resize(){const aspect=innerWidth/innerHeight;if(countryAutoFrame&&Math.abs(aspect-viewAspect)>.01)camera.desired.dist=K.dist*regionFit(K);viewAspect=aspect;dpr=Math.min(devicePixelRatio||1,quality==='low'?1:2)*resScale;const w=Math.floor(innerWidth*dpr),h=Math.floor(innerHeight*dpr);if(canvas.width!==w||canvas.height!==h)renderer.setSize(w,h,false);width=w;height=h;}
+  function resize(){const aspect=innerWidth/innerHeight;if(countryAutoFrame&&Math.abs(aspect-viewAspect)>.01){camera.desired.dist=K.dist*regionFit(K);camera.desired.target[2]=regionZ(K);}viewAspect=aspect;dpr=Math.min(devicePixelRatio||1,quality==='low'?1:2)*resScale;const w=Math.floor(innerWidth*dpr),h=Math.floor(innerHeight*dpr);if(canvas.width!==w||canvas.height!==h)renderer.setSize(w,h,false);width=w;height=h;}
   function updateCamera(dt){
     const k=1-Math.pow(.001,dt/1000*0.9*camSpeed);
     camera.az+=(camera.desired.az-camera.az)*k; camera.el+=(camera.desired.el-camera.el)*k; camera.dist+=(camera.desired.dist-camera.dist)*k;
@@ -2252,7 +2254,8 @@
   labelLayer.addEventListener('click', e => { const rg=e.target.closest('[data-region]'); if (rg) { hideChoices(); onRegion(rg.dataset.region); return; }
     const el=e.target.closest('[data-pid]'); if (!el || !selectable) return; hideChoices(); pickSelect(el.dataset.pid); });
   let lastPick=null;   // last map selection (tests)
-  function regionFit(r){return r.nationalFit ? Math.min(2.8,Math.max(1,Math.sqrt(1.75/(innerWidth/innerHeight)))) : r.fitWidth ? Math.min(r.phoneFit || 1.5, Math.max(1, Math.sqrt(1.1/(innerWidth/innerHeight)))) : 1;}
+  function regionZ(r){return r.z-(r.nationalFit?(regionFit(r)-1)*2.2:0);}   // V22: portrait screens centre the tilted Kingdom map lower, clear of the top bar
+  function regionFit(r){return r.nationalFit ? Math.min(2.8,Math.max(1,Math.pow(1.75/(innerWidth/innerHeight),.66))) : r.fitWidth ? Math.min(r.phoneFit || 1.5, Math.max(1, Math.sqrt(1.1/(innerWidth/innerHeight)))) : 1;}
   function pickSelect(id){ lastPick=id; if (id===CORE_ID) { selectedId=null; onPlace('riyadh'); } else if (String(id).startsWith('place:')) { selectedId=null; onPlace(id); } else onSelect(P(id)); }
   let hoverViaLabel=false;   // hovering a label keeps that label in place, so a click lands where the pointer is
   labelLayer.addEventListener('pointerover', e => { const el=e.target.closest('[data-pid]'); if (el && selectable) { hoverId=el.dataset.pid; hoverViaLabel=true; } });
@@ -2478,11 +2481,11 @@
 
   /* ------------------------------- API ------------------------------ */
   window.VisionWorld = {
-    start(){countryAutoFrame=true;setDesired(K.az,K.el,K.dist*regionFit(K),K.x,K.z); },
+    start(){countryAutoFrame=true;setDesired(K.az,K.el,K.dist*regionFit(K),K.x,regionZ(K)); },
     focusProject(p){countryAutoFrame=false; selectedId=p.id; directMode=false; follow=null; setDesired(.3,.8,2.3,p.x,p.z,.02); },
     focusRegion(id){ const r=D.regions[id]||K; selectedId=null; directMode=false;countryAutoFrame=r===K;
-      setDesired(r.az,r.el,r.dist*regionFit(r),r.x,r.z); },
-    overview(){ selectedId=null; directMode=false; follow=null; stormTarget=0;countryAutoFrame=true; setDesired(K.az,K.el,K.dist*regionFit(K),K.x,K.z); },
+      setDesired(r.az,r.el,r.dist*regionFit(r),r.x,regionZ(r)); },
+    overview(){ selectedId=null; directMode=false; follow=null; stormTarget=0;countryAutoFrame=true; setDesired(K.az,K.el,K.dist*regionFit(K),K.x,regionZ(K)); },
     // World coordinates for simulation data (same anchor spread as projects)
     place(lon, lat, anchor){ let [x,z]=geo(lon,lat); const a=anchor&&C(anchor); if(a){x=a.x+(x-a.x)*ANCHOR_SPREAD;z=a.z+(z-a.z)*ANCHOR_SPREAD;} return [x,z]; },
     focusPoint(x, z, dist=3.4, el=.72){countryAutoFrame=false; directMode=false; follow=null; setDesired(.35,el,dist,x,z,.03); },
@@ -2496,6 +2499,7 @@
     setDirectMode(v, x, z){ directMode=v; follow=v&&x!=null?[x,z]:null; if(v) setDesired(1.3,.42,1.7,x,z,.1); else follow=null; },
     followPoint(x, z){ if (directMode) follow=[x,z]; },
     cam(az, el, dist, x, z, speed=1){ directMode=false; follow=null; camSpeed=speed; setDesired(az,el,dist,x,z,0); },
+    kingdomCam(speed=1, dx=0, zoom=1, dz=0){ directMode=false; follow=null; camSpeed=speed; countryAutoFrame=!dx&&!dz&&zoom===1; setDesired(K.az,K.el,K.dist*regionFit(K)*zoom,K.x+dx,regionZ(K)+dz,0); },   // V22: the one Kingdom-map framing, for every caller
     snapCam(az, el, dist, x, z){ setDesired(az,el,dist,x,z,0); camera.az=az; camera.el=el; camera.dist=dist; camera.target=[x,0,z]; },
     camSpeed(k){ camSpeed=k; },
     setNight(v, instant){ nightTarget=Math.max(0,Math.min(1,v)); if(instant) night=nightTarget; },
@@ -2537,7 +2541,7 @@
       marker(id){ const pr=P(id), q=project([pr.pad[0],beaconTop(projectState[id],id)+.02,pr.pad[1]]); return q?{x:q[0],y:q[1]}:null; },
       screen(x,z,y=G){ const q=project([x,y,z]); return q?{x:q[0],y:q[1]}:null; },   // where a ground point is drawn (tests)
       lastPick(){ return lastPick; }, clearPick(){ lastPick=null; },
-      regionView(id){ const r=D.regions[id];countryAutoFrame=r===K; selectedId=null; directMode=false; follow=null; const d=r.dist*regionFit(r); setDesired(r.az,r.el,d,r.x,r.z,0); camera.az=r.az; camera.el=r.el; camera.dist=d; camera.target=[r.x,0,r.z]; },   // a region's default view, instantly
+      regionView(id){ const r=D.regions[id];countryAutoFrame=r===K; selectedId=null; directMode=false; follow=null; const d=r.dist*regionFit(r), z=regionZ(r); setDesired(r.az,r.el,d,r.x,z,0); camera.az=r.az; camera.el=r.el; camera.dist=d; camera.target=[r.x,0,z]; },   // a region's default view, instantly
       // V15: temporary completed-state preview of the Riyadh landmarks (visual only; see visPhase).
       previewComplete(v){ previewDone=!!v; buildStageMesh(); return previewDone; },
       holdQuality(){ frames=400; },   // V15 (tests): ends the adaptive-quality window, so captures keep the quality they set

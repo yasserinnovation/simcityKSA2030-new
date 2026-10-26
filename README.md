@@ -1,16 +1,16 @@
-# Vision Nexus 2030 — The Kingdom in Motion (build V21 — Kingdom map)
+# Vision Nexus 2030 — The Kingdom in Motion (build V23 — Kingdom diorama)
 
 The build label is shown in the bottom corner of the screen. If you see a "Strategic Actions" panel, "Path to 2030" or a calendar past 2030, you are running an older copy of the files.
 
 An unofficial Saudi strategy game in the browser (WebGL, no install, no build step).
 ## How to launch (works offline)
 The game runs from a tiny local web server, because browsers block the ES modules, models and textures of the three.js renderer on `file://` pages. Nothing is downloaded from the internet: three.js and the fonts are in `vendor/`.
-- **Windows:** double-click `Launch_Prototype.bat`. It starts `python -m http.server 8123` (or `node tools/serve.js` if Python is missing) and opens http://127.0.0.1:8123.
+- **Windows:** double-click `Launch_Prototype.bat`. It starts `node tools/serve.js 8123` (which sends no-cache headers), or `python -m http.server 8123` if Node is missing and opens http://127.0.0.1:8123.
 - **Why port 8123 on 127.0.0.1:** Docker Desktop and WSL also listen on port 8000, and browsers send `localhost` to IPv6 `::1`, where they answer with an empty page (`ERR_EMPTY_RESPONSE`). Always use http://127.0.0.1:8123.
 - **macOS / Linux:** run `./launch.sh` (same fallbacks).
 - **Any system with Node:** `npm start`, then open http://127.0.0.1:8123.
 - **Renderers:** http://127.0.0.1:8123/index.html uses the three.js renderer; add `?renderer=classic` for the original hand-written WebGL renderer (kept for comparison). Opening `index.html` directly from disk still works and uses the classic renderer. Add `?debug=1` for the frame-time counter.
-- **Updating an existing copy:** replace the whole `VisionNexus2030` folder (new files such as `kingdom-landmarks.js`, `premium.js`, `assets.js`, `assets/models/` and `vendor/three/addons/` must all be present), then reload the page with Ctrl+F5 so the browser drops cached scripts. The badge in the bottom corner should read **build V21 (Kingdom map)**. Saves are kept: they live in the browser, not in the folder.
+- **Updating an existing copy:** replace the whole `VisionNexus2030` folder (new files such as `kingdom-landmarks.js`, `premium.js`, `assets.js`, `assets/models/` and `vendor/three/addons/` must all be present), then reload the page with Ctrl+F5 so the browser drops cached scripts. The badge in the bottom corner should read **build V23 (Kingdom diorama)**. Saves are kept: they live in the browser, not in the folder.
 - **Development install (tests only, the game itself needs nothing):** Node.js 18 or newer, then `npm install` once in this folder. It installs only `playwright-core`, which drives your installed Chrome or Edge; no browser is downloaded.
 - **Tests:** `npm test` (game logic, headless), `npm run test:render` (both renderers), `npm run test:tutorial` (tutorial and City Builder, desktop and phone, English and Arabic) and `npm run test:premium` (graphics presets, GLB models, phone). Visual captures: `npm run check:premium` and `node tools/check-kingdom-map.js after`.
 
@@ -450,4 +450,13 @@ The National Simulation's Kingdom view now follows the illustrated reference map
 - a glossy six-button region bar.
 
 Regional and city views are unchanged. See `docs/kingdom-map-v21/NOTES.md`, and `node tools/check-kingdom-map.js after` for captures.
+
+**Build V22 (Kingdom diorama):**
+- a tilted camera, like the reference's isometric view;
+- skylines about three times larger;
+- a broad red-rock Hejaz escarpment, a forested Aseer and crescent dunes in the Empty Quarter;
+- a raised plateau with a glowing gold rim, and bolder highways;
+- denser palms, oases, farm circles, cartoon clouds and crisper neighbouring mountains.
+
+The captures are in `docs/kingdom-map-v21/v22/`.
 
