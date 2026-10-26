@@ -1,0 +1,76 @@
+{
+  "phase": "after",
+  "browser": "131.0.6778.204",
+  "viewport": [
+    1280,
+    800
+  ],
+  "gpu": "SwiftShader software renderer; not device GPU performance",
+  "errors": [],
+  "failed": [],
+  "overview": {
+    "version": 26,
+    "sculpted": {
+      "rocks": 44,
+      "facades": 2,
+      "houses": 18,
+      "palms": 24
+    },
+    "buttresses": 46,
+    "terraces": 4,
+    "waterRoutes": 8,
+    "scarp": 28,
+    "farms": 56,
+    "belts": 6,
+    "railSegments": 26,
+    "airports": 4,
+    "islands": 33,
+    "mesas": 30,
+    "camels": 7,
+    "solar": 38,
+    "oases": 16,
+    "palms": 669,
+    "clusters": 62,
+    "groveTrees": 699,
+    "duneGroups": 10,
+    "boats": 19,
+    "roadSegments": 84,
+    "terrainTriangles": 47744,
+    "neighTriangles": 58922,
+    "palette": {
+      "sand": 15910775,
+      "crest": 16769177,
+      "sandstone": 11560512,
+      "highland": 4880955,
+      "shallow": 7853519,
+      "deep": 1525349,
+      "road": 6780020,
+      "settlement": 15325624,
+      "navy": 1520716,
+      "gold": 15186788
+    },
+    "quality": "high"
+  },
+  "performance": {
+    "high": {
+      "meanMs": 601.5833333333334,
+      "p95Ms": 1304.4000000003725,
+      "fps": 1.7646020822304207,
+      "ms": 566.7000000000116,
+      "quality": "high",
+      "renderer": "three",
+      "calls": 169,
+      "triangles": 740200
+    },
+    "low": {
+      "meanMs": 372.0833333333333,
+      "p95Ms": 1302.0999999996275,
+      "fps": 4.735595895816891,
+      "ms": 211.16666666666666,
+      "quality": "low",
+      "renderer": "three",
+      "calls": 169,
+      "triangles": 582555
+    }
+  }
+}

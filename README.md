@@ -1,8 +1,12 @@
-# Vision Nexus 2030 — The Kingdom in Motion (build V25 — Saudi miniature world)
+# Vision Nexus 2030 — The Kingdom in Motion (build V26 — Sculpted Saudi world)
 
-The build label is shown in the bottom corner of the screen. This version reads **V25 (Saudi miniature world)**.
+The build label is shown in the bottom corner of the screen. This version reads **V26 (Sculpted Saudi world)**.
 
 An unofficial Saudi strategy game in the browser (WebGL, no install, no build step).
+
+**V26 adds a representative northwest/AlUla art rebuild.** Click the **AlUla** map label to inspect carved sandstone facades, eroded rock formations, a paved heritage village and original palm meshes. The new scenery stays visible as you zoom into that area. National geometry now casts and receives the existing renderer's sun shadows on Medium/High/Ultra; Reduced keeps the cheaper baked-light treatment. The sea has a brighter turquoise-to-blue palette. This is an art-development pass, not a claim of matching the reference illustration across every region.
+
+[V26 screenshots and test report](docs/sculpted-v26/NOTES.md). Start the complete project with `npm start` or **Launch_Prototype.bat**, then open **http://127.0.0.1:8123**. Enter the folder containing `package.json` first. No development install is needed to play.
 
 V25 develops the national map into a brighter miniature Saudi world: working sculpted dune fields, stratified western rocks, southern terraces, detailed AlUla sandstone architecture, finer settlement facades, smaller regional palms, restrained highways and muted neighbouring terrain. Boats follow land-checked water circuits; palms and soft clouds move gently. Six labelled regional controls and a compact launcher keep the map in view. Everything is real 3D geometry, with original procedural assets and no flat reference-image replacement.
 
@@ -19,7 +23,7 @@ The game runs from a tiny local web server, because browsers block the ES module
 - **macOS / Linux:** run `./launch.sh` (same fallbacks).
 - **Any system with Node:** `npm start`, then open http://127.0.0.1:8123.
 - **Renderers:** http://127.0.0.1:8123/index.html uses the three.js renderer; add `?renderer=classic` for the original hand-written WebGL renderer (kept for comparison). Opening `index.html` directly from disk still works and uses the classic renderer. Add `?debug=1` for the frame-time counter.
-- **Updating an existing copy:** replace the whole project folder (including `city-art.js`, `ui-icons.js`, `soundscape.js`, `assets/` and `vendor/`), then reload the page with Ctrl+F5. The badge should read **build V25 (Saudi miniature world)**. Saves are kept in the browser; use the same browser and local address to retain them.
+- **Updating an existing copy:** replace the whole project folder (including `city-art.js`, `ui-icons.js`, `soundscape.js`, `assets/` and `vendor/`), then reload the page with Ctrl+F5. The badge should read **build V26 (Sculpted Saudi world)**. Saves are kept in the browser; use the same browser and local address to retain them.
 - **Development install (tests only, the game itself needs nothing):** Node.js 18 or newer, then `npm install` once in this folder. It installs only `playwright-core`, which drives your installed Chrome or Edge; no browser is downloaded.
 - **Tests:** `npm test` (game logic, headless), `npm run test:render` (both renderers), `npm run test:tutorial` (tutorial and City Builder, desktop and phone, English and Arabic) and `npm run test:premium` (graphics presets, GLB models, phone). Visual captures: `npm run check:premium` and `node tools/check-kingdom-map.js after`.
 - **V25 checks:** `npm run test:reference` (terrain population, six region controls, expanded menu, phone RTL and asset loading), `npm run check:reference` (matched V24/V25 map captures).

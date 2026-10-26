@@ -1,0 +1,65 @@
+{
+  "date": "2026-10-26",
+  "baseline": "c17bb60566bb0cbbcc7c1eb6d13f72616bfee7da",
+  "checks": {
+    "logic": {
+      "passed": 305,
+      "failed": 0
+    },
+    "sculpted": {
+      "passed": 7,
+      "failed": 0
+    },
+    "render": {
+      "passed": 8,
+      "failed": 0
+    }
+  },
+  "performance": {
+    "before": {
+      "high": {
+        "meanMs": 550.6888888889096,
+        "p95Ms": 1072.7999999988824,
+        "fps": 1.5790304752881659,
+        "ms": 633.3000000000029,
+        "quality": "high",
+        "renderer": "three",
+        "calls": 170,
+        "triangles": 704416
+      },
+      "low": {
+        "meanMs": 376.3999999999586,
+        "p95Ms": 808.1999999992549,
+        "fps": 1.3331555792560887,
+        "ms": 750.1000000000058,
+        "quality": "low",
+        "renderer": "three",
+        "calls": 170,
+        "triangles": 558741
+      }
+    },
+    "after": {
+      "high": {
+        "meanMs": 601.5833333333334,
+        "p95Ms": 1304.4000000003725,
+        "fps": 1.7646020822304207,
+        "ms": 566.7000000000116,
+        "quality": "high",
+        "renderer": "three",
+        "calls": 169,
+        "triangles": 740200
+      },
+      "low": {
+        "meanMs": 372.0833333333333,
+        "p95Ms": 1302.0999999996275,
+        "fps": 4.735595895816891,
+        "ms": 211.16666666666666,
+        "quality": "low",
+        "renderer": "three",
+        "calls": 169,
+        "triangles": 582555
+      }
+    }
+  },
+  "conditions": "Chrome 131, SwiftShader software renderer, 1280x800; 18 frames after six warm-up frames; main-pass draw/triangle counts. No hardware FPS claim."
+}

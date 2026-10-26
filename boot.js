@@ -13,9 +13,9 @@
   window.VN_DEBUG = q.get('debug') === '1';
   // Build stamp: every game script loads as name.js?v=BUILD, so a browser holding an older copy in its cache (the
   // Python server sends no cache headers) can't mix old scripts into a new page. Bump it with each build.
-  const BUILD = 'v25-reference';
+  const BUILD = 'v26-sculpted';
 
-  const BEFORE = ['data.js', 'regions.js', 'layout.js', 'models.js', 'rocks.js', 'dunes.js', 'visual-details.js', 'scenic-landmarks.js', 'world-cosmetics.js', 'kingdom-diorama.js', 'kingdom-landmarks.js', 'country-overview.js', 'west-clay.js', 'east-clay.js', 'neom-clay.js', 'riyadh.js', 'city-art.js', 'ui-icons.js', 'soundscape.js', 'premium.js', 'assets.js'];
+  const BEFORE = ['data.js', 'regions.js', 'layout.js', 'models.js', 'rocks.js', 'dunes.js', 'visual-details.js', 'scenic-landmarks.js', 'world-cosmetics.js', 'kingdom-diorama.js', 'kingdom-landmarks.js', 'sculpted-world.js', 'country-overview.js', 'west-clay.js', 'east-clay.js', 'neom-clay.js', 'riyadh.js', 'city-art.js', 'ui-icons.js', 'soundscape.js', 'premium.js', 'assets.js'];
   const AFTER = ['sim.js', 'saves.js', 'game.js', 'competitiveness.js', 'mission.js', 'i18n.js', 'play_core.js', 'play_mission.js', 'city.js', 'lens.js', 'city_ui.js', 'national_ar.js', 'help.js', 'tutorial.js'];
   let loaded=0;
   const status=document.getElementById('bootStatus'), progress=document.getElementById('bootProgress');

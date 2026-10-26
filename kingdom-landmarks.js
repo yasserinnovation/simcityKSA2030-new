@@ -93,14 +93,14 @@ window.VisionKingdomLandmarks = function(ctx){
     const sd = proj('sindalah'); if (sd && !onLand(sd[0], sd[1])) { stamp(S.cyl, sd[0], -.175, sd[1], .04, .012, .03, 0xf0e2c0); for (let i = 0; i < 3; i++) tower(sd[0] - .015 + i * .015, sd[1], .01, .03, 0xf4f5f2); } }
 
   // ---- AlUla: sandstone outcrops (an elephant-like arch, mesas) and a carved tomb facade
-  { const [x, z] = city('AlUla'); at(x, z);
+  if(!window.VisionSculptedWorld){ const [x, z] = city('AlUla'); at(x, z);
     for (let i = 0; i < 9; i++) { const px = x - .12 + R() * .24, pz = z - .1 + R() * .2, w = .03 + R() * .03, h = .03 + R() * .05; stamp(S.cube, px, G + h / 2, pz, w, h, w * (.7 + R() * .5), pick([0xb8693f, 0xa95f39, 0xc9784a]), .72); stamp(S.cube, px, G + h + .003, pz, w * .85, .006, w * .7, 0xd18a57); }
     for(const dx of[-.024,.024])stamp(S.cyl,x+.05+dx,G+.018,z+.05,.009,.036,.012,0xb86a40,.7);
     for(let k=0;k<9;k++){const a=k/8*Math.PI;stamp(S.orb,x+.05+Math.cos(a)*.024,G+.034+Math.sin(a)*.018,z+.05,.011,.009,.012,0xc27a4b,.8);}   // arch with light beneath
     stamp(S.cube, x - .05, G + .025, z + .07, .05, .05, .03, 0xc27a4b, .74); stamp(S.cube, x - .05, G + .022, z + .086, .014, .022, .002, 0x6e3d22); stamp(S.cone, x - .05, G + .043, z + .086, .012, .008, .002, 0x8a5030); }
 
   // V25 AlUla: actual stepped sandstone geometry and carved portal details.
-  {const [x,z]=city('AlUla');at(x,z);
+  if(!window.VisionSculptedWorld){const [x,z]=city('AlUla');at(x,z);
    const tx=x-.05,tz=z+.07;
    for(let k=0;k<5;k++)stamp(S.cube,tx,G+.049+k*.003,tz,.055-k*.006,.003,.034,0xe0a46b);
    for(const d of[-.019,.019]){stamp(S.cube,tx+d,G+.027,tz+.017,.004,.035,.004,0xe2ab77);stamp(S.cube,tx+d,G+.045,tz+.017,.008,.003,.006,0xf0bc86);}

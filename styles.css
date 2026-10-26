@@ -1402,3 +1402,10 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
 }
 
 @media(min-width:781px){#menu .menu-regions{width:max-content}#menu .menu-regions .region-nav{max-width:none}}
+/* V26: a quieter navy frame and a directly inspectable AlUla landmark. */
+#mapLabels .map-label[data-scenic]{pointer-events:auto;cursor:pointer}
+#mapLabels .map-label[data-scenic]:hover{border-color:#ffdc91;box-shadow:0 3px 12px rgba(13,33,38,.3)}
+#mapLabels .map-label.badge{font-size:12px;border-radius:6px;padding:5px 9px;letter-spacing:.01em}
+#menu .menu-regions,.mn-nav{background:linear-gradient(135deg,#173b57,#102b44)!important}
+#menu .menu-card.collapsed .menu-foot{display:none}
+#menu .menu-card.collapsed{background:rgba(248,246,237,.95);border-radius:12px}
