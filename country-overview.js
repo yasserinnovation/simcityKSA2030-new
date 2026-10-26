@@ -21,7 +21,7 @@ window.VisionCountryOverview=function(T,scene,D,LY,geo,border,onLand,existingRoc
   h+=(1-smooth(42.6,45.6,inverseX(x)))*Math.pow(Math.max(0,ridges(x*2.1-3,z*2.1+5)-.44),1.4)*.12;   // V22: rugged western shield (red rock hills, reference)
   const sum=h+desertHeight(x,z);return sum>0?sum*clearance(x,z):0;}
  const inverseZ=z=>D.projection.lat0-z/D.projection.scale;
- function terrainColor(x,z,h){const lat=inverseZ(z),sand=[.99,.74,.38],rock=[.76,.40,.24],green=[.27,.56,.22],dh=desertHeight(x,z),r=h-dh;let c=mix(sand,rock,smooth(.012,.09,r));c=mix(c,[.88,.58,.36],smooth(.15,.32,r)*.55);c=mix(c,[1,.82,.52],smooth(.012,.045,dh)*.5);const tone=.93+.13*vnoise(x*1.7+9,z*1.7-4)+.04*vnoise(x*7,z*7);  return mix(c,green,(1-smooth(19.4,21.4,lat))*smooth(.03,.11,r)*.86).map(v=>v*tone)}
+ function terrainColor(x,z,h){const lat=inverseZ(z),sand=[.86,.75,.57],rock=[.65,.43,.30],green=[.28,.43,.29],dh=desertHeight(x,z),r=h-dh;let c=mix(sand,rock,smooth(.012,.09,r));c=mix(c,[.80,.60,.43],smooth(.15,.32,r)*.55);c=mix(c,[.94,.84,.65],smooth(.012,.045,dh)*.5);const tone=.93+.13*vnoise(x*1.7+9,z*1.7-4)+.04*vnoise(x*7,z*7);  return mix(c,green,(1-smooth(19.4,21.4,lat))*smooth(.03,.11,r)*.86).map(v=>v*tone)}
  const minX=Math.min(...border.map(p=>p[0])),maxX=Math.max(...border.map(p=>p[0])),minZ=Math.min(...border.map(p=>p[1])),maxZ=Math.max(...border.map(p=>p[1]));
  function landscape(step){const nx=Math.ceil((maxX-minX)/step)+1,nz=Math.ceil((maxZ-minZ)/step)+1,p=[],c=[],idx=[],hs=[];
   for(let j=0;j<nz;j++)for(let i=0;i<nx;i++){const x=minX+i*step,z=minZ+j*step,h=height(x,z);hs.push(h);p.push(x,G+.0065+h,z);c.push(...terrainColor(x,z,h));}

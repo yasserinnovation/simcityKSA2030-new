@@ -1,8 +1,15 @@
-# Vision Nexus 2030 — The Kingdom in Motion (build V23 — Kingdom diorama)
+# Vision Nexus 2030 — The Kingdom in Motion (build V24 — Cinematic districts)
 
-The build label is shown in the bottom corner of the screen. If you see a "Strategic Actions" panel, "Path to 2030" or a calendar past 2030, you are running an older copy of the files.
+The build label is shown in the bottom corner of the screen. This version reads **V24 (Cinematic districts)**.
 
 An unofficial Saudi strategy game in the browser (WebGL, no install, no build step).
+
+V24 adds original Najdi courtyard villas, glazed shopfronts, recognizable service buildings, shaded gardens, road crossings and instanced traffic to the **actual City Builder**. A sandstone/teal palette, restrained contact shading, material grain, glass reflections and warmer directional light carry through the existing Three.js world. The interface has matching SVG icons, a loading screen and persistent master-volume/ambience controls. The simulation, campaign, controls and save formats remain compatible.
+
+Start with `npm start` and open **http://127.0.0.1:8123**. No `npm install` is needed to play. Choose **City Builder** or the guided neighbourhood tutorial to see the new architecture grow through normal play. High/Ultra show the fullest treatment; Medium and Reduced progressively omit expensive effects and small details.
+
+[Before/after gallery](docs/cinematic-v24/review.html) · [Changes, validation and measured performance](docs/cinematic-v24/NOTES.md)
+
 ## How to launch (works offline)
 The game runs from a tiny local web server, because browsers block the ES modules, models and textures of the three.js renderer on `file://` pages. Nothing is downloaded from the internet: three.js and the fonts are in `vendor/`.
 - **Windows:** double-click `Launch_Prototype.bat`. It starts `node tools/serve.js 8123` (which sends no-cache headers), or `python -m http.server 8123` if Node is missing and opens http://127.0.0.1:8123.
@@ -10,9 +17,10 @@ The game runs from a tiny local web server, because browsers block the ES module
 - **macOS / Linux:** run `./launch.sh` (same fallbacks).
 - **Any system with Node:** `npm start`, then open http://127.0.0.1:8123.
 - **Renderers:** http://127.0.0.1:8123/index.html uses the three.js renderer; add `?renderer=classic` for the original hand-written WebGL renderer (kept for comparison). Opening `index.html` directly from disk still works and uses the classic renderer. Add `?debug=1` for the frame-time counter.
-- **Updating an existing copy:** replace the whole `VisionNexus2030` folder (new files such as `kingdom-landmarks.js`, `premium.js`, `assets.js`, `assets/models/` and `vendor/three/addons/` must all be present), then reload the page with Ctrl+F5 so the browser drops cached scripts. The badge in the bottom corner should read **build V23 (Kingdom diorama)**. Saves are kept: they live in the browser, not in the folder.
+- **Updating an existing copy:** replace the whole project folder (including `city-art.js`, `ui-icons.js`, `soundscape.js`, `assets/` and `vendor/`), then reload the page with Ctrl+F5. The badge should read **build V24 (Cinematic districts)**. Saves are kept in the browser; use the same browser and local address to retain them.
 - **Development install (tests only, the game itself needs nothing):** Node.js 18 or newer, then `npm install` once in this folder. It installs only `playwright-core`, which drives your installed Chrome or Edge; no browser is downloaded.
 - **Tests:** `npm test` (game logic, headless), `npm run test:render` (both renderers), `npm run test:tutorial` (tutorial and City Builder, desktop and phone, English and Arabic) and `npm run test:premium` (graphics presets, GLB models, phone). Visual captures: `npm run check:premium` and `node tools/check-kingdom-map.js after`.
+- **V24 checks:** `npm run test:cinematic` (parcel geometry, camera, selection, audio persistence and phone RTL settings), `npm run check:cinematic` (matched gameplay screenshots and timing report). Set `CHROME_PATH` to your browser executable if Chrome is not on the default path. The capture script explicitly uses software rendering for reproducibility; its timings do not predict device GPU performance.
 
 ## Renderer upgrade (build V8)
 The 3D world is drawn by **three.js** (vendored in `vendor/three`). The upgrade toward a cinematic, Unreal-like look happens in phases; each phase has notes and comparison screenshots in `docs/`.

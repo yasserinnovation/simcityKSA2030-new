@@ -1,0 +1,37 @@
+// Original 24px line icons: consistent, local, legible without an emoji font.
+(() => {
+  const paths={
+    home:'M3 5l6-2 6 2 6-2v16l-6 2-6-2-6 2V5zm6-2v16m6-14v16',
+    missions:'M20 12a8 8 0 1 1-8-8m8-2-8 10m8-10v5h-5m1 5a4 4 0 1 1-4-4',
+    city:'M3 21h18M6 21V4h12M6 8h14l-8-4m8 4v6m-2 0h4M4 13h4m-4 4h4',
+    national:'M12 2l9 10-9 10L3 12 12 2zm4 6-2 6-6 2 2-6 6-2z',
+    select:'M5 3l14 9-7 2-3 7-4-18z',road:'M7 3 4 21m13-18 3 18M12 3v4m0 3v4m0 3v4',
+    avenue:'M7 3 4 21m13-18 3 18M12 3v18m-2-8h4',remove:'M4 7h16M9 7V3h6v4M6 7l1 14h10l1-14M10 10v7m4-7v7',
+    rail:'M6 3h12v14H6V3zm0 6h12M8 17l-3 4m11-4 3 4M8 13h1m6 0h1',
+    zoneR:'M3 11l9-8 9 8M5 10v11h14V10M10 21v-7h4v7',
+    zoneC:'M4 9h16v12H4V9zm-1 0 2-6h14l2 6M8 3v6m8-6v6M9 21v-7h6v7',
+    zoneI:'M3 21V11l6-4v4l6-4v14H3zm12 0h6V3h-4v9M6 16h1m4 0h1',
+    zoneT:'M5 21V3h14v18M3 21h18M9 6h1m4 0h1m-6 4h1m4 0h1M9 14h1m4 0h1m-5 7v-4h4v4',
+    zoneM:'M2 12l6-6 6 6M4 11v10h8V11m1-6h7v16h-6m2-13h1m-1 4h1m-1 4h1',
+    gas:'M12 2c1 6 7 7 7 12a7 7 0 0 1-14 0c0-4 3-6 4-7 0 4 2 4 2 4l1-9z',
+    solar:'M4 10h16l2 9H2l2-9zm8 0v9m-9-4h18m-9 4v3M7 4h1m4-3v2m4 1h1',
+    battery:'M5 6h14v15H5V6zm4 0V3h6v3m-3 5-3 4h6l-3 4',
+    pump:'M12 2c-3 5-7 8-7 12a7 7 0 0 0 14 0c0-4-4-7-7-12zM8 15c0 2 2 3 4 3',
+    tower:'M5 4h14v6l-3 3H8l-3-3V4zm3 9-2 9m10-9 2 9M7 18h10',
+    school:'M2 8l10-5 10 5-10 5L2 8zm4 3v6l6 3 6-3v-6m4-3v8',
+    training:'M3 4h18v13H3V4zm9 13v4m-4 0h8M7 13l3-3 3 2 4-5',
+    clinic:'M8 3h8v5h5v8h-5v5H8v-5H3V8h5V3z',
+    park:'M12 2l6 8h-3l5 7H4l5-7H6l6-8zm0 15v5',
+    emergency:'M12 2 3 6v7c0 4 9 9 9 9s9-5 9-9V6l-9-4zm0 5v10m-5-5h10',
+    digital:'M12 12v10m-4 0h8M7 5a7 7 0 0 0 0 10m10-10a7 7 0 0 1 0 10M4 2a11 11 0 0 0 0 16m16-16a11 11 0 0 1 0 16',
+    terminal:'M3 8l9-5 9 5v12H3V8zm5 12v-8h8v8m-4-8v8',
+    invest:'M3 21h18M5 17v-5h3v5m3 0V8h3v9m3 0V3h3v14',
+    route:'M5 3h14v16H5V3zm0 7h14M8 19v3m8-3v3M8 14h1m6 0h1',
+    lock:'M5 10h14v11H5V10zm3 0V7a4 4 0 0 1 8 0v3m-4 4v3',
+    save:'M4 3h14l3 3v15H3V3h1zm3 0v7h10V3M7 21v-7h10v7',
+    goals:'M6 3h12v18H6V3zm3 5h6m-6 4h6m-6 4h4',
+    overlays:'M12 3l10 5-10 5L2 8l10-5zm-10 9 10 5 10-5M2 16l10 5 10-5',
+    budget:'M3 6h18v14H3V6zm0 4h18M15 14h6',
+  };
+  window.VisionIcon=id=>`<svg class="vn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${paths[id]||paths.city}"/></svg>`;
+})();

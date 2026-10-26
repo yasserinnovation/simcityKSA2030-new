@@ -1,0 +1,11 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Vision Nexus 2030 · V24 comparison</title>
+<style>
+*{box-sizing:border-box}body{margin:0;padding:28px;background:#10282e;color:#ece5d5;font:16px/1.6 system-ui,sans-serif}header{max-width:960px;margin:0 auto 26px}h1{font-size:clamp(26px,4vw,42px);margin:0;color:#e3c68e}p{color:#bacdca;margin:12px 0}a{color:#e3c68e}select{padding:10px;border:1px solid #637a78;border-radius:8px;background:#203e43;color:#fff;font:inherit}main{display:grid;grid-template-columns:1fr 1fr;gap:20px;max-width:1800px;margin:auto}figure{margin:0;background:#1c363c;border:1px solid #466063;border-radius:12px;overflow:hidden}figcaption{padding:12px 16px;color:#dfc698}img{display:block;width:100%;height:auto}footer{max-width:960px;margin:24px auto;color:#9db5b2} @media(max-width:850px){body{padding:16px}main{grid-template-columns:1fr}}
+</style>
+<header><h1>The district, brought to life</h1><p>Original gameplay captures at the same camera, quality setting and simulation state. The district grows normally: roads, zoning, utilities, 16 months of simulation, and 38 occupied plots. Unfinished plots remain visible.</p><p><a href="../../index.html">Play V24</a> · <a href="NOTES.md">Implementation and test report</a></p><label for="view">Compare view </label><select id="view"><option value="city">City Builder · scenery</option><option value="city-ui">City Builder · interface</option><option value="riyadh">Riyadh · close aerial</option><option value="kingdom-ui">Kingdom · home screen</option></select></header>
+<main><figure><figcaption>Before · original repository</figcaption><img id="before" alt="Original game"></figure><figure><figcaption>After · cinematic districts</figcaption><img id="after" alt="Updated game"></figure></main>
+<footer>Existing Three.js engine and authored world. Original procedural architecture, light, materials and sound; no Unreal Engine migration. <a href="after/city-night.jpg">Night view</a> · <a href="after/mobile-settings.jpg">Phone settings in Arabic</a></footer>
+<script>const v=document.querySelector('#view');function show(){for(const s of ['before','after'])document.getElementById(s).src=s+'/'+v.value+'.jpg';}v.addEventListener('change',show);show();</script>
+</html>
