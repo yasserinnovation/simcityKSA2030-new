@@ -49,7 +49,7 @@ window.VisionSculptedWorld=function({T,stamp,S,G,geo,LY,onLand,height,clearance,
  // The west's mountain spine gets large, legible cliff faces instead of scattered pebbles.
  for(let i=1;i<spine.length;i++){const a=spine[i-1],b=spine[i],l=Math.hypot(b[0]-a[0],b[1]-a[1]);for(let t=.05;t<l;t+=.13){const f=t/l,px=a[0]+(b[0]-a[0])*f,pz=a[1]+(b[1]-a[1])*f;
   if(!onLand(px,pz)||clearance(px,pz)<.95||Math.hypot(px-x,pz-z)<.48)continue;
-  rock(px,pz,.07+R()*.06,.06+R()*.05,.13+R()*.22,700+parts.rocks,G+height(px,pz)*.55);
+  rock(px,pz,.09+R()*.06,.07+R()*.05,.10+R()*.15,700+parts.rocks,G+height(px,pz)*.55);
  }}
  for(const g of owned)g.dispose();return parts;
 };

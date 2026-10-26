@@ -1,33 +1,45 @@
-# Vision Nexus 2030 — The Kingdom in Motion (build V26 — Sculpted Saudi world)
+# Vision Nexus 2030 — V27 Kingdom Atlas
 
-The build label is shown in the bottom corner of the screen. This version reads **V26 (Sculpted Saudi world)**.
+A Saudi city-building and strategy game for the browser, using the existing Three.js/WebGL engine. This is the complete cumulative project; no build step or asset downloads are required to play.
 
-An unofficial Saudi strategy game in the browser (WebGL, no install, no build step).
+**V27 focuses on the whole-country view.** It adds planned settlement districts, a broader western mountain belt, more sculpted dune fields, terraced southern greenery, port infrastructure, smaller regional palms and brighter blue/turquoise water. The Kingdom Centre has a new tapered, open-crown silhouette. Animated national traffic follows the displayed roads and rail routes. The regional plans, game modes, project IDs, progression, controls and save formats are retained.
 
-**V26 adds a representative northwest/AlUla art rebuild.** Click the **AlUla** map label to inspect carved sandstone facades, eroded rock formations, a paved heritage village and original palm meshes. The new scenery stays visible as you zoom into that area. National geometry now casts and receives the existing renderer's sun shadows on Medium/High/Ultra; Reduced keeps the cheaper baked-light treatment. The sea has a brighter turquoise-to-blue palette. This is an art-development pass, not a claim of matching the reference illustration across every region.
+[Before/after screenshots and verification](docs/atlas-v27/NOTES.md) · [Visual comparison gallery](docs/atlas-v27/review.html)
 
-[V26 screenshots and test report](docs/sculpted-v26/NOTES.md). Start the complete project with `npm start` or **Launch_Prototype.bat**, then open **http://127.0.0.1:8123**. Enter the folder containing `package.json` first. No development install is needed to play.
+## Start on Windows
 
-V25 develops the national map into a brighter miniature Saudi world: working sculpted dune fields, stratified western rocks, southern terraces, detailed AlUla sandstone architecture, finer settlement facades, smaller regional palms, restrained highways and muted neighbouring terrain. Boats follow land-checked water circuits; palms and soft clouds move gently. Six labelled regional controls and a compact launcher keep the map in view. Everything is real 3D geometry, with original procedural assets and no flat reference-image replacement.
+1. Extract the complete ZIP. Enter the folder containing **package.json** and **Launch_Prototype.bat**. If there is another folder with the same name inside, enter that inner folder.
+2. **Close the old game server window first** (press Ctrl+C in it). An older copy can otherwise keep serving the old game at the same address.
+3. Double-click **Launch_Prototype.bat**. Keep its terminal window open while playing. It opens the browser only after verifying the running server.
+4. Look for the **V27 · Kingdom Atlas** badge near the upper-right corner. The address is **http://127.0.0.1:8123**.
 
-This includes the V24 City Builder improvements: courtyard villas, shops, service buildings, gardens, instanced traffic, material detail, contact shading, SVG controls, loading feedback and persistent audio controls. Existing missions, National Simulation, progression, Arabic, controls and browser save formats are retained.
+Or open a terminal in that folder and run:
 
-**Windows:** extract the ZIP, open the folder containing `package.json` and `Launch_Prototype.bat`, then double-click **Launch_Prototype.bat**. Or run `npm start` from that folder and open **http://127.0.0.1:8123**. No `npm install` is needed to play. If the extracted ZIP contains another folder of the same name, enter that inner folder first.
+```sh
+npm start
+```
 
-[National map before/after gallery](docs/reference-v25/review.html) · [V25 changes, tests and performance](docs/reference-v25/NOTES.md) · [City Builder comparison](docs/cinematic-v24/review.html)
+Then open **http://127.0.0.1:8123**. No `npm install` is needed to play. Node.js or Python 3 is required for the launcher; all game assets and fonts are included.
 
-## How to launch (works offline)
-The game runs from a tiny local web server, because browsers block the ES modules, models and textures of the three.js renderer on `file://` pages. Nothing is downloaded from the internet: three.js and the fonts are in `vendor/`.
-- **Windows:** double-click `Launch_Prototype.bat`. It starts `node tools/serve.js 8123` (which sends no-cache headers), or `python -m http.server 8123` if Node is missing and opens http://127.0.0.1:8123.
-- **Why port 8123 on 127.0.0.1:** Docker Desktop and WSL also listen on port 8000, and browsers send `localhost` to IPv6 `::1`, where they answer with an empty page (`ERR_EMPTY_RESPONSE`). Always use http://127.0.0.1:8123.
-- **macOS / Linux:** run `./launch.sh` (same fallbacks).
-- **Any system with Node:** `npm start`, then open http://127.0.0.1:8123.
-- **Renderers:** http://127.0.0.1:8123/index.html uses the three.js renderer; add `?renderer=classic` for the original hand-written WebGL renderer (kept for comparison). Opening `index.html` directly from disk still works and uses the classic renderer. Add `?debug=1` for the frame-time counter.
-- **Updating an existing copy:** replace the whole project folder (including `city-art.js`, `ui-icons.js`, `soundscape.js`, `assets/` and `vendor/`), then reload the page with Ctrl+F5. The badge should read **build V26 (Sculpted Saudi world)**. Saves are kept in the browser; use the same browser and local address to retain them.
-- **Development install (tests only, the game itself needs nothing):** Node.js 18 or newer, then `npm install` once in this folder. It installs only `playwright-core`, which drives your installed Chrome or Edge; no browser is downloaded.
-- **Tests:** `npm test` (game logic, headless), `npm run test:render` (both renderers), `npm run test:tutorial` (tutorial and City Builder, desktop and phone, English and Arabic) and `npm run test:premium` (graphics presets, GLB models, phone). Visual captures: `npm run check:premium` and `node tools/check-kingdom-map.js after`.
-- **V25 checks:** `npm run test:reference` (terrain population, six region controls, expanded menu, phone RTL and asset loading), `npm run check:reference` (matched V24/V25 map captures).
-- **V24 checks:** `npm run test:cinematic` (parcel geometry, camera, selection, audio persistence and phone RTL settings), `npm run check:cinematic` (matched gameplay screenshots and timing report). Set `CHROME_PATH` to your browser executable if Chrome is not on the default path. The capture script explicitly uses software rendering for reproducibility; its timings do not predict device GPU performance.
+If the launcher says **“Port 8123 is serving another copy or application”**, it deliberately does not open that old copy. Close the previous server and run the launcher again. It never kills another process or silently switches ports. If the identical current folder is already serving V27, it safely reuses it.
+
+**Saves:** keep using the same browser and **http://127.0.0.1:8123**. Browser storage belongs to that origin; switching to `localhost` or another port appears to have different saves. V27 does not change storage keys or migrate/reset existing worlds. Refresh with Ctrl+F5 after the correct server is running.
+
+## Find the AlUla scene
+
+Click **AlUla / العُلا** on the Kingdom map. Both that map label and **Journey Through Time · AlUla** in the National Simulation project list now use the same camera framing. The sandstone tomb facades, village and oasis stay visible when you zoom closer. Use **Kingdom** in the bottom navigation to return to the national view.
+
+The six bottom controls still open Kingdom, Riyadh, Makkah & West, NEOM & Northwest, Eastern, and Aseer & South. Drag to orbit; right-drag or WASD to pan; scroll or pinch to zoom. Existing menus and the Arabic interface remain available.
+
+## Other launch options and verification
+
+- macOS/Linux: run `./launch.sh`. It verifies startup using Node or the included Python 3 fallback.
+- Use the launcher or HTTP address for the new scenery. Opening `index.html` as a file uses the original classic renderer, which does not contain the new national art. Its badge explicitly reads **V27 · Classic renderer**.
+- Development tests require `npm install` and an installed Chrome/Edge, or `CHROME_PATH` pointing to a browser executable. Run `npm test`, `npm run test:launcher`, `npm run test:atlas`, `npm run test:render`, `npm run test:cinematic`, and `npm run test:tutorial`.
+- `npm run check:atlas` records actual browser screenshots and a short rendering-timing sample. `node tools/check-atlas.js before` also needs the V26 Git history for baseline source files. Neither history nor test dependencies are needed to play the ZIP.
+- Reduced, Medium, High and Ultra remain in Settings. Measured software-rendering results and limitations are in the verification report; physical-device frame rate has not been benchmarked.
+
+The country map is still a stylized miniature using the existing illustrative geography. It is not a survey map or a finished match for the painted reference. Regional close-up planning views retain their previous assets, except the persistent AlUla scene. The newly composed settlements are existing-world scenery; project construction status remains driven by the original simulation.
 
 ## Renderer upgrade (build V8)
 The 3D world is drawn by **three.js** (vendored in `vendor/three`). The upgrade toward a cinematic, Unreal-like look happens in phases; each phase has notes and comparison screenshots in `docs/`.

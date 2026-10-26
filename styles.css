@@ -1409,3 +1409,11 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
 #menu .menu-regions,.mn-nav{background:linear-gradient(135deg,#173b57,#102b44)!important}
 #menu .menu-card.collapsed .menu-foot{display:none}
 #menu .menu-card.collapsed{background:rgba(248,246,237,.95);border-radius:12px}
+
+/* V27: an unmistakable build marker, including small screens; no overlap with region navigation. */
+.build-badge{display:block;inset-block-start:82px;inset-block-end:auto;inset-inline-end:14px;color:#f2e7cd;background:rgba(17,43,65,.92);border:1px solid rgba(220,190,130,.42);padding:5px 9px;border-radius:5px;font-size:11px;line-height:1.4;opacity:1;text-shadow:none;max-width:210px}
+#mapLabels .map-label.badge{box-shadow:0 3px 8px rgba(13,33,38,.17);border-color:rgba(250,229,178,.9)}
+@media(max-width:780px){.build-badge{inset-block-start:140px;inset-inline-end:8px;font-size:10px;padding:3px 6px}}
+/* Keep the original tutorial entry available in the compact launcher. */
+#menu .menu-card.collapsed .menu-foot{display:flex;justify-content:center;margin-top:4px}
+#menu .menu-card.collapsed #tutBtn{font-size:11px;padding:3px 2px;line-height:1.3;min-height:24px}

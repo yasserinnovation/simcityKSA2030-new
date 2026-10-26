@@ -17,7 +17,10 @@
     "check:reference": "node tools/check-reference.js after",
     "test:reference": "node tests/reference.smoke.js",
     "test:sculpted": "node tests/sculpted.smoke.js",
-    "check:sculpted": "node tools/check-sculpted.js after"
+    "check:sculpted": "node tools/check-sculpted.js after",
+    "test:launcher": "node tests/launcher.test.js",
+    "test:atlas": "node tests/atlas.smoke.js",
+    "check:atlas": "node tools/check-atlas.js after"
   },
   "devDependencies": {
     "playwright-core": "1.64.1"
