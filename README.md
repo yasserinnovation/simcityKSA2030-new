@@ -1,14 +1,16 @@
-# Vision Nexus 2030 — The Kingdom in Motion (build V24 — Cinematic districts)
+# Vision Nexus 2030 — The Kingdom in Motion (build V25 — Saudi miniature world)
 
-The build label is shown in the bottom corner of the screen. This version reads **V24 (Cinematic districts)**.
+The build label is shown in the bottom corner of the screen. This version reads **V25 (Saudi miniature world)**.
 
 An unofficial Saudi strategy game in the browser (WebGL, no install, no build step).
 
-V24 adds original Najdi courtyard villas, glazed shopfronts, recognizable service buildings, shaded gardens, road crossings and instanced traffic to the **actual City Builder**. A sandstone/teal palette, restrained contact shading, material grain, glass reflections and warmer directional light carry through the existing Three.js world. The interface has matching SVG icons, a loading screen and persistent master-volume/ambience controls. The simulation, campaign, controls and save formats remain compatible.
+V25 develops the national map into a brighter miniature Saudi world: working sculpted dune fields, stratified western rocks, southern terraces, detailed AlUla sandstone architecture, finer settlement facades, smaller regional palms, restrained highways and muted neighbouring terrain. Boats follow land-checked water circuits; palms and soft clouds move gently. Six labelled regional controls and a compact launcher keep the map in view. Everything is real 3D geometry, with original procedural assets and no flat reference-image replacement.
 
-Start with `npm start` and open **http://127.0.0.1:8123**. No `npm install` is needed to play. Choose **City Builder** or the guided neighbourhood tutorial to see the new architecture grow through normal play. High/Ultra show the fullest treatment; Medium and Reduced progressively omit expensive effects and small details.
+This includes the V24 City Builder improvements: courtyard villas, shops, service buildings, gardens, instanced traffic, material detail, contact shading, SVG controls, loading feedback and persistent audio controls. Existing missions, National Simulation, progression, Arabic, controls and browser save formats are retained.
 
-[Before/after gallery](docs/cinematic-v24/review.html) · [Changes, validation and measured performance](docs/cinematic-v24/NOTES.md)
+**Windows:** extract the ZIP, open the folder containing `package.json` and `Launch_Prototype.bat`, then double-click **Launch_Prototype.bat**. Or run `npm start` from that folder and open **http://127.0.0.1:8123**. No `npm install` is needed to play. If the extracted ZIP contains another folder of the same name, enter that inner folder first.
+
+[National map before/after gallery](docs/reference-v25/review.html) · [V25 changes, tests and performance](docs/reference-v25/NOTES.md) · [City Builder comparison](docs/cinematic-v24/review.html)
 
 ## How to launch (works offline)
 The game runs from a tiny local web server, because browsers block the ES modules, models and textures of the three.js renderer on `file://` pages. Nothing is downloaded from the internet: three.js and the fonts are in `vendor/`.
@@ -17,9 +19,10 @@ The game runs from a tiny local web server, because browsers block the ES module
 - **macOS / Linux:** run `./launch.sh` (same fallbacks).
 - **Any system with Node:** `npm start`, then open http://127.0.0.1:8123.
 - **Renderers:** http://127.0.0.1:8123/index.html uses the three.js renderer; add `?renderer=classic` for the original hand-written WebGL renderer (kept for comparison). Opening `index.html` directly from disk still works and uses the classic renderer. Add `?debug=1` for the frame-time counter.
-- **Updating an existing copy:** replace the whole project folder (including `city-art.js`, `ui-icons.js`, `soundscape.js`, `assets/` and `vendor/`), then reload the page with Ctrl+F5. The badge should read **build V24 (Cinematic districts)**. Saves are kept in the browser; use the same browser and local address to retain them.
+- **Updating an existing copy:** replace the whole project folder (including `city-art.js`, `ui-icons.js`, `soundscape.js`, `assets/` and `vendor/`), then reload the page with Ctrl+F5. The badge should read **build V25 (Saudi miniature world)**. Saves are kept in the browser; use the same browser and local address to retain them.
 - **Development install (tests only, the game itself needs nothing):** Node.js 18 or newer, then `npm install` once in this folder. It installs only `playwright-core`, which drives your installed Chrome or Edge; no browser is downloaded.
 - **Tests:** `npm test` (game logic, headless), `npm run test:render` (both renderers), `npm run test:tutorial` (tutorial and City Builder, desktop and phone, English and Arabic) and `npm run test:premium` (graphics presets, GLB models, phone). Visual captures: `npm run check:premium` and `node tools/check-kingdom-map.js after`.
+- **V25 checks:** `npm run test:reference` (terrain population, six region controls, expanded menu, phone RTL and asset loading), `npm run check:reference` (matched V24/V25 map captures).
 - **V24 checks:** `npm run test:cinematic` (parcel geometry, camera, selection, audio persistence and phone RTL settings), `npm run check:cinematic` (matched gameplay screenshots and timing report). Set `CHROME_PATH` to your browser executable if Chrome is not on the default path. The capture script explicitly uses software rendering for reproducibility; its timings do not predict device GPU performance.
 
 ## Renderer upgrade (build V8)

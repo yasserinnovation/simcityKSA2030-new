@@ -6,7 +6,7 @@ window.VisionKingdomLandmarks = function(ctx){
   const {S, G, onLand, geo, D, LY, R} = ctx;
   // Illustrated-map exaggeration about each city's anchor: footprints grow by SZ, heights by SY, their spread by OFF
   // (V22: the reference draws its skylines about three times the V21 size). Sea objects keep their water level.
-  const SZ = 2.5, SY = 3.3, OFF = 2.2; let ax = 0, az = 0; const at = (x, z) => { ax = x; az = z; };
+  const SZ = 2.5, SY = 3.0, OFF = 2.2; let ax = 0, az = 0; const at = (x, z) => { ax = x; az = z; };
   const stamp = (shape, x, y, z, sx, sy, sz, hex, bottom) => ctx.stamp(shape, ax + (x - ax) * OFF, y < G ? y : G + (y - G) * SY, az + (z - az) * OFF, sx * SZ, sy * SY, sz * SZ, hex, bottom);
   const city = n => LY.cityDisplay[n] || (c => [c.x, c.z])(D.cities.find(c => c.name === n));
   const proj = id => { const p = D.projects.find(q => q.id === id); return p ? [p.x, p.z] : null; };
@@ -20,7 +20,10 @@ window.VisionKingdomLandmarks = function(ctx){
   function tower(x, z, w, h, col, spire){ stamp(S.cube, x, G + h / 2, z, w, h, w * .9, col, .78);
     for (let k = 1; k < Math.min(9, h / .02); k++) stamp(S.cube, x, G + h * k / Math.min(9, h / .02), z, w * 1.04, .0016, w * .94, 0xe9f2f4);
     stamp(S.cube, x, G + h + .003, z, w * .8, .006, w * .7, 0xdfe8ea); if (spire) stamp(S.cone, x, G + h + .02, z, w * .18, .04, w * .18, 0xeef3f4); out.towers++; }
-  function lowBlock(x, z, w, h, col){ stamp(S.cube, x, G + h / 2, z, w, h, w * (.8 + R() * .4), col, .86); stamp(S.cube, x, G + h + .0015, z, w * 1.04, .003, w * 1.04, 0xf4e9d2); }
+  function lowBlock(x, z, w, h, col){ stamp(S.cube, x, G + h / 2, z, w, h, w * (.8 + R() * .4), col, .86); stamp(S.cube, x, G + h + .0015, z, w * 1.04, .003, w * 1.04, 0xf4e9d2);
+    for(const dx of [-.27,.27]){stamp(S.cube,x+dx*w,G+h*.52,z+w*.51,w*.17,h*.28,.0015,0x365b69);stamp(S.cube,x+w*.51,G+h*.52,z+dx*w,.0015,h*.28,w*.17,0x365b69);}
+    stamp(S.cube,x,G+h*.25,z+w*.52,w*.18,h*.5,.002,0x75533b);
+    stamp(S.cube,x-w*.22,G+h+.005,z-w*.18,w*.25,.007,w*.26,0xc6c1ad); }
   function najdi(x, z, w, h){ stamp(S.cube, x, G + h / 2, z, w, h, w, pick(MUD), .85); for (const sx of [-1, 1]) for (const sz of [-1, 1]) stamp(S.cube, x + sx * w * .42, G + h + .004, z + sz * w * .42, w * .14, .008, w * .14, 0xb07d4c); }
   function minaret(x, z, h){ stamp(S.cyl, x, G + h / 2, z, .0045, h, .0045, 0xf6f1e6); stamp(S.cyl, x, G + h * .72, z, .007, .004, .007, 0xe2d3ad); stamp(S.cone, x, G + h + .009, z, .0055, .018, .0055, 0xe0b54e); }
   function ship(x, z, rot, big){ out.ships.push([ax + (x - ax) * OFF, az + (z - az) * OFF, rot, big]); }
@@ -92,8 +95,20 @@ window.VisionKingdomLandmarks = function(ctx){
   // ---- AlUla: sandstone outcrops (an elephant-like arch, mesas) and a carved tomb facade
   { const [x, z] = city('AlUla'); at(x, z);
     for (let i = 0; i < 9; i++) { const px = x - .12 + R() * .24, pz = z - .1 + R() * .2, w = .03 + R() * .03, h = .03 + R() * .05; stamp(S.cube, px, G + h / 2, pz, w, h, w * (.7 + R() * .5), pick([0xb8693f, 0xa95f39, 0xc9784a]), .72); stamp(S.cube, px, G + h + .003, pz, w * .85, .006, w * .7, 0xd18a57); }
-    stamp(S.orb, x + .05, G + .03, z + .05, .035, .03, .025, 0xb86a40, .7); stamp(S.cube, x + .05, G + .008, z + .05, .016, .016, .03, 0xf0c27a);   // arch with light beneath
+    for(const dx of[-.024,.024])stamp(S.cyl,x+.05+dx,G+.018,z+.05,.009,.036,.012,0xb86a40,.7);
+    for(let k=0;k<9;k++){const a=k/8*Math.PI;stamp(S.orb,x+.05+Math.cos(a)*.024,G+.034+Math.sin(a)*.018,z+.05,.011,.009,.012,0xc27a4b,.8);}   // arch with light beneath
     stamp(S.cube, x - .05, G + .025, z + .07, .05, .05, .03, 0xc27a4b, .74); stamp(S.cube, x - .05, G + .022, z + .086, .014, .022, .002, 0x6e3d22); stamp(S.cone, x - .05, G + .043, z + .086, .012, .008, .002, 0x8a5030); }
+
+  // V25 AlUla: actual stepped sandstone geometry and carved portal details.
+  {const [x,z]=city('AlUla');at(x,z);
+   const tx=x-.05,tz=z+.07;
+   for(let k=0;k<5;k++)stamp(S.cube,tx,G+.049+k*.003,tz,.055-k*.006,.003,.034,0xe0a46b);
+   for(const d of[-.019,.019]){stamp(S.cube,tx+d,G+.027,tz+.017,.004,.035,.004,0xe2ab77);stamp(S.cube,tx+d,G+.045,tz+.017,.008,.003,.006,0xf0bc86);}
+   for(let i=0;i<14;i++){const a=i*2.39996,px=x+Math.cos(a)*(.13+i*.007),pz=z+Math.sin(a)*(.12+i*.004),h=.05+R()*.075;
+    if(!onLand(px,pz))continue;
+    for(let k=0;k<4;k++){const w=(.027+R()*.012)*(1-k*.10);stamp(S.rock,px,G+h*(k+.5)/4,pz,w,h/4,w*.72,[0x9b5736,0xbc7446,0xcc8954,0xe0a167][k],.8);}
+   }
+  }
 
   // ---- Tabuk, Sakakah, Hail, Buraydah, Hofuf, Najran: compact towns with a fort or a landmark tower
   for (const n of ['Tabuk', 'Sakakah', 'Hail', 'Buraydah', 'Hofuf', 'Najran']) { const [x, z] = city(n); at(x, z);
@@ -102,7 +117,7 @@ window.VisionKingdomLandmarks = function(ctx){
 
   // ---- Aseer (Abha, Taif, Rijal Almaa) highland villages: stone tower houses with white trim; Jazan: coastal town and port
   for (const n of ['Abha', 'Taif']) { const [x, z] = city(n); at(x, z);
-    ring(x, z, .12, 14, (px, pz) => { if (!onLand(px, pz)) return; const h = .02 + R() * .025; stamp(S.cube, px, G + h / 2 + ctx.height(px, pz), pz, .014, h, .014, pick([0x9b7b62, 0xb59072, 0xe9e1d0]), .8); stamp(S.cube, px, G + h + .002 + ctx.height(px, pz), pz, .015, .003, .015, 0xf5f2ea); }); }
+    ring(x, z, .12, 14, (px, pz) => { if (!onLand(px, pz)) return; const h = .02 + R() * .025; stamp(S.cube, px, G + h / 2 + ctx.height(ax+(px-ax)*OFF,az+(pz-az)*OFF)/SY, pz, .014, h, .014, pick([0x9b7b62, 0xb59072, 0xe9e1d0]), .8); stamp(S.cube, px, G + h + .002 + ctx.height(ax+(px-ax)*OFF,az+(pz-az)*OFF)/SY, pz, .015, .003, .015, 0xf5f2ea); }); }
   { const [x, z] = city('Jazan'), [cx, cz] = coastFrom(x, z, -1, .2); at(x, z);
     ring(x + .03, z, .09, 12, (px, pz) => { if (onLand(px, pz)) lowBlock(px, pz, .016, .012 + R() * .014, pick(STONE)); });
     for (let i = 0; i < 2; i++) stamp(S.cube, cx + .01, G + .03, cz - .02 + i * .03, .004, .06, .004, 0xd8473a); ship(cx - .08, cz, .2, false); ship(cx - .13, cz + .08, -.3, true); }

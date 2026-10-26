@@ -2308,8 +2308,9 @@
   labelLayer.addEventListener('click', e => { const rg=e.target.closest('[data-region]'); if (rg) { hideChoices(); onRegion(rg.dataset.region); return; }
     const el=e.target.closest('[data-pid]'); if (!el || !selectable) return; hideChoices(); pickSelect(el.dataset.pid); });
   let lastPick=null;   // last map selection (tests)
-  function regionZ(r){return r.z-(r.nationalFit?(regionFit(r)-1)*2.2:0);}   // V22: portrait screens centre the tilted Kingdom map lower, clear of the top bar
-  function regionFit(r){return r.nationalFit ? Math.min(2.8,Math.max(1,Math.pow(1.75/(innerWidth/innerHeight),.66))) : r.fitWidth ? Math.min(r.phoneFit || 1.5, Math.max(1, Math.sqrt(1.1/(innerWidth/innerHeight)))) : 1;}
+  function portraitKingdomPadding(){return innerWidth/innerHeight<.8?1.3:1;}
+  function regionZ(r){return r.z-(r.nationalFit?(regionFit(r)/portraitKingdomPadding()-1)*2.2:0);}   // V22: portrait screens centre the tilted Kingdom map lower, clear of the top bar
+  function regionFit(r){return r.nationalFit ? Math.min(2.8,Math.max(1,Math.pow(1.75/(innerWidth/innerHeight),.66)))*portraitKingdomPadding() : r.fitWidth ? Math.min(r.phoneFit || 1.5, Math.max(1, Math.sqrt(1.1/(innerWidth/innerHeight)))) : 1;}
   function pickSelect(id){ lastPick=id; if (id===CORE_ID) { selectedId=null; onPlace('riyadh'); } else if (String(id).startsWith('place:')) { selectedId=null; onPlace(id); } else onSelect(P(id)); }
   let hoverViaLabel=false;   // hovering a label keeps that label in place, so a click lands where the pointer is
   labelLayer.addEventListener('pointerover', e => { const el=e.target.closest('[data-pid]'); if (el && selectable) { hoverId=el.dataset.pid; hoverViaLabel=true; } });
@@ -2507,7 +2508,7 @@
       return; }
     const dx=e.clientX-prev.x, dy=e.clientY-prev.y; moved+=Math.abs(dx)+Math.abs(dy); prev.x=e.clientX; prev.y=e.clientY;
     if (dragMode==='tool') { const g=pickGround(e.clientX,e.clientY); if (g) dragTool('move',g[0],g[1]); return; }
-    if (dragMode==='pinch'&&pointers.size===2){const [a,b]=[...pointers.values()];const d=Math.hypot(a.x-b.x,a.y-b.y);camera.desired.dist=Math.max(MIN_DIST,Math.min(22,pinchDist*pinchStart/Math.max(20,d)));}
+    if (dragMode==='pinch'&&pointers.size===2){const [a,b]=[...pointers.values()];const d=Math.hypot(a.x-b.x,a.y-b.y);camera.desired.dist=Math.max(MIN_DIST,Math.min(Math.max(22,K.dist*regionFit(K)),pinchDist*pinchStart/Math.max(20,d)));}
     else if (dragMode==='pan') pan(dx,dy);
     else if (dragMode==='orbit'){camera.desired.az-=dx*.006;camera.desired.el=Math.max(.35,Math.min(1.45,camera.desired.el+dy*.004));}
   });

@@ -1,5 +1,5 @@
 // V19: country-only terrain and destination representations. Existing geography and IDs remain authoritative.
-window.VisionCountryPalette={sand:0xe3c391,crest:0xf4dbad,sandstone:0xb78662,highland:0x758659,shallow:0x77d5cf,deep:0x174665,road:0x677474,settlement:0xe9d9b8,navy:0x17344c,gold:0xe7bb64};
+window.VisionCountryPalette={sand:0xf2c777,crest:0xffe099,sandstone:0xb06640,highland:0x4a7a3b,shallow:0x77d5cf,deep:0x174665,road:0x677474,settlement:0xe9d9b8,navy:0x17344c,gold:0xe7bb64};
 window.VisionCountryOverview=function(T,scene,D,LY,geo,border,onLand,existingRocks,borderTriangles){
  const root=new T.Group();scene.add(root);const G=-.12,PA=VisionCountryPalette,owned=new Set(),groups={},smooth=(a,b,v)=>{const t=Math.max(0,Math.min(1,(v-a)/(b-a)));return t*t*(3-2*t)},mix=(a,b,t)=>a.map((v,i)=>v+(b[i]-v)*t);
  const rng=seed=>()=>{let t=seed+=0x6D2B79F5;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296},R=rng(203019);
@@ -16,12 +16,12 @@ window.VisionCountryOverview=function(T,scene,D,LY,geo,border,onLand,existingRoc
  function desertHeight(x,z){const lon=inverseX(x),lat=D.projection.lat0-z/D.projection.scale,fade=smooth(47.5,48.2,lon)*(1-smooth(54.0,55,lon))*smooth(18.8,19.5,lat)*(1-smooth(21.6,22.3,lat));if(!fade)return 0;const u=x*Math.cos(-.85)+z*Math.sin(-.85),v=-x*Math.sin(-.85)+z*Math.cos(-.85),phase=((u/.34+1.4*vnoise(v*1.3+4,u*.45)+.3*vnoise(v*4,u*1.6))%1+1)%1;const profile=phase<.66?Math.pow(Math.sin(phase/.66*Math.PI/2),2):Math.pow(1-(phase-.66)/.34,1.2);return profile*(.02+.035*vnoise(v*2.2+5,u*1.1))*(.35+.65*smooth(.2,.7,vnoise(v*.8,u*.8+3)))*fade;}   // V22: broken crescent dunes, not stripes
  // V23: the line of the Tuwaiq escarpment, the cliff arc through Najd (drawn as cliff blocks further down)
  const TUW=[[45.85,26.6],[45.95,25.6],[46.2,24.7],[46.3,23.8],[45.95,22.7],[45.45,21.5],[45.05,20.4]].map(p=>geo(...p));
- function height(x,z){if(!onLand(x,z))return 0;let h=0;for(let i=0;i<branches.length;i++){const[d,u]=near(x,z,branches[i]),w=i===0?.30:.16,shape=Math.pow(Math.max(0,1-d/(w*1.7)),1.6);h+=shape*(i===0?.34:.14)*(.55+.45*Math.sin(u*7.3+x*2)*Math.sin(u*7.3+x*2))*(.45+1.1*ridges(x*2.6+11,z*2.6-7));}
-  {const t=h/.05;h=h*.4+.6*.05*(Math.floor(t)+Math.pow(t-Math.floor(t),3));}   // V23: stratified ledges and cliff bands on the western ranges
+ function height(x,z){if(!onLand(x,z))return 0;let h=0;for(let i=0;i<branches.length;i++){const[d,u]=near(x,z,branches[i]),w=i===0?.30:.16,shape=Math.pow(Math.max(0,1-d/(w*1.7)),1.6);h+=shape*(i===0?.34:.14)*(.55+.45*Math.sin(u*7.3+x*2)*Math.sin(u*7.3+x*2))*(.40+1.35*ridges(x*4.8+11,z*4.8-7));}
+  {const t=h/.05;h=h*.25+.75*.05*(Math.floor(t)+Math.pow(t-Math.floor(t),3));}   // V23: stratified ledges and cliff bands on the western ranges
   h+=(1-smooth(42.6,45.6,inverseX(x)))*Math.pow(Math.max(0,ridges(x*2.1-3,z*2.1+5)-.44),1.4)*.12;   // V22: rugged western shield (red rock hills, reference)
   const sum=h+desertHeight(x,z);return sum>0?sum*clearance(x,z):0;}
  const inverseZ=z=>D.projection.lat0-z/D.projection.scale;
- function terrainColor(x,z,h){const lat=inverseZ(z),sand=[.86,.75,.57],rock=[.65,.43,.30],green=[.28,.43,.29],dh=desertHeight(x,z),r=h-dh;let c=mix(sand,rock,smooth(.012,.09,r));c=mix(c,[.80,.60,.43],smooth(.15,.32,r)*.55);c=mix(c,[.94,.84,.65],smooth(.012,.045,dh)*.5);const tone=.93+.13*vnoise(x*1.7+9,z*1.7-4)+.04*vnoise(x*7,z*7);  return mix(c,green,(1-smooth(19.4,21.4,lat))*smooth(.03,.11,r)*.86).map(v=>v*tone)}
+ function terrainColor(x,z,h){const lat=inverseZ(z),sand=[.97,.78,.47],rock=[.69,.40,.25],green=[.29,.48,.23],dh=desertHeight(x,z),r=h-dh;let c=mix(sand,rock,smooth(.012,.09,r));c=mix(c,[.80,.60,.43],smooth(.15,.32,r)*.55);c=mix(c,[1,.88,.60],smooth(.012,.045,dh)*.5);const tone=.93+.13*vnoise(x*1.7+9,z*1.7-4)+.04*vnoise(x*7,z*7);  return mix(c,green,(1-smooth(19.4,21.4,lat))*smooth(.03,.11,r)*.86).map(v=>v*tone)}
  const minX=Math.min(...border.map(p=>p[0])),maxX=Math.max(...border.map(p=>p[0])),minZ=Math.min(...border.map(p=>p[1])),maxZ=Math.max(...border.map(p=>p[1]));
  function landscape(step){const nx=Math.ceil((maxX-minX)/step)+1,nz=Math.ceil((maxZ-minZ)/step)+1,p=[],c=[],idx=[],hs=[];
   for(let j=0;j<nz;j++)for(let i=0;i<nx;i++){const x=minX+i*step,z=minZ+j*step,h=height(x,z);hs.push(h);p.push(x,G+.0065+h,z);c.push(...terrainColor(x,z,h));}
@@ -34,7 +34,7 @@ window.VisionCountryOverview=function(T,scene,D,LY,geo,border,onLand,existingRoc
  // Preserve the established asymmetric dune generator; enlarge its flowing field shapes for country-scale silhouettes.
  const duneClear=(x,z)=>onLand(x,z)&&onLand(x-.12,z)&&onLand(x+.12,z)&&onLand(x,z-.12)&&onLand(x,z+.12)&&clearance(x,z)>.98&&near(x,z,spine)[0]>.34;
  const sample=(a,b,c,d)=>r=>geo(a+r()*(b-a),c+r()*(d-c)),fields=[{seed:19031,groups:24,gap:.08,sample:sample(47.5,55,18.8,22.2),wind:()=>-.85,kinds:[['ridge',.75],['crescent',.25]],H:[.07,.13],len:[.32,.54],train:3.1,chain:2,core:.6},{seed:19033,groups:13,gap:.10,sample:sample(39.8,43.2,27.6,29.3),wind:()=>-1,kinds:[['crescent',.5],['ridge',.5]],H:[.04,.075],len:[.20,.34],train:2.3}];
- const duneGroups=[];
+ const duneGroups=fields.flatMap(f=>VisionDunes.plan({...f,test:duneClear}));
  function dunes(cell){const p=[],c=[];VisionDunes.build(duneGroups,{cell,y:G+.007,sink:.0015,ground:()=>[.96,.74,.43]},(a,b,d,ca,cb,cd)=>{for(const q of[a,b,d])p.push(q[0],q[1]+desertHeight(q[0],q[2]),q[2]);c.push(...ca,...cb,...cd)});return mesh(p,c)}
  groups.dunesHigh=dunes(.025);groups.dunesLow=dunes(.055);root.add(groups.dunesHigh,groups.dunesLow);
  // Shared merged skyline geometry, only for destinations that already exist in the data.
@@ -43,13 +43,26 @@ window.VisionCountryOverview=function(T,scene,D,LY,geo,border,onLand,existingRoc
  function stamp(shape,x,y,z,sx,sy,sz,hex,bottom=1){const q=shape.index?shape.toNonIndexed():shape,p=q.attributes.position,col=new T.Color(hex);for(let i=0;i<p.count;i++){const k=bottom===1?1:bottom+(1.06-bottom)*Math.max(0,Math.min(1,p.getY(i)+.5));bp.push(x+p.getX(i)*sx,y+p.getY(i)*sy,z+p.getZ(i)*sz);bc.push(col.r*k,col.g*k,col.b*k)}if(q!==shape)q.dispose()}
  // V21: landmark clusters in the illustrated-map scale (kingdom-landmarks.js); the V19 generic blocks are retired.
  const cyl=new T.CylinderGeometry(1,1,1,12),cone3=new T.ConeGeometry(1,1,3);owned.add(cyl);owned.add(cone3);
- const LM=window.VisionKingdomLandmarks?VisionKingdomLandmarks({stamp,S:{cube,orb,cone,cyl,cone3},G,onLand,geo,D,LY,R,height}):{towers:0,ships:[]};
+ const rock=new T.CylinderGeometry(.82,1,1,7,3);{const p=rock.attributes.position;for(let i=0;i<p.count;i++){const x=p.getX(i),y=p.getY(i),z=p.getZ(i),a=Math.atan2(z,x),w=1+.12*Math.sin(a*3+y*8)+.06*Math.cos(a*5-y*11);p.setXYZ(i,x*w+y*.13,y,z*w);}rock.computeVertexNormals();}owned.add(rock);
+ const LM=window.VisionKingdomLandmarks?VisionKingdomLandmarks({stamp,S:{cube,orb,cone,cyl,cone3,rock},G,onLand,geo,D,LY,R,height}):{towers:0,ships:[]};
  let clusters=LM.towers;
  // V21: desert detail of the illustrated map: terracotta mesas and outcrops, camel caravans, solar fields, a wind farm.
  const free=(x,z,r)=>onLand(x,z)&&clearance(x,z)>.97&&LY.decorAllowed(x,z,r,.05,true)&&LY.roadDist(x,z)>r+.03&&height(x,z)<.02&&!D.cities.some(c=>{const q=LY.cityDisplay[c.name]||[c.x,c.z];return Math.hypot(q[0]-x,q[1]-z)<.42});
  // V23: the Tuwaiq escarpment as a chain of crisp layered cliff blocks along its real line (a heightfield this coarse smears it)
  let scarp=0;for(let i=1;i<TUW.length;i++){const a=TUW[i-1],b=TUW[i],l=Math.hypot(b[0]-a[0],b[1]-a[1]);for(let t=0;t<l;t+=.075){const f=t/l,x=a[0]+(b[0]-a[0])*f+(R()-.5)*.02,z=a[1]+(b[1]-a[1])*f;if(!onLand(x,z)||clearance(x,z)<.9||LY.roadDist(x,z)<.06)continue;
   const h=.03+R()*.025,w=.05+R()*.03;stamp(cyl,x,G+h/2,z,w/2,h,.045,[0xc0703f,0xb2653a,0xcf8550][scarp%3],.62);stamp(cyl,x,G+h*.5,z,w/2*1.02,.003,.046,0xe2a36a);stamp(cyl,x+.006,G+h+.002,z,w/2*.9,.005,.04,0xe8b07a);scarp++;}}
+ // V25: irregular stratified rock buttresses follow the western ranges, merged into one mesh.
+ let buttresses=0,terraces=0;
+ for(let i=1;i<spine.length;i++){const a=spine[i-1],b=spine[i],len=Math.hypot(b[0]-a[0],b[1]-a[1]);
+  for(let d=.04;d<len;d+=.065){const f=d/len,x=a[0]+(b[0]-a[0])*f+(R()-.5)*.20,z=a[1]+(b[1]-a[1])*f+(R()-.5)*.15;
+   if(!onLand(x,z)||clearance(x,z)<.95||height(x,z)<.045)continue;
+   const base=G+height(x,z)-.018,h=.04+R()*.09,r=.025+R()*.045,n=7,phase=R()*6.28;
+   const rings=[];for(let k=0;k<4;k++){const ring=[];for(let j=0;j<n;j++){const a=j/n*Math.PI*2+phase,rr=r*(1-k*.15)*( .78+.22*Math.sin(j*13.4+i));ring.push([x+Math.cos(a)*rr+k*.004,base+h*k/3,z+Math.sin(a)*rr*.75]);}rings.push(ring);}
+   for(let k=0;k<3;k++)for(let j=0;j<n;j++){const a=rings[k][j],b=rings[k][(j+1)%n],c=rings[k+1][j],d=rings[k+1][(j+1)%n];for(const q of[a,c,b,b,c,d]){bp.push(...q);bc.push(...[[.57,.32,.21],[.71,.43,.27],[.83,.57,.35]][k]);}}
+   for(let j=1;j<n-1;j++)for(const q of[rings[3][0],rings[3][j+1],rings[3][j]]){bp.push(...q);bc.push(.89,.65,.42);}buttresses++;
+   if(inverseZ(z)<20.4&&buttresses%3===0){for(let k=0;k<3;k++){const tz=z+k*.025,ty=G+height(x,tz)+.006;stamp(cyl,x,ty,tz,.065-k*.01,.006,.026,[0x568345,0x75954d,0x426e37][k],.85);}terraces++;}
+  }
+ }
  let mesas=0;for(let i=0;i<900&&mesas<30;i++){const[x,z]=geo(38.5+R()*11.5,19.5+R()*11.5);if(!free(x,z,.14)||desertHeight(x,z)>0)continue;
   const n=2+Math.floor(R()*3);for(let k=0;k<n;k++){const px=x+(R()-.5)*.16,pz=z+(R()-.5)*.12,w=.04+R()*.06,h=.025+R()*.045,col=[0xc0703f,0xb2653a,0xcf8550][k%3];
    const d=w*(.6+R()*.5)/2;stamp(cyl,px,G+h/2,pz,w/2,h,d,col,.68);stamp(cyl,px,G+h*.55,pz,w/2*1.03,.003,d*1.03,0xe2a36a);stamp(cyl,px,G+h+.002,pz,w/2*.88,.005,d*.85,0xdc9d64);stamp(orb,px+w*.3,G+.006,pz+d*.4,w*.18,.012,w*.15,0xb8693f)}mesas++}
@@ -63,8 +76,8 @@ window.VisionCountryOverview=function(T,scene,D,LY,geo,border,onLand,existingRoc
  // Resurface the authoritative intercity polylines at the new overview ground height.
  for(const route of SMOOTH_ROADS)for(let i=1;i<route.length;i++){const a=route[i-1],b=route[i],dx=b[0]-a[0],dz=b[1]-a[1],l=Math.hypot(dx,dz);
   // V21: clean light highways (reference): a soft sand shadow, the light-grey carriageway, gold centre dashes
-  for(const[w,y,col,off]of[[.066,G+.0080,[.74,.54,.34],.016],[.032,G+.0086,[.97,.97,.95],0],[.044,G+.00855,[.50,.51,.54],0]].reverse()){const nx=-dz/l*w,nz=dx/l*w,ox=off,oz=-off,q=[[a[0]+nx+ox,y,a[1]+nz+oz],[b[0]+nx+ox,y,b[1]+nz+oz],[b[0]-nx+ox,y,b[1]-nz+oz],[a[0]-nx+ox,y,a[1]-nz+oz]];for(const k of[0,1,2,0,2,3]){bp.push(...q[k]);bc.push(...col)}}
-  for(let t=.03;t<l;t+=.12){const f=t/l;stamp(cube,a[0]+dx*f,G+.0092,a[1]+dz*f,.009,.0005,.009,0xe9d9a8)}roadSegments++;}
+  for(const[w,y,col,off]of[[.035,G+.0080,[.74,.54,.34],.009],[.021,G+.0086,[.35,.40,.42],0],[.025,G+.00855,[.85,.84,.74],0]].reverse()){const nx=-dz/l*w,nz=dx/l*w,ox=off,oz=-off,q=[[a[0]+nx+ox,y,a[1]+nz+oz],[b[0]+nx+ox,y,b[1]+nz+oz],[b[0]-nx+ox,y,b[1]-nz+oz],[a[0]-nx+ox,y,a[1]-nz+oz]];for(const k of[0,1,2,0,2,3]){bp.push(...q[k]);bc.push(...col)}}
+  for(let t=.03;t<l;t+=.12){const f=t/l;stamp(cube,a[0]+dx*f,G+.0092,a[1]+dz*f,.004,.0005,.004,0xe9d9a8)}roadSegments++;}
  // V22: railway corridors from the data (ballast bed, sleepers, a steel line), set beside the highway where both share a
  // route, and airports (runway, taxiway, terminal, tower) at Jeddah, Riyadh, Dammam and Madinah.
  const strip=(a,b,w,y,col,ox=0,oz=0)=>{const dx=b[0]-a[0],dz=b[1]-a[1],l=Math.hypot(dx,dz)||1,nx=-dz/l*w,nz=dx/l*w,q=[[a[0]+nx+ox,y,a[1]+nz+oz],[b[0]+nx+ox,y,b[1]+nz+oz],[b[0]-nx+ox,y,b[1]-nz+oz],[a[0]-nx+ox,y,a[1]-nz+oz]];for(const k of[0,1,2,0,2,3]){bp.push(...q[k]);bc.push(...col)}};
@@ -105,8 +118,10 @@ window.VisionCountryOverview=function(T,scene,D,LY,geo,border,onLand,existingRoc
  let farms=0;for(const[lo0,lo1,la0,la1,n]of[[43.3,44.6,25.7,26.7,22],[38.6,40.2,29.4,30.4,14],[41.2,42.4,27.1,27.8,10],[44.6,45.6,20.2,20.9,10],[49.2,49.9,25.1,25.7,8],[46.3,47.2,24.6,25.3,6]])for(let i=0,left=n;i<n*4&&left>0;i++){const[x,z]=geo(lo0+R()*(lo1-lo0),la0+R()*(la1-la0));if(!okDecor(x,z,.07)||height(x,z)>.03)continue;const r=.032+R()*.03,y=G+.0066+height(x,z);disc(x,y,z,r+.006,[.62,.55,.30],16);disc(x,y+.0004,z,r,[[.36,.62,.24],[.45,.68,.27],[.30,.55,.21]][farms%3],16);farms++;left--;}
  let belts=0;for(const route of SMOOTH_ROADS)for(let i=1;i<route.length;i++){const a=route[i-1],b=route[i],l=Math.hypot(b[0]-a[0],b[1]-a[1]);for(let t=.12;t<l;t+=.22){if(R()<.7)continue;const f=t/l,sd=R()<.5?-1:1,nx=-(b[1]-a[1])/l*sd,nz=(b[0]-a[0])/l*sd,cx=a[0]+(b[0]-a[0])*f+nx*(.09+R()*.06),cz=a[1]+(b[1]-a[1])*f+nz*(.09+R()*.06);if(!okDecor(cx,cz,.04)||height(cx,cz)>.05||!D.cities.some(c=>{const q=LY.cityDisplay[c.name]||[c.x,c.z];return Math.hypot(q[0]-cx,q[1]-cz)<1.1}))continue;const n=3+Math.floor(R()*4);for(let k=0;k<n;k++)palmSpots.push([cx+(R()-.5)*.07,cz+(R()-.5)*.07,.08+R()*.05,R()*6.28,Math.floor(R()*3)]);belts++;}}
  const oasisMesh=mesh(op,oc);oasisMesh.geometry.computeVertexNormals();root.add(oasisMesh);
- const palmMat=new T.MeshBasicMaterial({vertexColors:true});owned.add(palmMat);groups.palms=palmGeos.map((pg,v)=>{const own=palmSpots.filter(q=>(q[4]||0)===v),m=new T.InstancedMesh(pg,palmMat,Math.max(1,own.length));m.count=own.length;
-  own.forEach(([x,z,k,rot],i)=>{const s=v===1?1.15:v===2?1.25:1;matrix.compose(new T.Vector3(x,G+.006+height(x,z),z),new T.Quaternion().setFromAxisAngle(new T.Vector3(0,1,0),rot),new T.Vector3(k*.85*s,k*1.35*s,k*.85*s));m.setMatrixAt(i,matrix)});m.userData.n=own.length;root.add(m);return m});
+ const wind={value:0};
+ const palmMat=new T.MeshBasicMaterial({vertexColors:true});
+ palmMat.onBeforeCompile=shader=>{shader.uniforms.overviewWind=wind;shader.vertexShader='uniform float overviewWind;\n'+shader.vertexShader;shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\n#ifdef USE_INSTANCING\ntransformed.x += sin(overviewWind + instanceMatrix[3].x * 9.0 + instanceMatrix[3].z * 7.0) * 0.018 * pow(max(position.y,0.0),2.0);\n#endif');};owned.add(palmMat);groups.palms=palmGeos.map((pg,v)=>{const own=palmSpots.filter(q=>(q[4]||0)===v),m=new T.InstancedMesh(pg,palmMat,Math.max(1,own.length));m.count=own.length;
+  own.forEach(([x,z,k,rot],i)=>{const s=v===1?1.15:v===2?1.25:1;matrix.compose(new T.Vector3(x,G+.006+height(x,z),z),new T.Quaternion().setFromAxisAngle(new T.Vector3(0,1,0),rot),new T.Vector3(k*.60*s,k*.88*s,k*.60*s));m.setMatrixAt(i,matrix)});m.userData.n=own.length;root.add(m);return m});
  // V21: neighbouring countries as warm desert with ridged mountains (reference map), flat at the coasts and kept
  // (V22: their northern edge, lat 33.8 in the data, is drawn on to 37.5 so the tilted view never shows its end)
  // below Saudi's raised plateau. Purely visual: neighbours are not playable and nothing is picked here.
@@ -122,13 +137,13 @@ window.VisionCountryOverview=function(T,scene,D,LY,geo,border,onLand,existingRoc
   const ring=[.16,.34].flatMap(r=>[...Array(8)].map((_,k)=>[Math.round(Math.cos(k/8*Math.PI*2)*r/step),Math.round(Math.sin(k/8*Math.PI*2)*r/step)]));
   const fade=(i,j)=>{let n=0;for(const[di,dj]of ring){const a=i+di,b=j+dj;if(a>=0&&b>=0&&a<nx&&b<nz&&land[b*nx+a])n++}return smooth(.55,1,n/ring.length)};
   for(let j=0;j<nz;j++)for(let i=0;i<nx;i++){const x=nMinX+i*step,z=nMinZ+j*step,o=on[j*nx+i];const h=o?neighH(x,z,fade(i,j)):0;p.push(x,NEI+.0015+h,z);
-   const t=smooth(.004,.06,h),crev=smooth(.03,.09,h)*(1-smooth(.12,.2,h)),tone=.94+.12*vnoise(x*2.3,z*2.3);let col=mix([.90,.72,.50],[.70,.44,.30],t);col=mix(col,[.52,.31,.22],crev*.6);col=mix(col,[.93,.78,.60],smooth(.14,.24,h)*.6);const gy=(col[0]+col[1]+col[2])/3;col=mix(col,[gy,gy,gy],.45).map(v=>v*.86+.13);c.push(...col.map(v=>v*tone))}   /* V22: muted beside the kingdom */
+   const t=smooth(.004,.06,h),crev=smooth(.03,.09,h)*(1-smooth(.12,.2,h)),tone=.94+.12*vnoise(x*2.3,z*2.3);let col=mix([.90,.72,.50],[.70,.44,.30],t);col=mix(col,[.52,.31,.22],crev*.6);col=mix(col,[.93,.78,.60],smooth(.14,.24,h)*.6);const gy=(col[0]+col[1]+col[2])/3;col=mix(col,[gy*.94,gy*.98,gy*1.08],.65).map(v=>v*.77+.08);c.push(...col.map(v=>v*tone))}   /* V22: muted beside the kingdom */
   for(let j=0;j<nz-1;j++)for(let i=0;i<nx-1;i++){const a=j*nx+i,b=a+1,d=a+nx,e=d+1;if(on[a]&&on[b]&&on[d]&&on[e])idx.push(a,d,b,b,d,e)}return mesh(p,c,idx)}
- groups.neighHigh=neighbours(.045);groups.neighLow=neighbours(.09);root.add(groups.neighHigh,groups.neighLow);
+ groups.neighHigh=neighbours(.065);groups.neighLow=neighbours(.12);root.add(groups.neighHigh,groups.neighLow);
  // V22: Red Sea islands and reefs (Red Sea Global archipelago, Al Wajh banks, Farasan) and a few in the Gulf: a pale reef
  // halo, a sand island, a green crown.
  const ip=[],ic=[],blob=(x,y,z,r,col,seg=14)=>{for(let k=0;k<seg;k++){const a0=k/seg*Math.PI*2,a1=(k+1)/seg*Math.PI*2,w0=.8+.2*Math.sin(k*2.3+x*50),w1=.8+.2*Math.sin((k+1)*2.3+x*50);for(const[px,pz]of[[x,z],[x+Math.cos(a1)*r*w1,z+Math.sin(a1)*r*w1],[x+Math.cos(a0)*r*w0,z+Math.sin(a0)*r*w0]]){ip.push(px,y,pz);ic.push(...col)}}};
- let islands=0;for(const[lo0,lo1,la0,la1,n]of[[36.5,37.5,24.9,25.9,12],[36.2,36.8,26.0,26.7,6],[41.5,42.3,16.4,17.1,9],[49.9,50.4,26.8,27.4,3],[38.6,39.0,22.8,23.4,3]])for(let i=0,left=n;i<n*12&&left>0;i++){const[x,z]=geo(lo0+R()*(lo1-lo0),la0+R()*(la1-la0));if(anyLand(x,z)||anyLand(x+.08,z)||anyLand(x-.08,z)||anyLand(x,z+.08)||anyLand(x,z-.08))continue;const r=.018+R()*.03;
+ const islandFootprints=[];let islands=0;for(const[lo0,lo1,la0,la1,n]of[[36.5,37.5,24.9,25.9,12],[36.2,36.8,26.0,26.7,6],[41.5,42.3,16.4,17.1,9],[49.9,50.4,26.8,27.4,3],[38.6,39.0,22.8,23.4,3]])for(let i=0,left=n;i<n*12&&left>0;i++){const[x,z]=geo(lo0+R()*(lo1-lo0),la0+R()*(la1-la0));if(anyLand(x,z)||anyLand(x+.08,z)||anyLand(x-.08,z)||anyLand(x,z+.08)||anyLand(x,z-.08))continue;const r=.018+R()*.03;islandFootprints.push([x,z,r]);
   blob(x,-.1815,z,r*2.2,[.55,.90,.84]);blob(x,-.177,z,r,[.98,.90,.68]);if(r>.026)blob(x+r*.15,-.1745,z,r*.55,[.36,.64,.30],10);islands++;left--;}
  root.add(mesh(ip,ic));
  // V22: soft contact shadows under the big city clusters, so they sit on the ground
@@ -142,14 +157,14 @@ window.VisionCountryOverview=function(T,scene,D,LY,geo,border,onLand,existingRoc
  for(const[x,z,rot,big]of LM.ships){if(onLand(x,z))continue;const ship=new T.Group(),L=big?.075:.045,mk=(w,h,d,col,y,dx=0)=>{const m=new T.Mesh(cube,new T.MeshBasicMaterial({color:col}));owned.add(m.material);m.scale.set(w,h,d);m.position.set(dx,y,0);ship.add(m)};
   mk(L,.008,L*.28,big?0xf4f4f0:0xc8463a,0);mk(L*1.1,.0012,L*.14,0xf2fbfc,-.0042,L*.95);mk(L*.9,.0012,L*.3,0xd8f0f3,-.0044,L*1.75);   /* V22: wake foam */mk(L*.98,.003,L*.26,0x2d6ea8,-.004);mk(L*.45,.012,L*.2,0xfbfbf8,.009,-L*.12);if(big)mk(L*.3,.008,L*.16,0xf7f7f3,.018,-L*.14);mk(.004,.012,.004,0x333a40,.022,-L*.2);
   ship.rotation.y=-rot;ship.position.set(x,-.183,z);boats.add(ship);boatSeeds.push({hull:ship,x,z,i:boatSeeds.length})}
+ // V25: validate a complete elliptical water circuit before animating a vessel.
+ // Include a hull-width margin; unsafe coastal seeds remain moored.
+ for(const b of boatSeeds){b.route=0;for(const r of[.14,.09,.045]){let safe=true;for(let k=0;k<48&&safe;k++){const a=k/48*Math.PI*2,x=b.x+Math.cos(a)*r,z=b.z+Math.sin(a)*r*.55;for(const[dx,dz]of[[0,0],[.05,0],[-.05,0],[0,.05],[0,-.05]])if(anyLand(x+dx,z+dz)||islandFootprints.some(([ix,iz,ir])=>Math.hypot(x+dx-ix,z+dz-iz)<ir+.025))safe=false;}if(safe){b.route=r;break;}}}
  // V21: soft painted clouds round the map's edges (heaviest in the lower corners, as in the reference) and highland
  // mist over Aseer. Billboard sprites from one generated texture; drift slowly; hidden with the rest of the overview.
  // V23: three irregular cloud textures: layered puffs of varied size along a ragged base, soft rims, top-lit, cool undersides
- const cloudTexes=[7741,9133,4127].map(seed=>{const c=document.createElement('canvas');c.width=512;c.height=300;const g=c.getContext('2d'),r2=rng(seed),puffs=[];
-  const n=16+Math.floor(r2()*8);for(let i=0;i<n;i++){const u=r2(),x=50+u*412,edge=Math.sin(u*Math.PI),r=(16+r2()*46)*(.45+.75*edge),y=238-r*.45-r2()*70*edge*edge;puffs.push([x,y,r])}
-  g.save();g.beginPath();g.rect(0,0,512,252);g.clip();g.fillStyle='#fff';g.shadowColor='rgba(255,255,255,.95)';g.shadowBlur=16;for(const[x,y,r]of puffs){g.beginPath();g.arc(x,y,r,0,Math.PI*2);g.fill()}g.restore();
-  g.globalCompositeOperation='source-atop';const sh=g.createLinearGradient(120,40,400,270);sh.addColorStop(0,'rgba(255,255,255,0)');sh.addColorStop(.6,'rgba(236,242,250,.22)');sh.addColorStop(1,'rgba(192,208,232,.7)');g.fillStyle=sh;g.fillRect(0,0,512,300);
-  const base=g.createLinearGradient(0,190,0,252);base.addColorStop(0,'rgba(210,224,240,0)');base.addColorStop(1,'rgba(186,204,228,.6)');g.fillStyle=base;g.fillRect(0,0,512,300);g.globalCompositeOperation='source-over';
+ const cloudTexes=[7741,9133,4127].map(seed=>{const c=document.createElement('canvas');c.width=512;c.height=300;const g=c.getContext('2d'),r2=rng(seed);
+  for(let i=0;i<24;i++){const u=r2(),x=90+u*332,y=160-(Math.sin(u*Math.PI)*45)+r2()*25,r=30+r2()*38;const grad=g.createRadialGradient(x-r*.15,y-r*.2,r*.12,x,y,r);grad.addColorStop(0,'rgba(255,253,246,.65)');grad.addColorStop(.55,'rgba(237,243,246,.42)');grad.addColorStop(1,'rgba(213,228,239,0)');g.fillStyle=grad;g.fillRect(x-r,y-r,r*2,r*2);}
   const t=new T.CanvasTexture(c);t.colorSpace=T.SRGBColorSpace;owned.add(t);return t}),cloudTex=cloudTexes[0];
  const clouds=[],cloudAt=[[minX-.4,maxZ+.2,3.0,.6],[minX+.9,maxZ+.75,2.2,.45],[maxX+.2,maxZ+.1,3.0,.6],[maxX-1.1,maxZ+.75,2.0,.45],[minX-1.0,(minZ+maxZ)/2+.9,2.2,.5],[maxX+.75,(minZ+maxZ)/2+.9,2.3,.5],[minX-.9,minZ-.7,2.6,.55],[maxX+.6,minZ-.9,2.8,.55],[minX+1.2,minZ-1.3,1.8,.5]];   /* V22: in the corners of the tilted frame */
  for(const[x,z,k,y]of cloudAt){const m=new T.SpriteMaterial({map:cloudTexes[clouds.length%3],transparent:true,depthWrite:false,depthTest:false,opacity:.97});owned.add(m);const sp=new T.Sprite(m);sp.scale.set(k,k*(.5+.12*(clouds.length%3)),1);sp.position.set(x,G+y,z);m.opacity=.9;sp.renderOrder=30;root.add(sp);clouds.push({sp,x,z})}
@@ -157,10 +172,11 @@ window.VisionCountryOverview=function(T,scene,D,LY,geo,border,onLand,existingRoc
  // V22: MeshBasic output is sRGB-encoded by the renderer while this file's colours are display-space, so the basic
  // materials (palms, groves, ships, gold rim) get linear colours here and come out as authored, not washed out.
  { const seen=new Set();root.traverse(o=>{const m=o.material;if(!m||!m.isMeshBasicMaterial)return;if(!seen.has(m)){seen.add(m);m.color.convertSRGBToLinear()}const a=m.vertexColors&&o.geometry.attributes.color;if(a&&!seen.has(a)){seen.add(a);for(let i=0;i<a.array.length;i++)a.array[i]=Math.pow(a.array[i],2.2);a.needsUpdate=true}}) }
+ const nightMaterials=new Set();root.traverse(o=>{if(o.material?.color){o.material.userData.base=o.material.color.clone();nightMaterials.add(o.material);}});
  const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;let active=false,pass='main',lastQuality='';
- window.__visionCountryOverview={version:23,scarp,farms,belts,railSegments,airports,islands,mesas,camels,solar,oases,palms:palmSpots.length,clusters,groveTrees:sites.length,duneGroups:duneGroups.length,boats:boatSeeds.length,roadSegments,terrainTriangles:groups.terrainHigh.geometry.index.count/3,neighTriangles:groups.neighHigh.geometry.index.count/3,palette:PA};
- return {pass(p){pass=p;root.visible=active&&p==='main'},update(t,dist,night,quality){active=dist>6;root.visible=active&&pass==='main';if(!active)return;material.uniforms.night.value=night;const high=quality==='high';groups.terrainHigh.visible=high;groups.terrainLow.visible=!high;groups.dunesHigh.visible=high;groups.dunesLow.visible=!high;groups.neighHigh.visible=high;groups.neighLow.visible=!high;groups.trees.forEach((m,t)=>{const n=Math.floor((sites.length+2-t)/3);m.count=quality==='low'?Math.ceil(n*.65):n});groups.palms.forEach(m=>{m.count=quality==='low'?Math.ceil(m.userData.n*.5):m.userData.n});
-  if(lastQuality!==quality){lastQuality=quality;window.__visionCountryOverview.quality=quality;}const time=reduced?12:t*.001;boatSeeds.forEach(({hull,x,z,i})=>hull.position.set(x+Math.sin(time*.03+i)*.006,-.183,z+Math.cos(time*.03+i)*.009));clouds.forEach(({sp,x,z,mist},i)=>{sp.position.x=x+Math.sin(time*.02+i*1.7)*(mist?.03:.12);sp.material.opacity=(mist?.7:.95)*(1-night*.55)});
-  root.traverse(o=>{if(o.material?.color){o.material.userData.base??=o.material.color.clone();o.material.color.copy(o.material.userData.base).multiplyScalar(1-night*.40)}});
+ window.__visionCountryOverview={version:25,buttresses,terraces,waterRoutes:boatSeeds.filter(b=>b.route).length,scarp,farms,belts,railSegments,airports,islands,mesas,camels,solar,oases,palms:palmSpots.length,clusters,groveTrees:sites.length,duneGroups:duneGroups.length,boats:boatSeeds.length,roadSegments,terrainTriangles:groups.terrainHigh.geometry.index.count/3,neighTriangles:groups.neighHigh.geometry.index.count/3,palette:PA};
+ return {pass(p){pass=p;root.visible=active&&p==='main'},update(t,dist,night,quality){active=dist>6;root.visible=active&&pass==='main';if(!active)return;material.uniforms.night.value=night;const high=quality==='high'||quality==='ultra';groups.terrainHigh.visible=high;groups.terrainLow.visible=!high;groups.dunesHigh.visible=high;groups.dunesLow.visible=!high;groups.neighHigh.visible=high;groups.neighLow.visible=!high;groups.trees.forEach((m,t)=>{const n=Math.floor((sites.length+2-t)/3);m.count=quality==='low'?Math.ceil(n*.65):n});groups.palms.forEach(m=>{m.count=quality==='low'?Math.ceil(m.userData.n*.5):m.userData.n});
+  if(lastQuality!==quality){lastQuality=quality;window.__visionCountryOverview.quality=quality;}const time=reduced?12:t*.001;wind.value=reduced?0:time*.7;boatSeeds.forEach(({hull,x,z,i,route})=>{if(!route)return;const a=time*.055+i;hull.position.set(x+Math.cos(a)*route,-.183,z+Math.sin(a)*route*.55);hull.rotation.y=-Math.atan2(Math.cos(a)*.55,-Math.sin(a))+Math.PI;});clouds.forEach(({sp,x,z,mist},i)=>{sp.position.x=x+Math.sin(time*.02+i*1.7)*(mist?.03:.12);sp.material.opacity=(mist?.7:.95)*(1-night*.55)});
+  for(const m of nightMaterials)m.color.copy(m.userData.base).multiplyScalar(1-night*.40);
  },dispose(){scene.remove(root);for(const resource of owned)resource.dispose();}};
 };

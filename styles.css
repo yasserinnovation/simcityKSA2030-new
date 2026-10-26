@@ -1383,3 +1383,22 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
 .boot-mark span{font-size:11px;letter-spacing:.25em}.boot-status b{display:block;font-size:19px;font-weight:500}.boot-status small{display:block;margin-top:9px;color:#aebfb8;font-size:12px}.boot-status progress{width:190px;height:4px;accent-color:#ddba77}
 @media(max-width:780px){.ctool{min-width:62px;min-height:65px}.mn-row button{min-height:38px}.set-row{font-size:12px}#mapLabels .map-label.badge{font-size:11px}}
 @media(prefers-reduced-motion:reduce){.menu-card,button{transition:none!important}}
+
+/* V25: compact sea-corner launcher; full mission and save tools remain in All options. */
+#menu .menu-card.collapsed{width:min(282px,calc(100vw - 24px));padding:10px 12px}
+#menu .menu-card.collapsed :is(.eyebrow,.menu-title,.next-card){display:none}
+#menu .menu-card.collapsed .menu-expand{margin:0 0 7px 6px}
+#menu .menu-card.collapsed .primary.big{width:100%;padding:8px 12px}
+#menu .menu-card.collapsed .menu-foot{margin-top:3px}
+#menu .menu-regions .region-nav button span{display:block;font-size:12px;white-space:normal;line-height:1.15}
+#menu .menu-regions{max-width:calc(100vw - 24px)}
+@media(max-width:780px){
+ #menu .menu-card.collapsed{bottom:100px;width:240px}
+ #menu .menu-regions{left:6px;right:6px;max-width:none;padding:6px 3px}
+ #menu .menu-regions .region-nav{display:flex;width:100%;gap:3px;overflow:visible}
+ #menu .menu-regions .region-nav button{flex:1;min-width:0;padding:5px 2px;flex-direction:column;gap:3px;min-height:64px}
+ #menu .menu-regions .region-nav button span{font-size:9px;max-width:65px}
+ #menu .menu-regions .region-nav button svg{width:23px;height:23px}
+}
+
+@media(min-width:781px){#menu .menu-regions{width:max-content}#menu .menu-regions .region-nav{max-width:none}}

@@ -1,0 +1,67 @@
+{
+  "phase": "before",
+  "browser": "131.0.6778.204",
+  "viewport": [
+    1280,
+    800
+  ],
+  "gpu": "SwiftShader software renderer; not device GPU performance",
+  "errors": [],
+  "failed": [],
+  "overview": {
+    "version": 23,
+    "scarp": 28,
+    "farms": 56,
+    "belts": 10,
+    "railSegments": 26,
+    "airports": 4,
+    "islands": 33,
+    "mesas": 30,
+    "camels": 7,
+    "solar": 38,
+    "oases": 16,
+    "palms": 710,
+    "clusters": 62,
+    "groveTrees": 694,
+    "duneGroups": 0,
+    "boats": 19,
+    "roadSegments": 84,
+    "terrainTriangles": 47744,
+    "neighTriangles": 123098,
+    "palette": {
+      "sand": 14926737,
+      "crest": 16047021,
+      "sandstone": 12027490,
+      "highland": 7702105,
+      "shallow": 7853519,
+      "deep": 1525349,
+      "road": 6780020,
+      "settlement": 15325624,
+      "navy": 1520716,
+      "gold": 15186788
+    },
+    "quality": "high"
+  },
+  "performance": {
+    "high": {
+      "meanMs": 474.54444444448586,
+      "p95Ms": 922.0999999996275,
+      "fps": 1.0909884355225852,
+      "ms": 916.5999999999985,
+      "quality": "high",
+      "renderer": "three",
+      "calls": 170,
+      "triangles": 732876
+    },
+    "low": {
+      "meanMs": 297.0833333333333,
+      "p95Ms": 855.3000000007451,
+      "fps": 3.243067942273406,
+      "ms": 308.34999999999854,
+      "quality": "low",
+      "renderer": "three",
+      "calls": 170,
+      "triangles": 549184
+    }
+  }
+}
