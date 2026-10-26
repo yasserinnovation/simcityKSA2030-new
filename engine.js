@@ -161,25 +161,30 @@
       TAP(-1.,-1.) TAP(-1.,0.) TAP(-1.,1.) TAP(0.,-1.) TAP(0.,0.) TAP(0.,1.) TAP(1.,-1.) TAP(1.,0.) TAP(1.,1.)
       return sum/9.0;
     }
+    float grain(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f);
+      vec3 k=vec3(127.1,311.7,43758.5453);
+      float a=fract(sin(dot(i,k.xy))*k.z),b=fract(sin(dot(i+vec2(1.,0.),k.xy))*k.z);
+      float c=fract(sin(dot(i+vec2(0.,1.),k.xy))*k.z),d=fract(sin(dot(i+vec2(1.,1.),k.xy))*k.z);
+      return mix(mix(a,b,f.x),mix(c,d,f.x),f.y); }
     void main(){
       vec3 N=normalize(vNormal); vec3 V=normalize(uEye-vWorld); if(dot(N,V)<0.0) N=-N;
       float ndl=max(dot(N,uSun),0.0); float sh=mix(1.0, shadowAt(ndl), 1.0-uStorm*.6);
       vec3 hemi=mix(vec3(.80,.68,.54), vec3(.80,.88,1.0), N.y*0.5+0.5);   // V10: warm ground bounce, cool sky fill
       float ao = N.y>0.8 ? 1.0 : mix(0.66,1.0,clamp((vWorld.y-uGround)/0.06,0.0,1.0));   // contact darkening grounds buildings
-      vec3 sunCol=vec3(1.0,.86,.65);                                       // warm golden-hour palette
+      vec3 sunCol=vec3(1.0,.91,.77);                                       // warm golden-hour palette
       float cl=uGlow>0.3?1.0:cloudShade(vWorld.xz,uTime);
       // V20 (Medium and up): a little wrap on the sun term softens the terminator on rounded clay forms
       float ndlS=mix(ndl, clamp((dot(N,uSun)+.12)/1.12,0.0,1.0), uFx);
-      vec3 c=vColor*(hemi*(0.57+uGlow)*ao + sunCol*ndlS*mix(0.36,1.0,sh)*0.83*cl);   // V11: warm light, softer readable shadows
+      vec3 c=vColor*(hemi*(0.48+uGlow)*ao + sunCol*ndlS*mix(0.29,1.0,sh)*0.91*cl);   // V11: warm light, softer readable shadows
       // V20: shadowed sunlit faces take the cool sky colour (stylized coloured shadows) and walls catch a soft sky rim
       c*=mix(vec3(1.0), vec3(.90,.95,1.07), uFx*(1.0-sh)*smoothstep(.05,.5,ndl));
       c+=vColor*vec3(.80,.88,1.0)*pow(1.0-max(dot(N,V),0.0),3.0)*.16*uFx*(1.0-smoothstep(.55,.9,N.y))*(1.0-uNight*.7)*(1.0-uStorm);
       // Dielectric GGX response replaces the same shiny highlight on every surface.
       // Authored palette materials define roughness; unnamed terrain/foliage defaults to matte.
       c*=.96;
-      if(vRoughness<.70){ // matte terrain and foliage avoid expensive glossy lighting work
+      if(abs(vRoughness)<.70){ // matte terrain and foliage avoid expensive glossy lighting work
       vec3 H=normalize(uSun+V); float nv=max(dot(N,V),.001), nh=max(dot(N,H),0.0), vh=max(dot(V,H),0.0);
-      float rough=clamp(vRoughness,.22,.95), a2=pow(rough,4.0);
+      float rough=clamp(abs(vRoughness),.22,.95), a2=pow(rough,4.0);
       float denom=nh*nh*(a2-1.0)+1.0, D=a2/(3.14159*denom*denom);
       float k=(rough+1.0)*(rough+1.0)/8.0;
       float geom=(nv/(nv*(1.0-k)+k))*(ndl/(ndl*(1.0-k)+k));
@@ -187,17 +192,30 @@
       c+=sunCol*min(.20,D*geom*fres/(4.0*nv*max(ndl,.001)))*ndl*sh;
       c+=hemi*.04*pow(1.0-nv,5.0)*(1.0-rough); // restrained sky reflection, no extra render pass
       }
-      // Warm clay terrain and pastel miniature surfaces on every quality tier.
-      if(abs(vWorld.y-uGround)<.003 && N.y>.8){c=mix(c,vec3(.96,.73,.43),.30);}
+      // V24 world-space material detail. Low tier skips noise; fine detail fades before aliasing.
+      if(uFx>.5){
+        float close=1.0-smoothstep(.8,4.0,uDist);
+        if(abs(vRoughness)>.70){
+          vec2 uv=N.y>.6?vWorld.xz:vec2(vWorld.x+vWorld.z,vWorld.y);
+          float broad=grain(uv*65.0),fine=grain(uv*950.0);
+          c*=.975+.045*broad+(fine-.5)*.045*close;
+        } else if(vColor.b>vColor.r*1.12 && N.y<.7){
+          float fres=pow(1.0-max(dot(N,V),0.0),3.0);
+          c=mix(c,mix(vec3(.27,.36,.38),vec3(.67,.78,.82),N.y*.5+.5),fres*.23*(1.0-uNight));
+        }
+      }
+      // Warm limestone and matte sand, with readable miniature silhouettes.
+      if(abs(vWorld.y-uGround)<.003 && N.y>.8){c=mix(c,vec3(.80,.69,.51),.16);}
       if(abs(vWorld.y-(uGround-.03))<.002 && N.y>.8){c=mix(c,vec3(.45,.46,.48),.58);}
       if(vWorld.y>uGround+.003 && N.y>.6 && vColor.r>vColor.b*1.30 && vColor.g>vColor.b*1.12){float rip=sin(vWorld.x*430.0+vWorld.z*210.0+sin(vWorld.z*17.0)*3.0);c*=1.0+.035*rip*clamp(2.0-uDist*.12,0.0,1.0);}
-      float l=dot(c,vec3(.299,.587,.114)); c=mix(vec3(l),c,1.16);
+      float l=dot(c,vec3(.299,.587,.114)); c=mix(vec3(l),c,1.03);
       vec3 highlight=max(c-vec3(.78),vec3(0.0));
       c=min(c,vec3(.78))+highlight/(vec3(1.0)+highlight/.22); // soft exposure shoulder preserves pale roof detail
       // dusk to night in two stages: a warm golden-violet desert dusk first, then the cool night (lights read against both)
       vec3 duskC=c*vec3(.78,.60,.60)+vec3(.03,.012,.004), nightC=c*vec3(.26,.32,.58)+vec3(.012,.018,.05);
       // V20: with the HDR target, lit facades (glow layers above .5) shine past 1.0, so only they feed the bloom at night
       c=mix(c, mix(duskC,nightC,smoothstep(.35,1.0,uNight)), smoothstep(0.0,.5,uNight)) + vColor*uGlow*.6*uNight*(uGlow>.5?1.0+uHdr*1.6:1.0);
+      if(vRoughness<0.) c+=vec3(1.0,.67,.30)*uNight*.55*(1.0+uHdr); // occupied, powered city windows only
       gl_FragColor=vec4(applyAtmos(c,vW),1.0);
     }`;
   // Depth-only pass for the sun shadow map (packed into RGBA).
@@ -231,7 +249,7 @@
       float exposure=.25+.75*smoothstep(-.2,.5,sin(vWorld.z*2.7+vWorld.x*1.5));
       c=mix(c,vec3(.97,.98,.96),clamp(foam,0.0,1.0)*mix(.58,.20*exposure,national));
       // V21 national palette (reference map): bright turquoise shallows, vivid cyan-blue mid water, saturated deep blue
-      vec3 calmReef=vec3(.48,.90,.86),calmShallow=vec3(.10,.72,.80),calmMid=vec3(.07,.47,.76),calmDeep=vec3(.05,.29,.60);
+      vec3 calmReef=vec3(.49,.77,.72),calmShallow=vec3(.13,.55,.59),calmMid=vec3(.055,.30,.41),calmDeep=vec3(.035,.17,.27);
       float sn=s*(.75+.5*(.5+.5*sin(vWorld.x*5.3+sin(vWorld.z*3.1)*2.0)*sin(vWorld.z*4.7+vWorld.x*1.3)));   // V22: broken, narrower shallows
       vec3 calm=mix(calmReef,calmShallow,smoothstep(0.0,.045,sn));calm=mix(calm,calmMid,smoothstep(.05,.15,sn));calm=mix(calm,calmDeep,smoothstep(.15,.5,sn));
       calm=mix(calm,vec3(.20,.60,.60),smoothstep(.35,.8,coral)*(1.0-smoothstep(.03,.11,sn))*smoothstep(.008,.025,sn)*.5);   // reef patches
@@ -1659,6 +1677,7 @@
     cityMesh.p.length=cityMesh.c.length=cityMesh.n.length=cityLines.p.length=cityLines.c.length=0; cityMesh.inst={};
     target=cityMesh; lineTarget=cityLines; const rngKeep=rngNow;   // per-parcel seeds: a parcel's trees and palms look the same on every rebuild
     const d=cityDesc, CY=G+.011, rich=quality!=='low'; if (d) {   // rich: parcel dressing (kerbs, courtyards, yard planting) above the Reduced tier
+      const art=window.VisionCityArt?.({box:addBox,cylinder:addCylinder,ground:CY,quality,palm:(x,z,k)=>{const at=cityMesh.inst.palm?.length||0;addPalm(x,z,k);cityMesh.inst.palm[at+1]+=CY-G;}});
       const {x0,z0,ts,n}=d, X=i=>x0+(i+.5)*ts, Z=j=>z0+(j+.5)*ts, h=ts/2;
       const quad=(i,j,y,col,s=1)=>{ const x=X(i), z=Z(j), r=h*s; addQuad([x-r,y,z-r],[x+r,y,z-r],[x+r,y,z+r],[x-r,y,z+r],col); };
       const isRoad=(i,j)=>i>=0&&j>=0&&i<n&&j<n&&d.tiles[j*n+i]&&d.tiles[j*n+i].k==='r';
@@ -1678,11 +1697,25 @@
           const lc=t.art||t.avenue?[1,.86,.35]:[.95,.95,.92];
           if (cnt<=2 && (nb[1]||nb[3]) && !(nb[0]||nb[2])) addLine([x-h*.6,CY+.002,z],[x+h*.6,CY+.002,z],lc);
           else if (cnt<=2 && (nb[0]||nb[2]) && !(nb[1]||nb[3])) addLine([x,CY+.002,z-h*.6],[x,CY+.002,z+h*.6],lc);
-          else if (cnt>=3) { quad(i,j,CY+.0012,[.46,.47,.50],.55); }
+          else if (cnt>=3) { // Crosswalks sit inside road tiles; placement and connectivity are untouched.
+            quad(i,j,CY+.0012,[.35,.37,.38],.55);
+            if(rich) for(let k=0;k<5;k++){
+              const a=(k-2)*ts*.11;
+              if(nb[0]) addBox(x+a,CY+.0015,z-h*.70,ts*.06,.0002,ts*.18,[.88,.87,.80]);
+              if(nb[2]) addBox(x+a,CY+.0015,z+h*.70,ts*.06,.0002,ts*.18,[.88,.87,.80]);
+              if(nb[1]) addBox(x+h*.70,CY+.0015,z+a,ts*.18,.0002,ts*.06,[.88,.87,.80]);
+              if(nb[3]) addBox(x-h*.70,CY+.0015,z+a,ts*.18,.0002,ts*.06,[.88,.87,.80]);
+            }
+          }
+          if(rich && !t.art && (i+j)%4===0){ // restrained street-light rhythm, clear of junctions
+            const side=!nb[0]?-1:!nb[2]?1:0;
+            if(side){ const lz=z+side*h*.85;addCylinder(x,CY,lz,ts*.012,ts*.62,[.22,.29,.30],5);addBox(x+ts*.05,CY+ts*.62,lz,ts*.13,ts*.022,ts*.045,[.72,.74,.68]); }
+          }
           if (t.stop) { addBox(x+h*.55,G,z+h*.55,ts*.22,ts*.35,ts*.1,[.98,.80,.25]); }
           if (t.rail) { addBox(x,G,z,ts*.9,CY-G+.0022,ts*.12,[.95,.95,.95]); addBox(x+h*.8,G,z+h*.8,ts*.05,ts*.5,ts*.05,[.9,.25,.25]); }
           continue;
         }
+        if (art && art(t,x,z,ts,i,j)) continue;
         if (t.k==='z') {
           const zc=ZCOL[t.zone];
           if (t.st===0) { quad(i,j,CY+.0004,mix(zc,[.86,.80,.66],.45),.92); continue; }
@@ -1793,7 +1826,7 @@
   const surfaces=new Map([
     [[.50,.64,.76],.26], [[.42,.57,.63],.30], [[.70,.82,.90],.25],
     [[.30,.38,.46],.28], [[.96,.96,.95],.44], [[.86,.87,.88],.48],
-    [[.68,.70,.71],.52], [[.83,.79,.70],.88], [[.29,.48,.30],.92]
+    [[.68,.70,.71],.52], [[.83,.79,.70],.88], [[.29,.48,.30],.92], [[.24,.43,.49],.28], [[.241,.431,.491],-.28], [[.12,.26,.36],.34], [[.28,.52,.60],.42], [[.70,.72,.69],.52]
   ].map(([c,r])=>[surfaceKey(...c),r]));
   function roughnessArray(colors){const a=new Float32Array(colors.length/3);for(let i=0;i<a.length;i++)a[i]=surfaces.get(surfaceKey(colors[i*3],colors[i*3+1],colors[i*3+2]))??.84;return a;}
   function fillDyn(g, n, attrs){
@@ -1850,6 +1883,14 @@
       house:{dy:G, tint:1, build:c => houseRaw(0,0,1,c,0,false)},
       houseT:{dy:G, tint:1, build:c => houseRaw(0,0,1,c,0,true)},
       turbine:{dy:G, build:() => { const n = turbines.length; turbineRaw(0,0,1); turbines.length = n; }},
+      districtCar:{dy:0,tint:1,build:c=>{
+        addBox(0,.0007,0,.010,.0018,.0045,c);addBox(-.0006,.0025,0,.0055,.0015,.004,[.24,.43,.49]);
+        addBox(-.0006,.004,0,.004,.0005,.0038,c);
+        for(const x of[-.003,.003])for(const z of[-.0023,.0023])addBox(x,0,z,.0018,.0015,.0007,[.13,.16,.17]);
+        addBox(.005,.0015,0,.0004,.0006,.0034,[.94,.89,.72]);}},
+      districtBus:{dy:0,build:()=>{
+        addBox(0,.0008,0,.017,.0042,.0055,[.28,.52,.60]);addBox(0,.0031,0,.0165,.0015,.0056,[.24,.43,.49]);addBox(0,.005,0,.017,.0006,.0055,[.93,.90,.82]);
+        for(const x of[-.005,.005])for(const z of[-.0028,.0028])addBox(x,0,z,.002,.0016,.0007,[.13,.16,.17]);}},
       car0:{dy:0, build:() => { addBox(0,G+.006,0,.03,.013,.013,[.98,.96,.92]); addBox(0,G+.019,0,.03,.002,.014,[.86,.68,.30]); }},
       car1:{dy:0, build:() => { addBox(0,G+.006,0,.03,.013,.013,[.30,.55,.85]); addBox(0,G+.019,0,.03,.002,.014,[.95,.95,.95]); }},
       plane:{dy:0, build:() => { addBox(0,0,0,.07,.012,.012,[.98,.98,.98]); addBox(0,.004,0,.016,.003,.085,[.90,.92,.95]); addBox(-.03,.006,0,.012,.018,.004,[.14,.52,.34]); addBox(-.03,.006,0,.01,.003,.03,[.9,.92,.95]); }},
@@ -1917,11 +1958,12 @@
   syncLayer('mesh'); syncLayer('detail'); syncLayer('rock'); syncLayer('rockLo'); syncLayer('dune'); syncLayer('duneLo'); syncLayer('cloud'); syncLines(linesObj, lines);
 
   // Static geometry is also uploaded in local cells for close-view culling. Keep
-  // original batches for the national overview and the complete sun-shadow pass.
+  // original batches for the national overview. Shadow cells use the sun frustum.
   // Triangles are copied intact (including normals, colours and picking IDs).
-  const spatialEnabled = new URLSearchParams(location.search).get('culling') === 'on';
+  const spatialEnabled = new URLSearchParams(location.search).get('culling') !== 'off';
   const CELL_SIZE = .30, SPATIAL_DIST = 1.8;
   const spatialRoot=new THREE.Group();scene3.add(spatialRoot);
+  const lightFrustum=new THREE.Frustum(), lightMatrix=new THREE.Matrix4();
   let spatialBuilt=false;
   const cellOf = (x,z) => Math.floor(x/CELL_SIZE)+','+Math.floor(z/CELL_SIZE);
   function makeSpatialLayer(L){
@@ -1976,13 +2018,15 @@
     cosmetics?.pass(pass);
     kingdomDiorama?.pass(pass);
     countryOverview?.pass(pass);
-    spatialRoot.visible=pass!=='depth' && spatialBuilt && camera.dist<SPATIAL_DIST;
+    spatialRoot.visible=spatialBuilt && camera.dist<SPATIAL_DIST;
+    if(pass==='depth' && spatialRoot.visible)lightFrustum.setFromProjectionMatrix(lightMatrix.fromArray(lightVP));
     for (const o of OBJS) { const u = o.userData, L = u.L; let v = !L || !L.when || L.when();
-      if(L && L.spatialReady){const useCells=pass!=='depth' && camera.dist<SPATIAL_DIST;v=v && !!u.spatial===useCells;}
+      if(L && L.spatialReady){const useCells=camera.dist<SPATIAL_DIST;v=v && !!u.spatial===useCells;}
       o.frustumCulled=!!u.spatial && pass!=='depth';
       if (pass === 'depth') v = v && !!(L && L.cast); else if (pass === 'pick') v = v && !!(L && L.pick);
       if (u.inst) v = v && o.count > 0; if(countryOverview&&camera.dist>6&&(u.kind==='tree'||u.kind==='ghaf'))v=false;   /* V21: the overview's palms and oases replace them */
       if(countryOverview&&camera.dist>6&&[LAYERS.rock,LAYERS.rockLo,LAYERS.dune,LAYERS.duneLo,LAYERS.cloud].includes(u.L))v=false;
+      if(v && u.spatial && pass==='depth')v=lightFrustum.intersectsObject(o);
       o.visible = v; if (v) o.material = u.mats[pass]; }
   }
 
@@ -2000,7 +2044,7 @@
 
   function resize(){const aspect=innerWidth/innerHeight;if(countryAutoFrame&&Math.abs(aspect-viewAspect)>.01){camera.desired.dist=K.dist*regionFit(K);camera.desired.target[2]=regionZ(K);}viewAspect=aspect;dpr=Math.min(devicePixelRatio||1,quality==='low'?1:2)*resScale;const w=Math.floor(innerWidth*dpr),h=Math.floor(innerHeight*dpr);if(canvas.width!==w||canvas.height!==h)renderer.setSize(w,h,false);width=w;height=h;}
   function updateCamera(dt){
-    const k=1-Math.pow(.001,dt/1000*0.9*camSpeed);
+    const k=reducedMotion?1:1-Math.pow(.001,dt/1000*0.9*camSpeed);
     camera.az+=(camera.desired.az-camera.az)*k; camera.el+=(camera.desired.el-camera.el)*k; camera.dist+=(camera.desired.dist-camera.dist)*k;
     for (let i=0;i<3;i++) camera.target[i]+=(camera.desired.target[i]-camera.target[i])*k;
     // V20 cinematic move: a long region-to-region flight rises in a gentle arc (off on Reduced and with reduced motion).
@@ -2070,6 +2114,16 @@
     if (camera.dist >= DETAIL_DIST) flights.forEach(([a,b],i)=>{   // V9: decorative flights only in the overview — in close views they crossed downtown towers and labels
       const q=((t*.00002*(1+i*.13))+i*.21)%1, f=i%2?q:1-q, A=i%2?a:b, B=i%2?b:a;
       const x=A.x+(B.x-A.x)*f, z=A.z+(B.z-A.z)*f, y=G+.12+Math.sin(Math.PI*f)*.45, rot=Math.atan2(B.z-A.z,B.x-A.x); inst('plane', x, y, z, rot, 1);});
+    // Real City Builder road loads and bus paths drive miniature vehicles at close zoom.
+    if(quality!=='low' && camera.dist<2.8)for(const o of overlay){if(!o.flow||!o.vehicle)continue;
+      const P2=o._pts||[o.a,o.b],L=o._L||pathLen(P2),n=Math.min(o.n||10,quality==='high'?5:2),y=G+.012;
+      const seed=Math.abs(P2[0][0]*731+P2[0][1]*373),phase=seed%1;
+      for(let i=0;i<n;i++){let q=(t*.00012*(o.speed||1)/Math.max(.2,L[L.length-1])+phase+i/n)%1;const reverse=o.both&&i%2;if(reverse)q=1-q;
+        const [x,z,rot]=heading(P2,L,q,!reverse),lane=.0026;
+        const col=[[.90,.88,.81],[.55,.27,.20],[.25,.38,.41]][(Math.floor(seed)+i)%3];
+        inst(o.vehicle==='bus'?'districtBus':'districtCar',x-Math.sin(rot)*lane,y,z+Math.cos(rot)*lane,rot,1,col);
+      }
+    }
     if (RX && camera.dist < PROPS_DIST && quality !== 'low') RX.animate(t, {phase:visPhase, quality});   // V15: coaster trains, airside service traffic
     for (const cv of convoyList) inst('convoy', cv.x, 0, cv.z, cv.rot, 1, cv.color||[.95,.62,.18]);
     const bladeCol=[.97,.97,.96];
@@ -2119,7 +2173,7 @@
     // Simulation entities: support units, challenge assets, site beacons
     for (const e of entities) push(e.x,(e.y??G+.06)+(e.pulse?Math.sin(t*.006)*.01:0),e.z,e.color,e.size||10);
     // Flow dots along overlay layers (logistics, grid, dependencies)
-    for (const o of overlay) if (o.flow) { const P2=o._pts||[o.a,o.b], PL=o._L||pathLen(P2), L=PL[PL.length-1]; const n=o.n!=null?o.n:Math.max(1,Math.round(L*5)); const sp=(o.speed||1)*.00012, y=o.y??G+.03; for(let i=0;i<n;i++){ let q=((t*sp)/Math.max(.2,L)+i/n+(o.phase||0))%1; if(o.both&&i%2) q=1-q; const [x,z]=along(P2,PL,q); push(x,y,z,o.color,o.size||3.4); } }
+    for (const o of overlay) if (o.flow && !(o.vehicle && quality!=='low' && camera.dist<2.8)) { const P2=o._pts||[o.a,o.b], PL=o._L||pathLen(P2), L=PL[PL.length-1]; const n=o.n!=null?o.n:Math.max(1,Math.round(L*5)); const sp=(o.speed||1)*.00012, y=o.y??G+.03; for(let i=0;i<n;i++){ let q=((t*sp)/Math.max(.2,L)+i/n+(o.phase||0))%1; if(o.both&&i%2) q=1-q; const [x,z]=along(P2,PL,q); push(x,y,z,o.color,o.size||3.4); } }
     // City lights at night
     if (night>.28) { const k=Math.min(1,(night-.28)/.3); for (const c of cityLights) push(c[0],G+.012,c[1],[c[2],c[3],c[4]],c[5]*k); for (const c of missionLights) push(c[0],G+.02,c[1],[1,.86,.52],(c[2]||4)*k); }
     // Celebration bursts
@@ -2317,7 +2371,7 @@
     const sky=[(.60+storm*.18)*(1-night)+.07*night,(.82-storm*.26)*(1-night)+.10*night,(.94-storm*.44)*(1-night)+.22*night];
     const out = postOn ? post.begin(width,height) : null;   // V20: the premium tiers draw the frame into an HDR target
     // V21: on the Kingdom map, beyond the world's edge reads as open ocean (the haze keeps the sky colour)
-    const edge=countryOverview&&camera.dist>6?[.05*(1-night)+.03*night,.30*(1-night)+.07*night,.60*(1-night)+.18*night]:sky;
+    const edge=countryOverview&&camera.dist>6?[.035*(1-night)+.03*night,.17*(1-night)+.07*night,.27*(1-night)+.18*night]:sky;
     renderer.setRenderTarget(out); renderer.setClearColor(clearCol.setRGB(edge[0],edge[1],edge[2]), 1); renderer.clear();
     POINT_MAT.uniforms.uScale.value=dpr;
     buildDynLines(t); syncLines(dynLinesObj, dynLines);
@@ -2439,7 +2493,7 @@
   canvas.addEventListener('contextmenu', e=>e.preventDefault());
   let dragTool=null, hoverTool=null;
   canvas.addEventListener('pointerdown', e=>{
-    countryAutoFrame=false;
+    countryAutoFrame=false; arc.d0=0; camSpeed=1;
     pointers.set(e.pointerId,{x:e.clientX,y:e.clientY}); canvas.setPointerCapture(e.pointerId); moved=0;
     if (dragTool && e.button===0 && !e.shiftKey && pointers.size===1) { const g=pickGround(e.clientX,e.clientY); if (g && dragTool('down',g[0],g[1])!==false) { dragMode='tool'; return; } }
     if (pointers.size===2){const [a,b]=[...pointers.values()];pinchStart=Math.hypot(a.x-b.x,a.y-b.y);pinchDist=camera.desired.dist;dragMode='pinch';}
@@ -2466,9 +2520,9 @@
   };
   canvas.addEventListener('pointerup', endPointer); canvas.addEventListener('pointercancel', endPointer);
   canvas.addEventListener('pointerleave', ()=>{ if(!pointers.size){hoverId=null;canvas.style.cursor='';} });
-  canvas.addEventListener('wheel', e=>{e.preventDefault();countryAutoFrame=false;camera.desired.dist=Math.max(MIN_DIST,Math.min(Math.max(22,K.dist*regionFit(K)),camera.desired.dist*Math.exp(e.deltaY*.0012)));},{passive:false});
+  canvas.addEventListener('wheel', e=>{e.preventDefault();countryAutoFrame=false;arc.d0=0;camSpeed=1;camera.desired.dist=Math.max(MIN_DIST,Math.min(Math.max(22,K.dist*regionFit(K)),camera.desired.dist*Math.exp(e.deltaY*.0012)));},{passive:false});
   const keys=new Set();
-  addEventListener('keydown', e=>{ if(e.target.closest&&e.target.closest('input,textarea'))return; const k=e.key.toLowerCase(); if(['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright','q','e','=','+','-'].includes(k)){keys.add(k); if(k.startsWith('arrow'))e.preventDefault();} });
+  addEventListener('keydown', e=>{ if(e.target.closest&&e.target.closest('input,textarea,select,[contenteditable="true"]'))return; const k=e.key.toLowerCase(); if(['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright','q','e','=','+','-'].includes(k)){arc.d0=0;camSpeed=1;keys.add(k); if(k.startsWith('arrow'))e.preventDefault();} });
   addEventListener('keyup', e=>keys.delete(e.key.toLowerCase()));
   addEventListener('blur', ()=>keys.clear());
   function keyPan(dt){
@@ -2482,7 +2536,7 @@
   /* ------------------------------- API ------------------------------ */
   window.VisionWorld = {
     start(){countryAutoFrame=true;setDesired(K.az,K.el,K.dist*regionFit(K),K.x,regionZ(K)); },
-    focusProject(p){countryAutoFrame=false; selectedId=p.id; directMode=false; follow=null; setDesired(.3,.8,2.3,p.x,p.z,.02); },
+    focusProject(p){countryAutoFrame=false; selectedId=p.id; directMode=false; follow=null; setDesired(.3,.78,Math.max(.55,Math.min(1.6,(p.foot||.15)*7.5)),p.x,p.z,G+.025); },
     focusRegion(id){ const r=D.regions[id]||K; selectedId=null; directMode=false;countryAutoFrame=r===K;
       setDesired(r.az,r.el,r.dist*regionFit(r),r.x,regionZ(r)); },
     overview(){ selectedId=null; directMode=false; follow=null; stormTarget=0;countryAutoFrame=true; setDesired(K.az,K.el,K.dist*regionFit(K),K.x,regionZ(K)); },

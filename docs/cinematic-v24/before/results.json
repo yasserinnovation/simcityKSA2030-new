@@ -1,0 +1,65 @@
+{
+  "phase": "before",
+  "browser": "131.0.6778.204",
+  "viewport": [
+    1280,
+    800
+  ],
+  "gpu": "SwiftShader software renderer; not device GPU performance",
+  "errors": [],
+  "failed": [],
+  "city": {
+    "occupied": 38,
+    "stats": {
+      "fps": 2.069108214359614,
+      "ms": 483.2999999999993,
+      "quality": "high",
+      "renderer": "three",
+      "calls": 73,
+      "triangles": 2095519
+    },
+    "lighting": {
+      "night": 0,
+      "storm": 0,
+      "sun": [
+        -0.42346548685193386,
+        0.7699372488216979,
+        0.4773610942694527
+      ],
+      "renderer": "WebKit WebGL",
+      "vendor": "WebKit"
+    }
+  },
+  "performance": {
+    "high": {
+      "meanMs": 457.6333333333333,
+      "p95Ms": 574.5,
+      "fps": 2.2224691632403566,
+      "ms": 449.9500000000007,
+      "quality": "high",
+      "renderer": "three",
+      "calls": 73,
+      "triangles": 2095519
+    },
+    "medium": {
+      "meanMs": 315.1,
+      "p95Ms": 443.59999999962747,
+      "fps": 3.000300030002974,
+      "ms": 333.3000000000029,
+      "quality": "medium",
+      "renderer": "three",
+      "calls": 72,
+      "triangles": 2086323
+    },
+    "low": {
+      "meanMs": 247.83666666665425,
+      "p95Ms": 378.29999999981374,
+      "fps": 4.000533404453881,
+      "ms": 249.96666666666957,
+      "quality": "low",
+      "renderer": "three",
+      "calls": 48,
+      "triangles": 1839541
+    }
+  }
+}

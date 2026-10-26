@@ -120,8 +120,8 @@
     for (const [uS, v] of Object.entries(m.vc || {})) { const u = +uS, i = u % N, j = (u / N) | 0, c = center(u), h = grid.ts * .48;
       const horiz = isR(i - 1, j) || isR(i + 1, j), vert = isR(i, j - 1) || isR(i, j + 1);
       const segs = []; if (horiz || !vert) segs.push([[c[0] - h, c[1]], [c[0] + h, c[1]]]); if (vert) segs.push([[c[0], c[1] - h], [c[0], c[1] + h]]);
-      for (const [a, b] of segs) ov.push({a, b, color:v > 1 ? [1,.45,.3] : v > .7 ? [1,.85,.4] : [.98,.97,.92], flow:true, noLine:true, both:true, n:Math.min(5, Math.max(1, Math.round(v * 3 * rush))), speed:Math.max(.12, .9 - v * .4), size:2.6, y:W.ground + .016}); }
-    for (const r of S.routes) { for (let k = 1; k < r.path.length; k++) { const a = center(r.path[k - 1]), b = center(r.path[k]); if (k % 3 === 0) ov.push({a, b, color:[1,.8,.15], flow:true, noLine:true, n:1, speed:.5 + r.freq * .04, size:4.8, y:W.ground + .02}); }
+      for (const [a, b] of segs) ov.push({a, b, color:v > 1 ? [1,.45,.3] : v > .7 ? [1,.85,.4] : [.98,.97,.92], flow:true, vehicle:'car', noLine:true, both:true, n:Math.min(5, Math.max(1, Math.round(v * 3 * rush))), speed:Math.max(.12, .9 - v * .4), size:2.6, y:W.ground + .016}); }
+    for (const r of S.routes) { for (let k = 1; k < r.path.length; k++) { const a = center(r.path[k - 1]), b = center(r.path[k]); if (k % 3 === 0) ov.push({a, b, color:[1,.8,.15], flow:true, vehicle:'bus', noLine:true, n:1, speed:.5 + r.freq * .04, size:4.8, y:W.ground + .02}); }
       const perStop = (r.riders || 0) / Math.max(1, r.stops.length); for (const s of r.stops) { const c = center(s); for (let q = 0; q < Math.min(8, Math.round(perStop / 6)); q++) ents.push({x:c[0] + ((q % 3) - 1) * grid.ts * .15, z:c[1] + grid.ts * .35, y:W.ground + .016, color:[.95,.9,.8], size:2.4}); } }
     // Night lights follow the simulation: windows glow only in occupied buildings that have power, and street lamps only
     // on streets beside a powered parcel. An unpowered neighbourhood stays dark.
@@ -158,6 +158,7 @@
       <div class="ct-dem"><small>${esc(t('demand'))}</small>${bar('R')}${bar('C')}${bar('I')}</div>
       <div class="ct-stat"><small>${esc(t('weather'))}</small><b>${S.weather && S.weather.type === 'dust' ? '🌪' : (S.month % 12 >= 5 && S.month % 12 <= 7) ? '🔥' : '☀️'}</b></div>
       <div class="ct-btns"><button class="icon-btn" data-panel="missions" title="${esc(t('cityMissions'))}" aria-label="${esc(t('cityMissions'))}">🏅</button><button class="icon-btn" data-panel="goals" title="${esc(t('goals'))}" aria-label="${esc(t('goals'))}">📋</button><button class="icon-btn" data-panel="budget" title="${esc(t('budget'))}" aria-label="${esc(t('budget'))}">💰</button><button class="icon-btn" data-panel="overlays" title="${esc(t('overlays'))}" aria-label="${esc(t('overlays'))}">🗂️</button><button class="icon-btn" id="cLens" title="Competitiveness" aria-label="Competitiveness">📊</button><button class="icon-btn" id="cKingdom" title="${esc(t('toKingdom'))}" aria-label="${esc(t('toKingdom'))}">🌍</button><button class="icon-btn" id="cExit" title="${esc(t('backMenu'))}">✕</button></div><div class="nav-slot" id="cNavSlot"></div>`;
+    if(window.VisionIcon){$$('#cTop [data-panel]').forEach(b=>{b.innerHTML=VisionIcon(b.dataset.panel);});$('#cLens').innerHTML=VisionIcon('invest');$('#cKingdom').innerHTML=VisionIcon('home');}
     G.renderNav && G.renderNav();
     document.documentElement.style.setProperty('--ctop', ($('#cTop').offsetHeight || 60) + 'px');   // panels sit under the real (possibly wrapped) bar
     $$('#cTop [data-speed]').forEach(b => b.onclick = () => { ui.speed = +b.dataset.speed; renderHUD(); });
@@ -182,7 +183,7 @@
     $('#cTools').innerHTML = TOOLS.map((tl, i) => { const f = VC.FAC[tl.id], locked = tl.cap && !S.caps.includes(tl.cap), name = f ? t(f.name) : t('tool_' + tl.id);
       const cost = f ? `◆${f.cost}` : tl.cost ? `◆${tl.cost}/▢` : '', poor = !!(f && S.budget < f.cost);
       const sep = i && TOOLS[i - 1].grp !== tl.grp ? '<span class="ct-sep" aria-hidden="true"></span>' : '';
-      return `${sep}<button class="ctool ${ui.tool === tl.id ? 'on' : ''} ${locked ? 'locked' : ''} ${poor ? 'poor' : ''}" data-tool="${tl.id}" aria-pressed="${ui.tool === tl.id}" ${locked ? 'aria-disabled="true"' : ''} title="${esc(name + (cost ? ' · ' + cost : '') + (locked ? ' · 🔒 ' + t(VC.CAPS[tl.cap].how) : ''))}"><span class="ci">${locked ? '🔒' : f ? f.icon : tl.icon}</span><small>${esc(name)}</small><em dir="ltr">${cost || '&nbsp;'}</em></button>`; }).join('')
+      return `${sep}<button class="ctool ${ui.tool === tl.id ? 'on' : ''} ${locked ? 'locked' : ''} ${poor ? 'poor' : ''}" data-tool="${tl.id}" aria-pressed="${ui.tool === tl.id}" ${locked ? 'aria-disabled="true"' : ''} title="${esc(name + (cost ? ' · ' + cost : '') + (locked ? ' · 🔒 ' + t(VC.CAPS[tl.cap].how) : ''))}"><span class="ci">${window.VisionIcon?VisionIcon(locked?'lock':tl.id):(locked ? '🔒' : f ? f.icon : tl.icon)}</span><small>${esc(name)}</small><em dir="ltr">${cost || '&nbsp;'}</em></button>`; }).join('')
       + (['zoneR','zoneC','zoneI','zoneT','zoneM'].includes(ui.tool) ? `<div class="dens">${[1,2,3].map(d => `<button class="${ui.density === d ? 'on' : ''} ${(d === 2 && !S.caps.includes('medium')) || (d === 3 && !S.caps.includes('high')) ? 'locked' : ''}" data-dens="${d}">${esc(t('dens' + d))}</button>`).join('')}</div>` : '')
       + `<button class="ctool" id="cUndo" ${VC.canUndo() ? '' : 'disabled'}><span>↶</span><small>${esc(t('undo'))}</small></button>`;
     $$('#cTools [data-tool]').forEach(b => b.onclick = () => selectTool(b.dataset.tool));
@@ -407,8 +408,11 @@
     if (ui.newRoute) { const r = VC.state.routes.find(x => x.id === ui.newRoute); ui.newRoute = null; if (r && !pause) say(t('routeOpened', {id:r.id, r:r.riders || 0}), r.riders ? 'good' : 'info'); }   // the route's first simulated month
     if (VC.dateOf().year > 2030 && !ui.beyondShown) { ui.beyondShown = true; say(t('beyondEntered'), 'info'); }
   }
+  // A player input owns the camera immediately, including the timed district-entry flight.
+  for(const event of ['pointerdown','wheel'])$('#world').addEventListener(event,()=>{if(ui.active)ui.cutFlight=true;},{passive:true});
   addEventListener('keydown', e => {
     if (!ui.active || (e.target.closest && e.target.closest('input,select,textarea'))) return;
+    if(['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright','q','e','=','+','-'].includes(e.key.toLowerCase()))ui.cutFlight=true;
     if (e.key === 'Enter' && ui.pending && !$('#cConfirm').classList.contains('hidden') && ui.tool !== 'route') confirmPending();
     if (e.key === 'Escape') { if (ui.pending || ui.stops.length) { cancelPending(); ui.stops = []; $('#cConfirm').classList.add('hidden'); render(); } else selectTool('select'); }
     if (e.code === 'Space') { e.preventDefault(); ui.speed = ui.speed ? 0 : 1; renderHUD(); }

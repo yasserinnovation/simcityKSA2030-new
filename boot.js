@@ -13,17 +13,20 @@
   window.VN_DEBUG = q.get('debug') === '1';
   // Build stamp: every game script loads as name.js?v=BUILD, so a browser holding an older copy in its cache (the
   // Python server sends no cache headers) can't mix old scripts into a new page. Bump it with each build.
-  const BUILD = 'v23h';
+  const BUILD = 'v24-cinematic';
 
-  const BEFORE = ['data.js', 'regions.js', 'layout.js', 'models.js', 'rocks.js', 'dunes.js', 'visual-details.js', 'scenic-landmarks.js', 'world-cosmetics.js', 'kingdom-diorama.js', 'kingdom-landmarks.js', 'country-overview.js', 'west-clay.js', 'east-clay.js', 'neom-clay.js', 'riyadh.js', 'premium.js', 'assets.js'];
+  const BEFORE = ['data.js', 'regions.js', 'layout.js', 'models.js', 'rocks.js', 'dunes.js', 'visual-details.js', 'scenic-landmarks.js', 'world-cosmetics.js', 'kingdom-diorama.js', 'kingdom-landmarks.js', 'country-overview.js', 'west-clay.js', 'east-clay.js', 'neom-clay.js', 'riyadh.js', 'city-art.js', 'ui-icons.js', 'soundscape.js', 'premium.js', 'assets.js'];
   const AFTER = ['sim.js', 'saves.js', 'game.js', 'competitiveness.js', 'mission.js', 'i18n.js', 'play_core.js', 'play_mission.js', 'city.js', 'lens.js', 'city_ui.js', 'national_ar.js', 'help.js', 'tutorial.js'];
+  let loaded=0;
+  const status=document.getElementById('bootStatus'), progress=document.getElementById('bootProgress');
   const loadOne = src => new Promise((resolve, reject) => {
     const s = document.createElement('script'); s.src = src + '?v=' + BUILD; s.async = false;
-    s.onload = resolve; s.onerror = () => reject(new Error('Could not load ' + src));
+    s.onload = () => {loaded++;if(progress)progress.value=Math.round(loaded/(BEFORE.length+AFTER.length+1)*100);resolve();}; s.onerror = () => reject(new Error('Could not load ' + src));
     document.body.appendChild(s);
   });
   const loadAll = list => list.reduce((p, src) => p.then(() => loadOne(src)), Promise.resolve());
   const fail = e => {
+    status?.remove();
     const d = document.createElement('div');
     d.style.cssText = 'position:fixed;inset:auto 16px 16px 16px;z-index:99;padding:14px 16px;border-radius:12px;background:#FAF9F5;color:#153F36;font:14px/1.5 sans-serif;box-shadow:0 6px 20px rgba(0,0,0,.2)';
     d.textContent = 'Vision Nexus 2030 could not start the renderer (' + e.message + '). Open index.html?renderer=classic, or start the game with Launch_Prototype.bat / launch.sh.';
@@ -35,8 +38,11 @@
     .then(() => classic ? loadOne('engine_classic.js') : import('./vendor/three/three.module.js').then(T => { window.THREE = T; return loadOne('engine.js'); }))
     .then(() => loadAll(AFTER))
     .then(() => {
+      if(progress)progress.value=100; status?.remove();
       const b = document.querySelector('.build-badge');
       if (b) b.textContent += classic ? ' · classic renderer' + (fileMode ? ' (file:// — use the launcher for three.js)' : '') : ' · three.js renderer';
+      // The introduction must not finish before tutorial.js has installed its entry hook.
+      window.dispatchEvent(new Event('visionready'));
     })
     .catch(fail);
 })();
