@@ -15,7 +15,9 @@
     "test:cinematic": "node tests/cinematic.test.js && node tests/cinematic.smoke.js",
     "check:cinematic": "node tools/check-cinematic.js after",
     "check:reference": "node tools/check-reference.js after",
-    "test:reference": "node tests/reference.smoke.js"
+    "test:reference": "node tests/reference.smoke.js",
+    "test:sculpted": "node tests/sculpted.smoke.js",
+    "check:sculpted": "node tools/check-sculpted.js after"
   },
   "devDependencies": {
     "playwright-core": "1.64.1"

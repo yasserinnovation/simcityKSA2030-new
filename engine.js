@@ -249,7 +249,7 @@
       float exposure=.25+.75*smoothstep(-.2,.5,sin(vWorld.z*2.7+vWorld.x*1.5));
       c=mix(c,vec3(.97,.98,.96),clamp(foam,0.0,1.0)*mix(.58,.20*exposure,national));
       // V21 national palette (reference map): bright turquoise shallows, vivid cyan-blue mid water, saturated deep blue
-      vec3 calmReef=vec3(.49,.77,.72),calmShallow=vec3(.13,.55,.59),calmMid=vec3(.055,.30,.41),calmDeep=vec3(.035,.17,.27);
+      vec3 calmReef=vec3(.43,.88,.78),calmShallow=vec3(.06,.69,.72),calmMid=vec3(.025,.40,.57),calmDeep=vec3(.025,.23,.39);
       float sn=s*(.75+.5*(.5+.5*sin(vWorld.x*5.3+sin(vWorld.z*3.1)*2.0)*sin(vWorld.z*4.7+vWorld.x*1.3)));   // V22: broken, narrower shallows
       vec3 calm=mix(calmReef,calmShallow,smoothstep(0.0,.045,sn));calm=mix(calm,calmMid,smoothstep(.05,.15,sn));calm=mix(calm,calmDeep,smoothstep(.15,.5,sn));
       calm=mix(calm,vec3(.20,.60,.60),smoothstep(.35,.8,coral)*(1.0-smoothstep(.03,.11,sn))*smoothstep(.008,.025,sn)*.5);   // reef patches
@@ -1815,6 +1815,7 @@
   const RAW = (vs, fsrc, uniforms, o = {}) => new THREE.RawShaderMaterial(Object.assign({vertexShader:vs, fragmentShader:fsrc, uniforms, side:THREE.DoubleSide, blending:THREE.NoBlending, depthTest:true, depthWrite:true}, o));
   const depthU = {uLightVP:SU.uLightVP, uOffset:{value:[0,0,0]}};
   const DEPTH = [RAW(DEPTH_VS(0), DEPTH_FS, depthU), RAW(DEPTH_VS(1), DEPTH_FS, depthU)];
+  countryOverview?.setLighting(SU,DEPTH[0]);
   const pickU = o => ({uVP:SU.uVP, uOcc:{value:o}});
   const PICK = {ids:[RAW(PICK_VS(0), PICK_FS, pickU(0)), RAW(PICK_VS(1), PICK_FS, pickU(0))], occ:[RAW(PICK_VS(0), PICK_FS, pickU(1)), RAW(PICK_VS(1), PICK_FS, pickU(1))]};
   const OBJS = [];   // every drawable; userData: {L (layer), mats:{main, depth, pick}, inst}
@@ -2024,8 +2025,8 @@
       if(L && L.spatialReady){const useCells=camera.dist<SPATIAL_DIST;v=v && !!u.spatial===useCells;}
       o.frustumCulled=!!u.spatial && pass!=='depth';
       if (pass === 'depth') v = v && !!(L && L.cast); else if (pass === 'pick') v = v && !!(L && L.pick);
-      if (u.inst) v = v && o.count > 0; if(countryOverview&&camera.dist>6&&(u.kind==='tree'||u.kind==='ghaf'))v=false;   /* V21: the overview's palms and oases replace them */
-      if(countryOverview&&camera.dist>6&&[LAYERS.rock,LAYERS.rockLo,LAYERS.dune,LAYERS.duneLo,LAYERS.cloud].includes(u.L))v=false;
+      if (u.inst) v = v && o.count > 0; if(countryOverview?.isActive()&&(u.kind==='tree'||u.kind==='ghaf'||u.kind==='palm'))v=false;   /* V21: the overview's palms and oases replace them */
+      if(countryOverview?.isActive()&&[LAYERS.rock,LAYERS.rockLo,LAYERS.dune,LAYERS.duneLo,LAYERS.cloud].includes(u.L))v=false;
       if(v && u.spatial && pass==='depth')v=lightFrustum.intersectsObject(o);
       o.visible = v; if (v) o.material = u.mats[pass]; }
   }
@@ -2213,7 +2214,7 @@
   // V21: Kingdom-map badges (kingdom-landmarks.js), national overview only; a click opens the badge's regional view.
   for (const b of window.VisionKingdomBadges || []) { const c = b.city && (LY.cityDisplay[b.city] || (q => q && [q.x, q.z])(C(b.city))), p = b.project && P(b.project), at = c || (p && [p.x, p.z]); if (!at) continue;
     const L = makeLabel('', 'badge badge-' + b.style, at[0] + (b.dx || 0), G + .16, at[1] + (b.dz || 0), 26); L.base = null; L.badge = b; L.el.innerHTML = window.VisionKingdomIcon(b.icon, b.color) + '<span></span>';
-    if (b.region) L.el.dataset.region = b.region; else L.el.classList.add('static'); }
+    if(b.id==='alula'){L.el.dataset.scenic='alula';L.el.tabIndex=0;L.el.setAttribute('role','button');L.el.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();L.el.click();}});} else if (b.region) L.el.dataset.region = b.region; else L.el.classList.add('static'); }
   const clusterLabels = clusters.map(cl => { const L=makeLabel(cl.anchor+' · '+cl.ids.length+' projects', 'cluster', cl.x, G+.34, cl.z, 9.5); L.cluster=true; return L; });
   // Project name labels hold a full and a short variant (each translated once by the Arabic layer); the placer picks the
   // variant that fits, anchors the label just above the model's real top, and lets the player click it.
@@ -2305,7 +2306,7 @@
     }
   }
   // Clicking or hovering a project's label acts on that same project.
-  labelLayer.addEventListener('click', e => { const rg=e.target.closest('[data-region]'); if (rg) { hideChoices(); onRegion(rg.dataset.region); return; }
+  labelLayer.addEventListener('click', e => { if(e.target.closest('[data-scenic=alula]')){const q=LY.cityDisplay.AlUla;countryAutoFrame=false;follow=null;directMode=false;setDesired(.3,.78,1.7,q[0],q[1]+.08,G+.1);return;} const rg=e.target.closest('[data-region]'); if (rg) { hideChoices(); onRegion(rg.dataset.region); return; }
     const el=e.target.closest('[data-pid]'); if (!el || !selectable) return; hideChoices(); pickSelect(el.dataset.pid); });
   let lastPick=null;   // last map selection (tests)
   function portraitKingdomPadding(){return innerWidth/innerHeight<.8?1.3:1;}
@@ -2352,7 +2353,7 @@
     night=captureTime!==null?0:night+(nightTarget-night)*Math.min(1,dt*.0015);
     cosmetics?.update(t,camera.dist,night);
     kingdomDiorama?.update(t,camera.dist,night);
-    countryOverview?.update(t,camera.dist,night,quality);
+    countryOverview?.update(t,camera.dist,night,quality,camera.target);
     document.body.classList.toggle('country-overview',!!countryOverview&&camera.dist>6);
     SU.uStorm.value=storm; SU.uDist.value=camera.dist*EYE; SU.uTime.value=t*.001; SU.uTint.value=tint; SU.uNight.value=night; SU.uEye.value=eye; SU.uVP.value=vp;
     for (const L of Object.values(LAYERS)) L.own.uShadowOn.value = L.cast && shadowsOn() ? 1 : 0;
