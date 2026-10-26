@@ -40,7 +40,7 @@
   { const [x, z] = LY.R(.03, -.06); Object.assign(D.regions.riyadh, {x, z, az:0, el:1.02, dist:3.35, fitWidth:true}); }
   // Every regional plan is framed north-up the same way (regions.js cameras).
   for (const [k, v] of Object.entries(LY.REGION_VIEWS || {})) if (D.regions[k]) Object.assign(D.regions[k], {x:v.camera.x, z:v.camera.z, az:0, el:1.02, dist:v.camera.dist, fitWidth:true, phoneFit:v.camera.phoneFit || 1.5});
-  Object.assign(D.regions.kingdom,{el:.82,az:.02,dist:9.0,nationalFit:true}); D.regions.kingdom.x+=.1; D.regions.kingdom.z+=.15;   // V22: the reference's tilted diorama framing (V21: el 1.02, dist 11.2; V19: dist 14.4)
+  Object.assign(D.regions.kingdom,{el:.88,az:.02,dist:9.7,nationalFit:true}); D.regions.kingdom.x+=.1; D.regions.kingdom.z+=.15;   // V22: the reference's tilted diorama framing (V21: el 1.02, dist 11.2; V19: dist 14.4)
   const P = id => D.projects.find(p => p.id === id);
   const C = name => cityByName[name];
   const pt = w => typeof w === 'string' ? [C(w).x, C(w).z] : geo(w[0], w[1]);
@@ -249,9 +249,9 @@
       float exposure=.25+.75*smoothstep(-.2,.5,sin(vWorld.z*2.7+vWorld.x*1.5));
       c=mix(c,vec3(.97,.98,.96),clamp(foam,0.0,1.0)*mix(.58,.20*exposure,national));
       // V21 national palette (reference map): bright turquoise shallows, vivid cyan-blue mid water, saturated deep blue
-      vec3 calmReef=vec3(.43,.88,.78),calmShallow=vec3(.06,.69,.72),calmMid=vec3(.025,.40,.57),calmDeep=vec3(.025,.23,.39);
+      vec3 calmReef=vec3(.43,.88,.78),calmShallow=vec3(.06,.73,.77),calmMid=vec3(.025,.48,.65),calmDeep=vec3(.025,.30,.49);
       float sn=s*(.75+.5*(.5+.5*sin(vWorld.x*5.3+sin(vWorld.z*3.1)*2.0)*sin(vWorld.z*4.7+vWorld.x*1.3)));   // V22: broken, narrower shallows
-      vec3 calm=mix(calmReef,calmShallow,smoothstep(0.0,.045,sn));calm=mix(calm,calmMid,smoothstep(.05,.15,sn));calm=mix(calm,calmDeep,smoothstep(.15,.5,sn));
+      vec3 calm=mix(calmReef,calmShallow,smoothstep(0.0,.045,sn));calm=mix(calm,calmMid,smoothstep(.07,.23,sn));calm=mix(calm,calmDeep,smoothstep(.23,.7,sn));
       calm=mix(calm,vec3(.20,.60,.60),smoothstep(.35,.8,coral)*(1.0-smoothstep(.03,.11,sn))*smoothstep(.008,.025,sn)*.5);   // reef patches
       c=mix(c,calm*(.97+.05*w1*fade),national*.9); c=mix(c,vec3(.93,.99,.98),national*smoothstep(.022,.0,s)*.55);   // V21: soft white surf on every coast
       vec3 V=normalize(uEye-vWorld); vec3 H=normalize(uSun+V);
@@ -1515,7 +1515,13 @@
     }
     const idx=new Uint16Array((nx-1)*(nz-1)*6); let o=0;
     for (let j=0;j<nz-1;j++) for (let i=0;i<nx-1;i++){ const a=j*nx+i,b=a+1,c=a+nx,d=c+1; idx.set([a,c,b,b,c,d],o); o+=6; }
-    return {pos, shore, idx};
+    // Four coarse offshore quads continue the water beyond the detailed shore grid. This avoids
+    // rectangular ocean edges when the whole kingdom is framed on a tall phone screen.
+    const outerPos=[...pos],outerShore=[...shore],outerIdx=[...idx],M=80;
+    for(const q of [[[-M,-M],[M,-M],[M,z0],[-M,z0]],[[-M,z1],[M,z1],[M,M],[-M,M]],[[-M,z0],[x0,z0],[x0,z1],[-M,z1]],[[x1,z0],[M,z0],[M,z1],[x1,z1]]]){
+      const base=outerPos.length/3;for(const[x,z]of q){outerPos.push(x,SEA,z);outerShore.push(1);}for(const i of[0,3,1,1,3,2])outerIdx.push(base+i);
+    }
+    return {pos:new Float32Array(outerPos),shore:new Float32Array(outerShore),idx:new Uint16Array(outerIdx)};
   })();
 
   /* ------------------------------ vehicles --------------------------- */
@@ -2026,8 +2032,10 @@
       o.frustumCulled=!!u.spatial && pass!=='depth';
       if (pass === 'depth') v = v && !!(L && L.cast); else if (pass === 'pick') v = v && !!(L && L.pick);
       if (u.inst) v = v && o.count > 0; if(countryOverview?.isActive()&&(u.kind==='tree'||u.kind==='ghaf'||u.kind==='palm'))v=false;   /* V21: the overview's palms and oases replace them */
+      if(countryOverview?.isActive()&&pass!=='pick'&&[LAYERS.mesh,LAYERS.detail].includes(u.L))v=false; // National scenery replaces static legacy props; live stages, missions and picking stay intact.
       if(countryOverview?.isActive()&&[LAYERS.rock,LAYERS.rockLo,LAYERS.dune,LAYERS.duneLo,LAYERS.cloud].includes(u.L))v=false;
       if(v && u.spatial && pass==='depth')v=lightFrustum.intersectsObject(o);
+      if(o===linesObj&&countryOverview?.isActive())v=false;
       o.visible = v; if (v) o.material = u.mats[pass]; }
   }
 
@@ -2296,7 +2304,7 @@
       const free = r => !placed.some(q => hits(r, q)) && !obstacles.some(q => hits(r, q, 2, 2)) && !(L.pid && coversOther(r, L.pid)) && !(deco && coversOther(r, null));
       let r = at(L.small ? L.wF : L.w), short = false;
       if (!free(r) && L.small) { r = at(L.wS); short = true; }        // shorten before giving up
-      if (!free(r) && L.pid) { const b = r, H = L.h + 5, Wd = b.w / 2 + 12;   // then nudge it round its marker: above and beside first, below (over its own model) last
+      if (!free(r) && (L.pid || L.badge)) { const b = r, H = L.h + 5, Wd = b.w / 2 + 12;   // then nudge it round its marker: above and beside first, below (over its own model) last
         for (const [dx, dy] of [[0, -H], [-Wd, 0], [Wd, 0], [-Wd, -H], [Wd, -H], [0, -2 * H], [-2 * Wd, 0], [2 * Wd, 0], [-Wd, -2 * H], [Wd, -2 * H], [-Wd, H], [Wd, H], [0, H], [0, 2 * H]]) { const c = {...b, x:Math.max(6, Math.min(innerWidth - b.w - 6, b.x + dx)), y:b.y + dy}; if (free(c)) { r = c; break; } } }
       if (!free(r)) { hideLabel(L); continue; }
       if (L.small) L.el.classList.toggle('use-short', short);
@@ -2306,7 +2314,7 @@
     }
   }
   // Clicking or hovering a project's label acts on that same project.
-  labelLayer.addEventListener('click', e => { if(e.target.closest('[data-scenic=alula]')){const q=LY.cityDisplay.AlUla;countryAutoFrame=false;follow=null;directMode=false;setDesired(.3,.78,1.7,q[0],q[1]+.08,G+.1);return;} const rg=e.target.closest('[data-region]'); if (rg) { hideChoices(); onRegion(rg.dataset.region); return; }
+  labelLayer.addEventListener('click', e => { if(e.target.closest('[data-scenic=alula]')){focusAlUla();onSelect(P('alula'));return;} const rg=e.target.closest('[data-region]'); if (rg) { hideChoices(); onRegion(rg.dataset.region); return; }
     const el=e.target.closest('[data-pid]'); if (!el || !selectable) return; hideChoices(); pickSelect(el.dataset.pid); });
   let lastPick=null;   // last map selection (tests)
   function portraitKingdomPadding(){return innerWidth/innerHeight<.8?1.3:1;}
@@ -2535,10 +2543,12 @@
     if(keys.has('=')||keys.has('+'))camera.desired.dist=Math.max(MIN_DIST,camera.desired.dist*(1-dt*.0015)); if(keys.has('-'))camera.desired.dist=Math.min(Math.max(22,K.dist*regionFit(K)),camera.desired.dist*(1+dt*.0015));
   }
 
+  // Both the map badge and project navigator frame the same AlUla heritage composition.
+  function focusAlUla(){const q=LY.cityDisplay.AlUla;countryAutoFrame=false;follow=null;directMode=false;setDesired(.3,.78,1.7,q[0],q[1]+.08,G+.1);}
   /* ------------------------------- API ------------------------------ */
   window.VisionWorld = {
     start(){countryAutoFrame=true;setDesired(K.az,K.el,K.dist*regionFit(K),K.x,regionZ(K)); },
-    focusProject(p){countryAutoFrame=false; selectedId=p.id; directMode=false; follow=null; setDesired(.3,.78,Math.max(.55,Math.min(1.6,(p.foot||.15)*7.5)),p.x,p.z,G+.025); },
+    focusProject(p){countryAutoFrame=false; selectedId=p.id;if(p.id==='alula'){focusAlUla();return;} directMode=false; follow=null; setDesired(.3,.78,Math.max(.55,Math.min(1.6,(p.foot||.15)*7.5)),p.x,p.z,G+.025); },
     focusRegion(id){ const r=D.regions[id]||K; selectedId=null; directMode=false;countryAutoFrame=r===K;
       setDesired(r.az,r.el,r.dist*regionFit(r),r.x,regionZ(r)); },
     overview(){ selectedId=null; directMode=false; follow=null; stormTarget=0;countryAutoFrame=true; setDesired(K.az,K.el,K.dist*regionFit(K),K.x,regionZ(K)); },

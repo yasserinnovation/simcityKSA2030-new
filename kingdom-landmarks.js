@@ -31,8 +31,13 @@ window.VisionKingdomLandmarks = function(ctx){
 
   // ---- Riyadh: Kingdom Centre (twin-shaft "arch" crown), Al Faisaliah (tapered with a golden orb), glass skyline, Najdi quarter
   { const [x, z] = city('Riyadh'), kx = x + .02, kz = z - .02, H = .36; at(x, z);
-    for (const s of [-1, 1]) { stamp(S.cube, kx + s * .016, G + H * .42, kz, .022, H * .84, .034, 0x8ab6c9, .74); stamp(S.cube, kx + s * .011, G + H * .9, kz, .008, H * .2, .022, 0x9cc4d4, .8); }
-    stamp(S.cube, kx, G + H * .78, kz, .04, .007, .03, 0xc9dde4);                                  // sky bridge
+    // Kingdom Centre's continuous tapered body and curved open crown, extruded as a real concave mesh.
+    {const T=ctx.T,shape=new T.Shape(),outline=[[-.026,0],[.026,0],[.022,H*.65],[.027,H*.96],[.024,H],[.017,H*.98],[.013,H*.92],[.008,H*.88],[0,H*.865],[-.008,H*.88],[-.013,H*.92],[-.017,H*.98],[-.024,H],[-.027,H*.96],[-.022,H*.65]];
+     outline.forEach(([px,py],i)=>i?shape.lineTo(px,py):shape.moveTo(px,py));shape.closePath();const g=new T.ExtrudeGeometry(shape,{depth:.027,bevelEnabled:false,steps:1,curveSegments:12});g.translate(0,0,-.0135);stamp(g,kx,G,kz,1,1,1,0x84b3c9);g.dispose();
+     for(let k=1;k<18;k++)stamp(S.cube,kx,G+H*.043*k,kz+.0139,.043,.0007,.001,0xb8d7df);
+     for(const sd of[-1,1])stamp(S.cube,kx+sd*.022,G+H*.39,kz+.014,.0015,H*.78,.0015,0xdbeced);
+     stamp(S.cube,kx,G+H*.865,kz,.025,.005,.029,0xe1eded);
+    }
     stamp(S.cube, kx, G + .012, kz, .07, .024, .05, 0xdfe7e6);
     const fx = x - .09, fz = z + .03; stamp(S.cone, fx, G + .13, fz, .032, .26, .032, 0x8fb1c2, .78); stamp(S.orb, fx, G + .195, fz, .012, .012, .012, 0xe6b04a); stamp(S.cone, fx, G + .27, fz, .004, .04, .004, 0xdbe3e5);
     ring(x, z, .2, 26, (px, pz, i) => { if (Math.hypot(px - kx, pz - kz) < .045 || Math.hypot(px - fx, pz - fz) < .04) return; tower(px, pz, .016 + R() * .012, .06 + R() * .2 * (1 - Math.hypot(px - x, pz - z) / .3), pick(GLASS), R() < .3); });
@@ -143,14 +148,14 @@ window.VisionKingdomLandmarks = function(ctx){
   window.VisionKingdomIcon = (name, c) => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[name](c)}</svg>`;
   window.VisionKingdomBadges = [
     {id:'neom', en:'NEOM', ar:'نيوم', style:'blue', icon:'mountain', color:W, project:'neom', region:'northwest', dx:-.05, dz:-.12},
-    {id:'alula', en:'AlUla', ar:'العُلا', style:'brown', icon:'temple', color:Au, city:'AlUla', region:'northwest'},
+    {id:'alula', en:'AlUla', ar:'العُلا', style:'brown', icon:'temple', color:Au, city:'AlUla', region:'northwest', dx:.48, dz:.09},
     {id:'tabuk', en:'Tabuk', ar:'تبوك', style:'brown', icon:'monument', color:Au, city:'Tabuk', region:'northwest', dx:.75, dz:.3},
     {id:'sakakah', en:'Sakakah', ar:'سكاكا', style:'brown', icon:'oasis', color:Au, city:'Sakakah', region:null},
-    {id:'madinah', en:'Madinah', ar:'المدينة المنورة', style:'green', icon:'mosque', color:W, city:'Madinah', region:'west'},
+    {id:'madinah', en:'Madinah', ar:'المدينة المنورة', style:'green', icon:'mosque', color:W, city:'Madinah', region:'west', dx:.28, dz:.28},
     {id:'jeddah', en:'Jeddah', ar:'جدة', style:'blue', icon:'ship', color:W, city:'Jeddah', region:'west', dx:-.16, dz:-.04},
     {id:'makkah', en:'Makkah', ar:'مكة المكرمة', style:'black', icon:'kaaba', color:Au, city:'Makkah', region:'west', dx:.42, dz:.12},
-    {id:'riyadh', en:'Riyadh', ar:'الرياض', style:'brown', icon:'tower', color:Au, city:'Riyadh', region:'riyadh'},
-    {id:'dammam', en:'Dammam', ar:'الدمام', style:'blue', icon:'industry', color:W, city:'Dammam', region:'east'},
+    {id:'riyadh', en:'Riyadh', ar:'الرياض', style:'brown', icon:'tower', color:Au, city:'Riyadh', region:'riyadh', dx:.12, dz:.55},
+    {id:'dammam', en:'Dammam', ar:'الدمام', style:'blue', icon:'industry', color:W, city:'Dammam', region:'east', dx:.18, dz:.40},
     {id:'aseer', en:'Aseer', ar:'عسير', style:'green', icon:'mountain', color:W, city:'Abha', region:'south'},
     {id:'jazan', en:'Jazan', ar:'جازان', style:'green', icon:'palm', color:W, city:'Jazan', region:'south'}
   ];

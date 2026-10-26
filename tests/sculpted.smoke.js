@@ -15,7 +15,7 @@ const {chromium}=require('playwright-core');
   const info=await page.evaluate(()=>window.__visionCountryOverview);
   assert.ok(info.duneGroups>0&&info.buttresses>30&&info.terraces>0&&info.waterRoutes>0,JSON.stringify(info));
   console.log('PASS dunes, western rocks, terraces and navigable water routes are populated');
-  assert.equal(info.version,26);assert.ok(info.sculpted.facades===2&&info.sculpted.houses>=15&&info.sculpted.rocks>30);
+  assert.ok(info.version>=26);assert.ok(info.sculpted.facades===2&&info.sculpted.houses>=15&&info.sculpted.rocks>30);
   await page.locator('[data-scenic="alula"]').click();
   await page.waitForFunction(()=>VisionWorld.debug.state().dist<1.9,null,{polling:300});
   assert.ok(await page.evaluate(()=>Math.hypot(VisionWorld.debug.state().target[0]-VisionLayout.cityDisplay.AlUla[0],VisionWorld.debug.state().target[2]-VisionLayout.cityDisplay.AlUla[1])<.3));

@@ -1,0 +1,103 @@
+{
+  "build": "v27-atlas",
+  "baseline": "6d46b757b96f84f23c7da11bbd2230a38f65b4d9",
+  "environment": {
+    "browser": "Chrome headless shell 131.0.6778.204",
+    "rendering": "SwiftShader software rendering",
+    "desktopViewport": [
+      1280,
+      800
+    ],
+    "phoneViewport": [
+      390,
+      844
+    ],
+    "nativeWindowsTested": false,
+    "physicalDeviceFpsTested": false
+  },
+  "checks": [
+    {
+      "command": "npm test",
+      "status": "passed",
+      "assertions": 305,
+      "scope": "missions, construction, road access/collisions, resources, progression, regional layout and save compatibility"
+    },
+    {
+      "command": "npm run test:launcher",
+      "status": "passed",
+      "groups": 3,
+      "scope": "Node and Python startup, old/different-server refusal, same-copy reuse, asset serving, invalid URLs"
+    },
+    {
+      "command": "npm run test:render",
+      "status": "passed",
+      "checks": 8,
+      "scope": "both Three.js and classic, national and City Builder canvases, browser errors"
+    },
+    {
+      "command": "npm run test:cinematic",
+      "status": "passed",
+      "browserChecks": 8,
+      "scope": "geometry, live audio controls and persistence, camera, project picking, phone RTL settings"
+    },
+    {
+      "command": "node tests/browser/tutorial.pw.js",
+      "status": "44 passed; 1 menu-visibility failure before the CSS correction",
+      "passed": 44,
+      "failedBeforeFix": 1,
+      "failure": "Main menu offers the tutorial",
+      "resolution": "Restored the compact-menu tutorial link in styles.css; the exact visibility regression is verified by the final passing test:atlas run. The full tutorial script was not rerun after this isolated CSS fix."
+    },
+    {
+      "command": "node tests/browser/city-consequences.pw.js",
+      "status": "passed",
+      "checks": 12,
+      "scope": "real placement, utilities, school/park coverage, construction feedback, powered windows, bus routes"
+    },
+    {
+      "command": "npm run test:atlas",
+      "status": "passed",
+      "checks": 8,
+      "scope": "world population, both real AlUla entry points, save round-trip, all six regions, menus including restored Tutorial, Arabic phone controls, continuous pinch, missing assets/errors"
+    }
+  ],
+  "notes": [
+    "The first expanded-dune implementation exceeded the render smoke test startup timeout. Cached clearance sampling fixed the startup regression; the unchanged 30-second render smoke wait then passed.",
+    "An earlier long-test process ended without a final summary; its partial results were discarded and the tutorial checks were rerun.",
+    "New atlas meshes are original procedural scenery. Simulation data, IDs, storage keys and saved-world formats are unchanged.",
+    "Capture timings are short diagnostics of software rendering; they are not a device FPS guarantee."
+  ],
+  "finalCapture": {
+    "browser": "131.0.6778.204",
+    "viewport": [
+      1280,
+      800
+    ],
+    "gpu": "SwiftShader software renderer; not device GPU performance",
+    "readyMs": 10783,
+    "errors": [],
+    "failed": [],
+    "performance": {
+      "high": {
+        "meanMs": 442.1666666666667,
+        "p95Ms": 861.4000000003725,
+        "fps": 1.4285714285714286,
+        "ms": 700,
+        "quality": "high",
+        "renderer": "three",
+        "calls": 107,
+        "triangles": 537272
+      },
+      "low": {
+        "meanMs": 197.90555555559695,
+        "p95Ms": 837.7000000011176,
+        "fps": 9.729203826820218,
+        "ms": 102.78333333333285,
+        "quality": "low",
+        "renderer": "three",
+        "calls": 107,
+        "triangles": 381900
+      }
+    }
+  }
+}
